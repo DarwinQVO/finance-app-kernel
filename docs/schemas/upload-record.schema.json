@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://finance-kernel.io/schemas/upload-record.schema.json",
+  "title": "UploadRecord",
+  "description": "State machine orchestrator for upload pipeline. Tracks file from upload through parse/normalize stages.",
+  "type": "object",
+  "properties": {
+    "upload_id": {
+      "type": "string",
+      "pattern": "^UL_[a-zA-Z0-9]+$",
+      "description": "Canonical public identifier for this upload"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued_for_parse",
+        "parsing",
+        "parsed",
+        "normalizing",
+        "normalized",
+        "error"
+      ],
+      "description": "Current state in the pipeline. Only Coordinator can update this field."
+    },
+    "error_message": {
+      "type": ["string", "null"],
+      "description": "Human-readable error message if status=error, otherwise null"
+    },
+    "upload_log_ref": {
+      "type": "string",
+      "pattern": "^/logs/uploads/UL_[a-zA-Z0-9]+\\.log$",
+      "description": "Path to upload log file"
+    },
+    "parse_log_ref": {
+      "type": "string",
+      "pattern": "^/logs/parse/UL_[a-zA-Z0-9]+\\.log\\.json$",
+      "description": "Path to parse log file. Present only if status ∈ {parsing, parsed, normalizing, normalized, error}"
+    },
+    "observations_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of ObservationTransactions extracted. Present only if status ∈ {parsed, normalizing, normalized, error}"
+    },
+    "normalizer_log_ref": {
+      "type": "string",
+      "pattern": "^/logs/normalize/UL_[a-zA-Z0-9]+\\.log\\.json$",
+      "description": "Path to normalizer log file. Present only if status ∈ {normalizing, normalized, error}"
+    },
+    "canonicals_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of CanonicalTransactions created. Present only if status = normalized"
+    }
+  },
+  "required": ["upload_id", "status", "upload_log_ref"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "upload_id": "UL_abc123",
+      "status": "queued_for_parse",
+      "error_message": null,
+      "upload_log_ref": "/logs/uploads/UL_abc123.log"
+    },
+    {
+      "upload_id": "UL_xyz789",
+      "status": "normalized",
+      "error_message": null,
+      "upload_log_ref": "/logs/uploads/UL_xyz789.log",
+      "parse_log_ref": "/logs/parse/UL_xyz789.log.json",
+      "observations_count": 42,
+      "normalizer_log_ref": "/logs/normalize/UL_xyz789.log.json",
+      "canonicals_count": 42
+    },
+    {
+      "upload_id": "UL_err001",
+      "status": "error",
+      "error_message": "PDF_CORRUPT: Unable to extract text from pages 3-5",
+      "upload_log_ref": "/logs/uploads/UL_err001.log",
+      "parse_log_ref": "/logs/parse/UL_err001.log.json"
+    }
+  ]
+}

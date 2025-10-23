@@ -1,0 +1,15 @@
+# Exclude everything by default
+/*
+
+# But include docs/ directory
+!/docs/
+
+# Include .gitignore itself
+!.gitignore
+
+# Exclude macOS metadata
+.DS_Store
+
+# Exclude IDE files
+.vscode/
+.idea/

@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://finance-kernel.io/schemas/upload-error-response.schema.json",
+  "title": "UploadErrorResponse",
+  "description": "Standardized error response for upload endpoint failures",
+  "type": "object",
+  "properties": {
+    "error": {
+      "type": "string",
+      "enum": [
+        "missing_params",
+        "duplicate",
+        "file_too_large",
+        "unsupported_media_type",
+        "invalid_source_type"
+      ],
+      "description": "Machine-readable error code"
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable error description (optional, for debugging)"
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of missing/invalid fields (only for missing_params error)"
+    },
+    "upload_id": {
+      "type": "string",
+      "pattern": "^UL_[a-zA-Z0-9]+$",
+      "description": "Existing upload_id (only for duplicate error)"
+    },
+    "file_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "Hash of duplicate file (only for duplicate error)"
+    },
+    "upload_log_ref": {
+      "type": "string",
+      "pattern": "^/logs/uploads/UL_[a-zA-Z0-9]+\\.log$",
+      "description": "Log reference (only for duplicate error)"
+    },
+    "max_size_mb": {
+      "type": "integer",
+      "description": "Maximum allowed file size in MB (only for file_too_large error)"
+    },
+    "expected": {
+      "type": "string",
+      "description": "Expected MIME type (only for unsupported_media_type error)"
+    },
+    "allowed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of allowed source types (only for invalid_source_type error)"
+    }
+  },
+  "required": ["error"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "error": "missing_params",
+      "fields": ["source_type"]
+    },
+    {
+      "error": "duplicate",
+      "upload_id": "UL_abc123",
+      "file_hash": "sha256:a3c5f1e7b9d2c8e4f6a1b3c5d7e9f1a3c5e7b9d2c8e4f6a1b3c5d7e9f1a3c5e7",
+      "upload_log_ref": "/logs/uploads/UL_abc123.log"
+    },
+    {
+      "error": "file_too_large",
+      "max_size_mb": 50
+    },
+    {
+      "error": "unsupported_media_type",
+      "expected": "application/pdf"
+    },
+    {
+      "error": "invalid_source_type",
+      "allowed": ["bofa_pdf"]
+    }
+  ]
+}

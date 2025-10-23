@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://finance-kernel.io/schemas/provenance-entry.schema.json",
+  "title": "ProvenanceEntry",
+  "description": "Append-only audit trail entry for upload events. Every upload creates at least one entry in ProvenanceLedger.",
+  "type": "object",
+  "properties": {
+    "upload_id": {
+      "type": "string",
+      "pattern": "^UL_[a-zA-Z0-9]+$",
+      "description": "Canonical public identifier for the upload this entry refers to"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["bofa_pdf"],
+      "description": "Type of document uploaded. v1 supports only bofa_pdf. Extensible via ParserRegistry."
+    },
+    "file_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Original filename provided by user (may contain PII, handle accordingly)"
+    },
+    "file_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "SHA-256 hash of file content. Used for deduplication."
+    },
+    "uploaded_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp (UTC) when upload was initiated"
+    },
+    "uploader_id": {
+      "type": "string",
+      "description": "ID of user who uploaded the file. Placeholder in v1 (auth deferred to v2)."
+    },
+    "extension": {
+      "type": "string",
+      "enum": ["pdf"],
+      "description": "File extension. v1 only supports PDF."
+    },
+    "result": {
+      "type": "string",
+      "enum": ["ok", "error"],
+      "description": "Outcome of upload operation. 'ok' = successfully queued, 'error' = upload failed validation"
+    },
+    "error_code": {
+      "type": "string",
+      "enum": [
+        "missing_params",
+        "file_too_large",
+        "unsupported_media_type",
+        "invalid_source_type",
+        "duplicate"
+      ],
+      "description": "Error code if result=error. Omit if result=ok."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Extensible metadata object for domain-specific fields",
+      "properties": {
+        "file_size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "user_agent": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "upload_id",
+    "source_type",
+    "file_hash",
+    "uploaded_at",
+    "result"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "upload_id": "UL_abc123",
+      "source_type": "bofa_pdf",
+      "file_name": "statement_jan_2024.pdf",
+      "file_hash": "sha256:a3c5f1e7b9d2c8e4f6a1b3c5d7e9f1a3c5e7b9d2c8e4f6a1b3c5d7e9f1a3c5e7",
+      "uploaded_at": "2025-10-22T14:32:01Z",
+      "uploader_id": "user_001",
+      "extension": "pdf",
+      "result": "ok",
+      "metadata": {
+        "file_size_bytes": 2457600,
+        "mime_type": "application/pdf"
+      }
+    },
+    {
+      "upload_id": "UL_err001",
+      "source_type": "bofa_pdf",
+      "file_name": "large_file.pdf",
+      "file_hash": "sha256:b4d6g2f8c0e3d9f5g7b2d4f6h8j0l2n4p6r8t0v2x4z6a8c0e2g4i6k8m0o2q4s6",
+      "uploaded_at": "2025-10-22T15:45:30Z",
+      "uploader_id": "user_002",
+      "extension": "pdf",
+      "result": "error",
+      "error_code": "file_too_large",
+      "metadata": {
+        "file_size_bytes": 55000000,
+        "mime_type": "application/pdf"
+      }
+    }
+  ]
+}
