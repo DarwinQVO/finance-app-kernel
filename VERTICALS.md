@@ -366,13 +366,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 3 | 1.1, 1.2, 1.3 |
-| 📝 Pending | 20 | 2.1-2.3, 3.1-3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 4 | 1.1, 1.2, 1.3, 2.1 |
+| 📝 Pending | 19 | 2.2-2.3, 3.1-3.9, 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 13% (3/23)
+**Completion:** 17% (4/23)
 
-**Next up:** 2.1 Transaction List View
+**Next up:** 2.2 OL Exploration
 
 ---
 
