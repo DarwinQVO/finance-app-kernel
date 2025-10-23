@@ -6,12 +6,17 @@
 
 ## 📋 Vertical Specifications
 
-### Group 1: Upload & Ingestion
+> **📖 [CANONICAL VERTICAL LIST](../VERTICALS.md)** — Single source of truth for all 23 verticals
+
+### Group 1: Upload & Ingestion (Complete ✅)
 - **[1.1 Upload Flow](verticals/1.1-upload-flow.md)** - File upload with deduplication and state machine
 - **[1.2 Extraction](verticals/1.2-extraction.md)** - Parser execution, raw observation extraction (AS-IS)
 - **[1.3 Normalization](verticals/1.3-normalization.md)** - Raw → canonical transformation, validation, categorization
 
-*Pending: 1.4 Transfer Linking*
+### Group 2: Exploration & Visualization (Pending 📝)
+- **2.1 Transaction List View** — Next up (pagination & indexing)
+- **2.2 OL Exploration** — Drill-down, decisions, provenance
+- **2.3 Finance Dashboard** — Saved views, exports, snapshots
 
 ---
 

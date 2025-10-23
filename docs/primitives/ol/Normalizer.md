@@ -90,7 +90,7 @@ canonical = normalizer.normalize(observation, rules)
 ❌ **DOES NOT:**
 - Modify raw observations (they remain immutable)
 - Update UploadRecord.status (Coordinator only)
-- Make multi-transaction decisions (transfers → vertical 1.4)
+- Make multi-transaction decisions (transfers → vertical 3.5 or 3.9)
 
 ---
 
