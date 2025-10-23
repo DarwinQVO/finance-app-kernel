@@ -202,12 +202,39 @@ class MultiHashCalculator(HashCalculator):
 
 ---
 
-## Reusability
+## Multi-Domain Applicability
 
-- **Finance**: Dedupe uploaded statements
-- **Health**: Dedupe lab results, medical images
-- **Legal**: Verify document integrity (chain of custody)
-- **Generic**: Any file deduplication system
+This primitive constructs verifiable truth about **content identity through cryptographic hashing** - a universal concept across ALL domains:
+
+**Finance Domain:**
+- Dedupe uploaded statements
+- Verify transaction document integrity
+
+**Healthcare Domain:**
+- Dedupe lab results, medical images
+- Verify patient record integrity (HIPAA)
+
+**Legal Domain:**
+- Verify document integrity (chain of custody)
+- Detect tampering in evidence files
+
+**Research/Academic Domain:**
+- Verify dataset integrity
+- Detect duplicate research submissions
+- Ensure reproducibility (same input hash → same results)
+
+**Software Development:**
+- Verify build artifacts
+- Detect code changes (Git uses SHA-1 hashing)
+
+**Digital Forensics:**
+- Evidence integrity verification
+- Timeline reconstruction
+
+**Generic Systems:**
+- Any file deduplication system
+- Any system requiring tamper detection
+- Any system needing content-addressable storage
 
 ---
 

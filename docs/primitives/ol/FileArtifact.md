@@ -189,12 +189,33 @@ class PDFFileArtifact(FileArtifact):
 
 ---
 
-## Reusability
+## Multi-Domain Applicability
 
-- **Finance**: BoFA PDFs, receipts, invoices
-- **Health**: Lab results, medical images, prescriptions
-- **Legal**: Contracts, court documents, evidence
-- **Generic**: Any file upload system
+This primitive constructs verifiable truth about **uploaded content metadata** - a universal concept across ALL domains:
+
+**Finance Domain:**
+- BoFA PDFs, receipts, invoices
+- Payment confirmations, tax documents
+
+**Healthcare Domain:**
+- Lab results, medical images (DICOM), prescriptions
+- Patient records, insurance claims
+
+**Legal Domain:**
+- Contracts, court documents, evidence files
+- Signed agreements, discovery materials
+
+**Research/Academic Domain:**
+- Research papers, datasets, supplementary materials
+- Grant applications, ethics approvals
+
+**Media/Publishing Domain:**
+- Articles, images, videos for publication
+- Source files, final outputs
+
+**Generic Systems:**
+- Any file upload system requiring metadata tracking
+- Any system needing reference counting for garbage collection
 
 ---
 

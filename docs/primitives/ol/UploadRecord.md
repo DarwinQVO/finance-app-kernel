@@ -1,7 +1,7 @@
 # OL Primitive: UploadRecord
 
 **Type**: State Machine / Orchestrator
-**Domain**: Domain-specific (adaptable pattern)
+**Domain**: Universal pattern (multi-stage async pipelines)
 **Version**: 1.0
 **Status**: Specification
 
@@ -9,7 +9,13 @@
 
 ## Purpose
 
-State machine orchestrator for async multi-stage pipelines. Tracks an upload from creation through processing stages. Single source of truth for current status.
+Universal state machine pattern for async multi-stage pipelines. Tracks an entity from creation through processing stages. Single source of truth for current status.
+
+**This pattern applies to ANY domain requiring:**
+- Multi-stage async processing (upload → parse → normalize)
+- Progressive disclosure of results (show what's available at each stage)
+- Clear status tracking (queued → processing → complete)
+- Separation of data writing (runners) from orchestration (coordinator)
 
 ---
 
@@ -265,31 +271,68 @@ LIMIT 10;
 
 ---
 
-## Pattern Generalization
+## Multi-Domain Applicability
 
-**This pattern applies to any multi-stage async pipeline:**
+This primitive constructs verifiable truth about **processing lifecycle state** - a universal pattern for ANY multi-stage async pipeline:
 
-### Image Processing Pipeline
+**Finance Domain:**
+```typescript
+interface TransactionUploadRecord {
+  upload_id: string
+  status: "queued_for_parse" | "parsing" | "parsed" | "normalizing" | "normalized" | "error"
+  parse_log_ref?: string
+  observations_count?: number
+}
+```
 
+**Healthcare Domain:**
+```typescript
+interface LabResultUploadRecord {
+  upload_id: string
+  status: "uploaded" | "validating" | "validated" | "analyzing" | "analyzed" | "approved" | "error"
+  validation_log_ref?: string
+  test_results_count?: number
+  approval_timestamp?: ISO8601
+}
+```
+
+**Image Processing:**
 ```typescript
 interface ImageUploadRecord {
   upload_id: string
   status: "queued" | "resizing" | "resized" | "thumbnailing" | "complete" | "error"
-  image_log_ref: string
   resize_log_ref?: string
   thumbnail_ref?: string
 }
 ```
 
-### Document OCR Pipeline
-
+**Document OCR:**
 ```typescript
 interface DocumentUploadRecord {
   upload_id: string
   status: "queued" | "ocr_pending" | "ocr_complete" | "indexing" | "indexed" | "error"
   ocr_log_ref?: string
   page_count?: number
-  indexed_at?: ISO8601
+}
+```
+
+**Manufacturing Quality Control:**
+```typescript
+interface InspectionRecord {
+  inspection_id: string
+  status: "pending" | "scanning" | "scanned" | "analyzing" | "passed" | "failed" | "error"
+  scan_log_ref?: string
+  defects_count?: number
+}
+```
+
+**Research Data Pipeline:**
+```typescript
+interface ExperimentRecord {
+  experiment_id: string
+  status: "submitted" | "validating" | "validated" | "processing" | "analyzed" | "published" | "error"
+  validation_log_ref?: string
+  data_points_count?: number
 }
 ```
 

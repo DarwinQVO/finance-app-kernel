@@ -250,23 +250,34 @@ class S3StorageEngine(StorageEngine):
 
 ---
 
-## Reusability Across Domains
+## Multi-Domain Applicability
 
-### Finance
-- Store: BoFA PDFs, receipts, invoices
-- Dedupe: Same statement uploaded multiple times
+This primitive constructs verifiable truth about **content identity and integrity** - a universal concept across ALL domains:
 
-### Health
-- Store: Lab results, medical images, prescriptions
-- Dedupe: Same test result from different sources
+**Finance Domain:**
+- Store BoFA PDFs, receipts, invoices
+- Dedupe same statement uploaded multiple times
 
-### Legal
-- Store: Contracts, court documents, evidence files
-- Dedupe: Same contract with multiple signatories
+**Healthcare Domain:**
+- Store lab results, medical images, prescriptions
+- Dedupe same test result from different sources
 
-### Generic File Processing
-- Store: User uploads, generated reports, backups
-- Dedupe: Attachments, media libraries
+**Legal Domain:**
+- Store contracts, court documents, evidence files
+- Dedupe same contract with multiple signatories
+- Chain of custody verification
+
+**Research/Academic Domain:**
+- Store datasets, papers, experimental results
+- Dedupe identical data submissions
+
+**Media/Content Domain:**
+- Store photos, videos, audio files
+- Dedupe user-generated content
+
+**Generic Systems:**
+- Any system requiring file storage with integrity guarantees
+- Any system needing deduplication by content hash
 
 ---
 

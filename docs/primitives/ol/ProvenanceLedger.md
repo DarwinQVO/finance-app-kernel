@@ -411,27 +411,47 @@ def verify_signature(self, entry: ProvenanceEntry, public_key: Key) -> bool:
 
 ---
 
-## Reusability Across Domains
+## Multi-Domain Applicability
 
-### Finance
+This primitive constructs verifiable truth about **event history and causality** - a universal concept across ALL domains:
+
+**Finance Domain:**
 - Track transaction corrections, categorization changes
 - Audit who flagged transactions for review
 - Prove compliance (GDPR: "show me all changes to my data")
 
-### Health
+**Healthcare Domain:**
 - Medical record updates (HIPAA compliance)
 - Lab result corrections (who, when, why)
 - Prescription history (dosage changes)
+- Patient consent audit trail
 
-### Legal
+**Legal Domain:**
 - Document chain of custody
 - Contract version history
 - Evidence handling audit trail
+- Discovery process tracking
 
-### Generic Data Processing
+**Research/Academic Domain:**
+- Experimental procedure lineage
+- Data transformation audit trail
+- Peer review history
+
+**Manufacturing Domain:**
+- Product component traceability
+- Quality control decision history
+- Recall investigation trails
+
+**Supply Chain Domain:**
+- Package movement history
+- Temperature/condition monitoring
+- Custody transfers
+
+**Generic Systems:**
 - ETL pipeline lineage
 - ML model training provenance (data → features → model)
 - Report generation audit (who ran report, with what filters)
+- Any system requiring "who did what, when, and why"
 
 ---
 

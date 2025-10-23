@@ -1,6 +1,6 @@
-# Finance App Kernel - Specification Documentation
+# Truth Construction Primitives - Finance Instantiation
 
-> **Literate Programming approach:** Each vertical specification mixes prose (WHY), architecture (HOW), and executable contracts (WHAT) in a single source of truth.
+> **Literate Programming approach:** Multi-domain truth construction primitives demonstrated through finance domain. Each vertical specification mixes prose (WHY), architecture (HOW), and executable contracts (WHAT) in a single source of truth.
 
 ---
 
@@ -16,7 +16,9 @@
 ## 🧩 Primitives Catalog
 
 ### Objective Layer (OL)
-Domain-isomorphic primitives that construct financial truth:
+**Multi-domain truth construction primitives** (finance instantiation)
+
+These primitives are domain-agnostic - they construct verifiable truth across ANY domain (finance, medicine, legal, etc.). This repository demonstrates their instantiation in the finance domain.
 
 - **[StorageEngine](primitives/ol/StorageEngine.md)** - Content-addressable storage with deduplication
 - **[ProvenanceLedger](primitives/ol/ProvenanceLedger.md)** - Append-only audit trail with cryptographic integrity
