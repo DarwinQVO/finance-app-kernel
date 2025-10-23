@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://finance-kernel.io/schemas/upload-error-response.schema.json",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/upload-error-response.schema.json",
   "title": "UploadErrorResponse",
   "description": "Standardized error response for upload endpoint failures",
   "type": "object",

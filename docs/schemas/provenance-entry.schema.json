@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://finance-kernel.io/schemas/provenance-entry.schema.json",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/provenance-entry.schema.json",
   "title": "ProvenanceEntry",
   "description": "Append-only audit trail entry for upload events. Every upload creates at least one entry in ProvenanceLedger.",
   "type": "object",

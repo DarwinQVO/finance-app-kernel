@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://finance-kernel.io/schemas/upload-record.schema.json",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/upload-record.schema.json",
   "title": "UploadRecord",
   "description": "State machine orchestrator for upload pipeline. Tracks file from upload through parse/normalize stages.",
   "type": "object",
