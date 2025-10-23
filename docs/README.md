@@ -9,8 +9,9 @@
 ### Group 1: Upload & Ingestion
 - **[1.1 Upload Flow](verticals/1.1-upload-flow.md)** - File upload with deduplication and state machine
 - **[1.2 Extraction](verticals/1.2-extraction.md)** - Parser execution, raw observation extraction (AS-IS)
+- **[1.3 Normalization](verticals/1.3-normalization.md)** - Raw → canonical transformation, validation, categorization
 
-*Pending: 1.3 Normalization*
+*Pending: 1.4 Transfer Linking*
 
 ---
 
@@ -48,6 +49,10 @@ Executable contracts extracted from vertical specifications:
 - **[observation-transaction.schema.json](schemas/observation-transaction.schema.json)** - Raw extracted observations (AS-IS from parser)
 - **[parse-log.schema.json](schemas/parse-log.schema.json)** - Parser execution log
 
+**Vertical 1.3 (Normalization):**
+- **[canonical-transaction.schema.json](schemas/canonical-transaction.schema.json)** - Validated and normalized canonical transactions
+- **[normalization-log.schema.json](schemas/normalization-log.schema.json)** - Normalization execution log with validation results
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -58,6 +63,7 @@ Key architectural decisions with rationale:
 - **[ADR-0002: State Machine Global](adr/0002-state-machine-global.md)** - Why single `status` field
 - **[ADR-0003: Runner/Coordinator Split](adr/0003-runner-coordinator-split.md)** - Separation of concerns
 - **[ADR-0004: Raw-First Extraction](adr/0004-raw-first-extraction.md)** - Store AS-IS, validate later
+- **[ADR-0005: Configurable Normalization Rules](adr/0005-configurable-normalization-rules.md)** - Externalized, versioned rule sets
 
 ---
 
@@ -67,6 +73,7 @@ User experience specifications with wireframes and journeys:
 
 - **[1.1 Upload Experience](ux-flows/1.1-upload-experience.md)** - File upload UX, drag & drop, validation feedback
 - **[1.2 Extraction Experience](ux-flows/1.2-extraction-experience.md)** - Parsing status, error handling, retry flows
+- **[1.3 Normalization Experience](ux-flows/1.3-normalization-experience.md)** - Validation results, error review, duplicate resolution, categorization
 
 ---
 
@@ -76,7 +83,7 @@ User experience specifications with wireframes and journeys:
 |-------|----------|--------|
 | **1. Upload & Ingestion** | 1.1 Upload Flow | ✅ Complete |
 | | 1.2 Extraction | ✅ Complete |
-| | 1.3 Normalization | 📝 Pending |
+| | 1.3 Normalization | ✅ Complete |
 | **2. Exploration & Viz** | 2.1-2.3 | 📝 Pending |
 | **3. Registries** | 3.1-3.9 | 📝 Pending |
 | **4. Derivatives** | 4.1-4.3 | 📝 Pending |

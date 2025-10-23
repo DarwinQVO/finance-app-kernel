@@ -1,0 +1,215 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/canonical-transaction.schema.json",
+  "title": "CanonicalTransaction",
+  "description": "Validated and normalized transaction data. This is a universal pattern for any normalization pipeline that transforms raw observations into validated canonical records.",
+  "type": "object",
+  "required": [
+    "canonical_id",
+    "upload_id",
+    "observation_id",
+    "date",
+    "amount",
+    "currency",
+    "description",
+    "account",
+    "confidence_score",
+    "applied_rules",
+    "normalized_at",
+    "normalizer_version"
+  ],
+  "properties": {
+    "canonical_id": {
+      "type": "string",
+      "pattern": "^CT_[a-zA-Z0-9]+$",
+      "description": "Globally unique canonical transaction ID. Generated deterministically from upload_id + row_id + normalizer_version."
+    },
+    "upload_id": {
+      "type": "string",
+      "pattern": "^UL_[a-zA-Z0-9]+$",
+      "description": "Reference to source UploadRecord (for traceability)"
+    },
+    "observation_id": {
+      "type": "string",
+      "pattern": "^UL_[a-zA-Z0-9]+:[0-9]+$",
+      "description": "Reference to source ObservationTransaction (upload_id:row_id). Enables linking canonical back to raw data."
+    },
+    "date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Normalized transaction date in ISO 8601 format (UTC). Example: '2025-01-15T00:00:00Z'"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Normalized amount as signed decimal. Negative = debit/expense, Positive = credit/income. Example: -5.75"
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "Validated ISO 4217 currency code. Examples: 'USD', 'MXN', 'EUR'"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Cleaned and normalized description. Whitespace trimmed, consistent formatting."
+    },
+    "merchant": {
+      "type": "string",
+      "description": "Extracted canonical merchant name. Examples: 'Starbucks', 'Amazon', 'Shell'. May be null if merchant extraction not applicable."
+    },
+    "category": {
+      "type": "string",
+      "description": "Inferred transaction category. Examples: 'Food & Drink', 'Shopping', 'Transportation', 'Uncategorized'. Configurable taxonomy."
+    },
+    "account": {
+      "type": "string",
+      "description": "Account identifier from source. Examples: 'bofa_debit', 'chase_credit', 'scotia_debit'"
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Confidence score for normalization quality (0.0 = low, 1.0 = high). Based on validation success and rule applicability."
+    },
+    "applied_rules": {
+      "type": "array",
+      "description": "List of normalization rules applied to this transaction. Examples: ['date_locale_us', 'merchant_extract', 'category_infer']",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "flags": {
+      "type": "array",
+      "description": "Warning flags for manual review. Examples: 'possible_duplicate', 'large_amount', 'future_date', 'ambiguous_date'",
+      "items": {
+        "type": "string",
+        "enum": [
+          "possible_duplicate",
+          "large_amount",
+          "future_date",
+          "ambiguous_date",
+          "low_confidence",
+          "unknown_merchant",
+          "uncategorized",
+          "manual_review_required"
+        ]
+      },
+      "default": []
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional domain-specific metadata (extensible)",
+      "properties": {
+        "merchant_location": {
+          "type": "string",
+          "description": "Extracted location info. Example: '#1234', 'JFK Airport'"
+        },
+        "original_description": {
+          "type": "string",
+          "description": "Original raw description before cleaning (for audit)"
+        },
+        "duplicate_of": {
+          "type": "string",
+          "pattern": "^CT_[a-zA-Z0-9]+$",
+          "description": "Canonical ID of potential duplicate transaction"
+        }
+      },
+      "additionalProperties": true
+    },
+    "normalized_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this canonical was created/updated (ISO 8601 UTC)"
+    },
+    "normalizer_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of normalizer used. Example: '1.0.0'"
+    },
+    "rule_set_version": {
+      "type": "string",
+      "description": "Version of NormalizationRuleSet used. Example: '2024.10'. Tracks configuration changes."
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "canonical_id": "CT_abc123xyz",
+      "upload_id": "UL_abc123",
+      "observation_id": "UL_abc123:0",
+      "date": "2025-01-15T00:00:00Z",
+      "amount": -5.75,
+      "currency": "USD",
+      "description": "Starbucks #1234",
+      "merchant": "Starbucks",
+      "category": "Food & Drink",
+      "account": "bofa_debit",
+      "confidence_score": 0.95,
+      "applied_rules": [
+        "date_locale_us",
+        "merchant_extract",
+        "category_infer"
+      ],
+      "flags": [],
+      "metadata": {
+        "merchant_location": "#1234",
+        "original_description": "  STARBUCKS #1234  "
+      },
+      "normalized_at": "2025-10-23T14:35:12Z",
+      "normalizer_version": "1.0.0",
+      "rule_set_version": "2024.10"
+    },
+    {
+      "canonical_id": "CT_def456uvw",
+      "upload_id": "UL_def456",
+      "observation_id": "UL_def456:15",
+      "date": "2025-01-02T00:00:00Z",
+      "amount": -123.45,
+      "currency": "USD",
+      "description": "Amazon.com",
+      "merchant": "Amazon",
+      "category": "Shopping",
+      "account": "bofa_credit",
+      "confidence_score": 0.87,
+      "applied_rules": [
+        "date_locale_us",
+        "merchant_extract",
+        "category_infer"
+      ],
+      "flags": [
+        "ambiguous_date",
+        "large_amount"
+      ],
+      "metadata": {
+        "original_description": "AMAZON.COM*AB12CD",
+        "merchant_location": "order: AB12CD"
+      },
+      "normalized_at": "2025-10-23T15:10:25Z",
+      "normalizer_version": "1.0.0",
+      "rule_set_version": "2024.10"
+    },
+    {
+      "canonical_id": "CT_ghi789rst",
+      "upload_id": "UL_ghi789",
+      "observation_id": "UL_ghi789:42",
+      "date": "2025-02-28T00:00:00Z",
+      "amount": 2500.00,
+      "currency": "USD",
+      "description": "Direct Deposit - Payroll",
+      "merchant": null,
+      "category": "Income",
+      "account": "bofa_checking",
+      "confidence_score": 1.0,
+      "applied_rules": [
+        "date_locale_us",
+        "category_infer"
+      ],
+      "flags": [],
+      "metadata": {},
+      "normalized_at": "2025-10-23T16:20:33Z",
+      "normalizer_version": "1.0.0",
+      "rule_set_version": "2024.10"
+    }
+  ]
+}

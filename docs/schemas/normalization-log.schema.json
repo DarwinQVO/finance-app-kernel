@@ -1,0 +1,377 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/normalization-log.schema.json",
+  "title": "NormalizationLog",
+  "description": "Structured execution log for normalization pipeline. Captures validation results, failures, warnings, and applied rules. This is a universal pattern for any normalization pipeline observability.",
+  "type": "object",
+  "required": [
+    "upload_id",
+    "normalizer_version",
+    "rule_set_version",
+    "started_at",
+    "completed_at",
+    "duration_ms",
+    "observations_processed",
+    "canonicals_created",
+    "failures",
+    "warnings"
+  ],
+  "properties": {
+    "upload_id": {
+      "type": "string",
+      "pattern": "^UL_[a-zA-Z0-9]+$",
+      "description": "Reference to UploadRecord being normalized"
+    },
+    "normalizer_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of normalizer used. Example: '1.0.0'"
+    },
+    "rule_set_version": {
+      "type": "string",
+      "description": "Version of NormalizationRuleSet applied. Example: '2024.10'. Tracks configuration changes."
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when normalization started (ISO 8601 UTC)"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when normalization completed (ISO 8601 UTC)"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total execution time in milliseconds"
+    },
+    "observations_processed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of raw observations processed (from ObservationStore)"
+    },
+    "canonicals_created": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of canonical transactions successfully created"
+    },
+    "failures": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of observations that failed validation (not normalized)"
+    },
+    "warnings": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of canonicals created with warning flags (e.g., possible_duplicate, large_amount)"
+    },
+    "failure_details": {
+      "type": "array",
+      "description": "Details for each failed observation (for debugging and manual review)",
+      "items": {
+        "type": "object",
+        "required": [
+          "observation_id",
+          "field",
+          "raw_value",
+          "error"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "pattern": "^UL_[a-zA-Z0-9]+:[0-9]+$",
+            "description": "upload_id:row_id identifying the failed observation"
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "date",
+              "amount",
+              "currency",
+              "description",
+              "account",
+              "multiple"
+            ],
+            "description": "Field that caused validation failure"
+          },
+          "raw_value": {
+            "type": "string",
+            "description": "Original value from observation that failed validation"
+          },
+          "error": {
+            "type": "string",
+            "description": "Human-readable error message. Example: 'Unparseable date format'"
+          },
+          "error_code": {
+            "type": "string",
+            "description": "Machine-readable error code for aggregation. Examples: 'invalid_date_format', 'invalid_currency', 'amount_parse_error'"
+          }
+        }
+      },
+      "default": []
+    },
+    "warning_details": {
+      "type": "array",
+      "description": "Details for canonicals created with warning flags (for review)",
+      "items": {
+        "type": "object",
+        "required": [
+          "canonical_id",
+          "flag",
+          "message"
+        ],
+        "properties": {
+          "canonical_id": {
+            "type": "string",
+            "pattern": "^CT_[a-zA-Z0-9]+$",
+            "description": "Canonical transaction ID that has warning"
+          },
+          "flag": {
+            "type": "string",
+            "enum": [
+              "possible_duplicate",
+              "large_amount",
+              "future_date",
+              "ambiguous_date",
+              "low_confidence",
+              "unknown_merchant",
+              "uncategorized",
+              "manual_review_required"
+            ],
+            "description": "Warning flag type"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable warning message"
+          },
+          "context": {
+            "type": "object",
+            "description": "Additional context for warning (e.g., duplicate canonical_id, threshold exceeded)",
+            "additionalProperties": true
+          }
+        }
+      },
+      "default": []
+    },
+    "rules_applied": {
+      "type": "object",
+      "description": "Summary of normalization rules applied during this execution",
+      "properties": {
+        "date_locale": {
+          "type": "string",
+          "description": "Locale used for date parsing. Examples: 'en_US', 'es_MX', 'fr_FR'"
+        },
+        "merchant_normalization": {
+          "type": "boolean",
+          "description": "Whether merchant extraction and normalization was applied"
+        },
+        "category_inference": {
+          "type": "boolean",
+          "description": "Whether category inference was applied"
+        },
+        "duplicate_detection": {
+          "type": "boolean",
+          "description": "Whether duplicate detection was applied"
+        },
+        "custom_rules": {
+          "type": "array",
+          "description": "List of custom rule IDs applied (domain-specific)",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "performance_metrics": {
+      "type": "object",
+      "description": "Detailed performance breakdown (optional, for profiling)",
+      "properties": {
+        "avg_per_observation_ms": {
+          "type": "number",
+          "description": "Average time per observation (total_duration / observations_processed)"
+        },
+        "validation_time_ms": {
+          "type": "integer",
+          "description": "Time spent in validation logic"
+        },
+        "transformation_time_ms": {
+          "type": "integer",
+          "description": "Time spent in field transformations"
+        },
+        "persistence_time_ms": {
+          "type": "integer",
+          "description": "Time spent persisting canonicals to CanonicalStore"
+        }
+      }
+    },
+    "validation_summary": {
+      "type": "object",
+      "description": "Aggregate validation statistics (for quality dashboards)",
+      "properties": {
+        "date_failures": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of date validation failures"
+        },
+        "amount_failures": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of amount validation failures"
+        },
+        "currency_failures": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of currency validation failures"
+        },
+        "duplicate_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of possible duplicates detected"
+        },
+        "uncategorized_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of transactions that couldn't be categorized"
+        },
+        "low_confidence_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of canonicals with confidence_score < 0.7"
+        }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "upload_id": "UL_abc123",
+      "normalizer_version": "1.0.0",
+      "rule_set_version": "2024.10",
+      "started_at": "2025-10-23T14:35:10Z",
+      "completed_at": "2025-10-23T14:35:15Z",
+      "duration_ms": 5120,
+      "observations_processed": 100,
+      "canonicals_created": 95,
+      "failures": 5,
+      "warnings": 12,
+      "failure_details": [
+        {
+          "observation_id": "UL_abc123:42",
+          "field": "date",
+          "raw_value": "invalid_date",
+          "error": "Unparseable date format",
+          "error_code": "invalid_date_format"
+        },
+        {
+          "observation_id": "UL_abc123:78",
+          "field": "currency",
+          "raw_value": "US",
+          "error": "Invalid ISO 4217 code",
+          "error_code": "invalid_currency"
+        },
+        {
+          "observation_id": "UL_abc123:91",
+          "field": "amount",
+          "raw_value": "N/A",
+          "error": "Amount parse error: non-numeric value",
+          "error_code": "amount_parse_error"
+        }
+      ],
+      "warning_details": [
+        {
+          "canonical_id": "CT_xyz789",
+          "flag": "possible_duplicate",
+          "message": "Similar transaction found within 1 day",
+          "context": {
+            "duplicate_of": "CT_aaa111",
+            "similarity_score": 0.92
+          }
+        },
+        {
+          "canonical_id": "CT_abc456",
+          "flag": "large_amount",
+          "message": "Amount exceeds $10,000",
+          "context": {
+            "amount": 15750.00,
+            "threshold": 10000.00
+          }
+        },
+        {
+          "canonical_id": "CT_def789",
+          "flag": "ambiguous_date",
+          "message": "Date format ambiguous (01/02/2024), assumed MM/DD/YYYY",
+          "context": {
+            "raw_date": "01/02/2024",
+            "assumed_locale": "en_US"
+          }
+        }
+      ],
+      "rules_applied": {
+        "date_locale": "en_US",
+        "merchant_normalization": true,
+        "category_inference": true,
+        "duplicate_detection": true,
+        "custom_rules": []
+      },
+      "performance_metrics": {
+        "avg_per_observation_ms": 51.2,
+        "validation_time_ms": 2100,
+        "transformation_time_ms": 1800,
+        "persistence_time_ms": 1220
+      },
+      "validation_summary": {
+        "date_failures": 2,
+        "amount_failures": 2,
+        "currency_failures": 1,
+        "duplicate_count": 8,
+        "uncategorized_count": 15,
+        "low_confidence_count": 3
+      }
+    },
+    {
+      "upload_id": "UL_def456",
+      "normalizer_version": "1.0.0",
+      "rule_set_version": "2024.10",
+      "started_at": "2025-10-23T15:10:20Z",
+      "completed_at": "2025-10-23T15:10:22Z",
+      "duration_ms": 2050,
+      "observations_processed": 42,
+      "canonicals_created": 42,
+      "failures": 0,
+      "warnings": 3,
+      "failure_details": [],
+      "warning_details": [
+        {
+          "canonical_id": "CT_bbb222",
+          "flag": "uncategorized",
+          "message": "Merchant not in whitelist, category unknown",
+          "context": {
+            "merchant": "XYZ CORP 123456"
+          }
+        }
+      ],
+      "rules_applied": {
+        "date_locale": "en_US",
+        "merchant_normalization": true,
+        "category_inference": true,
+        "duplicate_detection": false,
+        "custom_rules": []
+      },
+      "performance_metrics": {
+        "avg_per_observation_ms": 48.8,
+        "validation_time_ms": 850,
+        "transformation_time_ms": 720,
+        "persistence_time_ms": 480
+      },
+      "validation_summary": {
+        "date_failures": 0,
+        "amount_failures": 0,
+        "currency_failures": 0,
+        "duplicate_count": 0,
+        "uncategorized_count": 3,
+        "low_confidence_count": 0
+      }
+    }
+  ]
+}
