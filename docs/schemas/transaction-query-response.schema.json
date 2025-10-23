@@ -1,0 +1,163 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/transaction-query-response.schema.json",
+  "title": "Transaction Query Response",
+  "description": "API response for paginated transaction queries (vertical 2.1)",
+  "type": "object",
+  "required": ["data", "pagination", "summary"],
+  "properties": {
+    "data": {
+      "type": "array",
+      "description": "Array of canonical transactions matching query",
+      "items": {
+        "type": "object",
+        "description": "Reference to canonical-transaction.schema.json",
+        "properties": {
+          "canonical_id": { "type": "string" },
+          "upload_id": { "type": "string" },
+          "row_id": { "type": "integer" },
+          "transaction_date": { "type": "string", "format": "date" },
+          "merchant": { "type": "string" },
+          "amount": { "type": "number" },
+          "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+          "amount_usd": { "type": "number" },
+          "account_id": { "type": "string" },
+          "category": { "type": "string" },
+          "deductible_usa": { "type": "boolean" },
+          "deductible_mexico": { "type": "boolean" },
+          "confidence_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "created_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["canonical_id", "upload_id", "transaction_date", "merchant", "amount", "currency"]
+      }
+    },
+    "pagination": {
+      "type": "object",
+      "description": "Pagination metadata for cursor-based navigation",
+      "required": ["total_count", "has_next", "has_prev"],
+      "properties": {
+        "total_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total transactions matching filter (approximate, for UI display)"
+        },
+        "has_next": {
+          "type": "boolean",
+          "description": "True if more results available (next page exists)"
+        },
+        "next_cursor": {
+          "type": ["string", "null"],
+          "description": "Opaque cursor token for next page (null if no next page)",
+          "pattern": "^[A-Za-z0-9+/=]+$",
+          "examples": ["eyJmIjoiMjAyNS0wNC0yNSIsImlkIjoiY2FuXzEyMyJ9"]
+        },
+        "has_prev": {
+          "type": "boolean",
+          "description": "True if previous page exists"
+        },
+        "prev_cursor": {
+          "type": ["string", "null"],
+          "description": "Opaque cursor token for previous page (null if no prev page)"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Summary metrics for current filtered result set",
+      "required": ["income", "expenses", "net", "currency"],
+      "properties": {
+        "income": {
+          "type": "number",
+          "description": "Sum of positive amounts in result set (all pages, not just current)",
+          "examples": [9000.00]
+        },
+        "expenses": {
+          "type": "number",
+          "description": "Sum of negative amounts (absolute value)",
+          "examples": [8247.00]
+        },
+        "net": {
+          "type": "number",
+          "description": "income - expenses",
+          "examples": [753.00]
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "Currency for summary (USD if multi-currency filtered, otherwise original)",
+          "examples": ["USD", "MXN"]
+        },
+        "filters_applied": {
+          "type": "object",
+          "description": "Echo of filters for UI display (what was queried)",
+          "properties": {
+            "date_from": { "type": "string", "format": "date" },
+            "date_to": { "type": "string", "format": "date" },
+            "account_ids": { "type": "array", "items": { "type": "string" } },
+            "category": { "type": "string" },
+            "amount_min": { "type": "number" },
+            "amount_max": { "type": "number" },
+            "deductible": { "type": "boolean" },
+            "search": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "data": [
+        {
+          "canonical_id": "can_bofa_20250426_001",
+          "upload_id": "upl_abc123",
+          "row_id": 1,
+          "transaction_date": "2025-04-26",
+          "merchant": "Aeromexico",
+          "amount": 4516.00,
+          "currency": "MXN",
+          "amount_usd": 231.78,
+          "account_id": "apple_card",
+          "category": "Personal > Travel > Flights",
+          "deductible_usa": false,
+          "deductible_mexico": false,
+          "confidence_score": 0.98,
+          "created_at": "2025-04-27T10:30:00Z"
+        },
+        {
+          "canonical_id": "can_bofa_20250430_002",
+          "upload_id": "upl_def456",
+          "row_id": 1,
+          "transaction_date": "2025-04-30",
+          "merchant": "HubSpot Inc",
+          "amount": 5000.00,
+          "currency": "USD",
+          "amount_usd": 5000.00,
+          "account_id": "bofa_debit",
+          "category": "Business > Clients > HubSpot",
+          "deductible_usa": false,
+          "deductible_mexico": false,
+          "confidence_score": 1.00,
+          "created_at": "2025-05-01T08:15:00Z"
+        }
+      ],
+      "pagination": {
+        "total_count": 127,
+        "has_next": true,
+        "next_cursor": "eyJmIjoiMjAyNS0wNC0yNSIsImlkIjoiY2FuXzEyMyJ9",
+        "has_prev": false,
+        "prev_cursor": null
+      },
+      "summary": {
+        "income": 9000.00,
+        "expenses": 8247.00,
+        "net": 753.00,
+        "currency": "USD",
+        "filters_applied": {
+          "date_from": "2025-04-01",
+          "date_to": "2025-04-30"
+        }
+      }
+    }
+  ]
+}

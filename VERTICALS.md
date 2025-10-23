@@ -77,21 +77,30 @@
 ## 📊 Group 2: Exploration & Visualization
 
 ### **2.1 Transaction List View**
-**Status:** 📝 Pending (NEXT)
+**Status:** ✅ Complete
 **Full Name:** Transaction List View
 **Additions:** + Pagination & Indexing
-**Spec:** TBD
+**Spec:** [docs/verticals/2.1-transaction-list-view.md](docs/verticals/2.1-transaction-list-view.md)
 
-**Expected Primitives:**
-- TransactionQuery (filtering, sorting)
-- PaginationEngine (cursor-based pagination)
-- IndexStrategy (optimized indexing for common queries)
+**Primitives Delivered:**
+- TransactionQuery (universal query builder with filter/sort/pagination)
+- PaginationEngine (cursor-based pagination - keyset pagination)
+- IndexStrategy (database index suggestion based on query patterns)
+- ExportEngine (CSV/PDF/Excel export generation)
+- TransactionTable (IL - data grid component with sorting/pagination)
 
-**Expected Use Cases:**
-- View all canonical transactions from 1.3
-- Filter by date range, account, category, amount
-- Sort by date, amount, merchant
-- Export to CSV/PDF
+**Schemas:** transaction-query-response.schema.json
+**UX Flow:** [2.1-transaction-list-experience.md](docs/ux-flows/2.1-transaction-list-experience.md)
+
+**Delivered:**
+- View canonical transactions with server-side filtering
+- Filter by date, account, category, amount, search text
+- Sort by any column (date, amount, merchant, etc.)
+- Cursor-based pagination (stable under concurrent inserts)
+- Summary metrics (income, expenses, net) for filtered results
+- Export to CSV/PDF with metadata
+- Responsive table UI with loading skeletons
+- Accessibility support (keyboard nav, screen readers)
 
 ---
 

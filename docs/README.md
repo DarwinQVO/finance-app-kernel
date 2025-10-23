@@ -47,10 +47,17 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[NormalizationRuleSet](primitives/ol/NormalizationRuleSet.md)** - Externalized, versioned configuration for normalization rules
 - **[NormalizationLog](primitives/ol/NormalizationLog.md)** - Structured execution log for normalization operations
 
+**Vertical 2.1 (Transaction List View):**
+- **[TransactionQuery](primitives/ol/TransactionQuery.md)** - Universal query builder for canonical stores with filter/sort/pagination
+- **[PaginationEngine](primitives/ol/PaginationEngine.md)** - Cursor-based pagination (keyset pagination)
+- **[IndexStrategy](primitives/ol/IndexStrategy.md)** - Database index suggestion engine based on query patterns
+- **[ExportEngine](primitives/ol/ExportEngine.md)** - Generate CSV/PDF/Excel exports from query results
+
 ### Interface Layer (IL)
 Reusable UI components:
 
 - **[FileUpload](primitives/il/FileUpload.md)** - Drag & drop component with validation
+- **[TransactionTable](primitives/il/TransactionTable.md)** - Data grid with sorting, pagination, and row selection
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -71,6 +78,9 @@ Executable contracts extracted from vertical specifications:
 **Vertical 1.3 (Normalization):**
 - **[canonical-transaction.schema.json](schemas/canonical-transaction.schema.json)** - Validated and normalized canonical transactions
 - **[normalization-log.schema.json](schemas/normalization-log.schema.json)** - Normalization execution log with validation results
+
+**Vertical 2.1 (Transaction List View):**
+- **[transaction-query-response.schema.json](schemas/transaction-query-response.schema.json)** - API response format for paginated query results
 
 ---
 
@@ -93,6 +103,7 @@ User experience specifications with wireframes and journeys:
 - **[1.1 Upload Experience](ux-flows/1.1-upload-experience.md)** - File upload UX, drag & drop, validation feedback
 - **[1.2 Extraction Experience](ux-flows/1.2-extraction-experience.md)** - Parsing status, error handling, retry flows
 - **[1.3 Normalization Experience](ux-flows/1.3-normalization-experience.md)** - Validation results, error review, duplicate resolution, categorization
+- **[2.1 Transaction List Experience](ux-flows/2.1-transaction-list-experience.md)** - Filtering, sorting, pagination, export workflows
 
 ---
 
@@ -103,7 +114,9 @@ User experience specifications with wireframes and journeys:
 | **1. Upload & Ingestion** | 1.1 Upload Flow | ✅ Complete |
 | | 1.2 Extraction | ✅ Complete |
 | | 1.3 Normalization | ✅ Complete |
-| **2. Exploration & Viz** | 2.1-2.3 | 📝 Pending |
+| **2. Exploration & Viz** | 2.1 Transaction List View | ✅ Complete |
+| | 2.2 OL Exploration | 📝 Pending |
+| | 2.3 Finance Dashboard | 📝 Pending |
 | **3. Registries** | 3.1-3.9 | 📝 Pending |
 | **4. Derivatives** | 4.1-4.3 | 📝 Pending |
 | **5. Governance** | 5.1-5.5 | 📝 Pending |
