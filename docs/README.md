@@ -65,7 +65,8 @@ Key architectural decisions with rationale:
 
 User experience specifications with wireframes and journeys:
 
-- **[1.1 Upload Experience](ux-flows/1.1-upload-experience.md)** - Complete user journeys, wireframes, and decision points
+- **[1.1 Upload Experience](ux-flows/1.1-upload-experience.md)** - File upload UX, drag & drop, validation feedback
+- **[1.2 Extraction Experience](ux-flows/1.2-extraction-experience.md)** - Parsing status, error handling, retry flows
 
 ---
 
