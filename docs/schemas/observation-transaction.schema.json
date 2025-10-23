@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/observation-transaction.schema.json",
+  "title": "ObservationTransaction",
+  "description": "Raw extracted transaction data from parser (unvalidated, as-is). This is a universal pattern for any extraction pipeline storing raw observations before normalization.",
+  "type": "object",
+  "required": [
+    "upload_id",
+    "row_id",
+    "date",
+    "description",
+    "amount",
+    "currency",
+    "account",
+    "source_type",
+    "parser_id",
+    "parser_version",
+    "extracted_at"
+  ],
+  "properties": {
+    "upload_id": {
+      "type": "string",
+      "pattern": "^UL_[a-zA-Z0-9]+$",
+      "description": "Reference to UploadRecord (composite key part 1)"
+    },
+    "row_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "0-indexed position in source file (composite key part 2). Ensures idempotent upserts."
+    },
+    "date": {
+      "type": "string",
+      "description": "Date as-is from parser (NOT normalized to ISO 8601 yet). Examples: '01/15/2024', '2024-01-15', 'Jan 15 2024'"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Transaction description from source (merchant name, notes, etc.)"
+    },
+    "amount": {
+      "type": "string",
+      "description": "Amount as-is from parser (NOT normalized to decimal yet). Examples: '-50.00', '1,234.56', '(50.00)'"
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "ISO 4217 currency code (or parser's best guess). Examples: 'USD', 'MXN', 'EUR'"
+    },
+    "account": {
+      "type": "string",
+      "description": "Account identifier from source_type mapping. Examples: 'bofa_debit', 'chase_credit', 'scotia_debit'"
+    },
+    "source_type": {
+      "type": "string",
+      "description": "Parser type that extracted this observation. Examples: 'bofa_pdf', 'chase_csv', 'wise_json'"
+    },
+    "parser_id": {
+      "type": "string",
+      "description": "Unique parser identifier. Examples: 'bofa_pdf_parser', 'chase_csv_parser'"
+    },
+    "parser_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of parser used. Example: '1.2.0'"
+    },
+    "extracted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this observation was extracted (ISO 8601 UTC)"
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Row-level warnings (not errors). Parser succeeded but flagged potential issues.",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "upload_id": "UL_abc123",
+      "row_id": 0,
+      "date": "01/15/2024",
+      "description": "STARBUCKS #1234",
+      "amount": "-5.75",
+      "currency": "USD",
+      "account": "bofa_debit",
+      "source_type": "bofa_pdf",
+      "parser_id": "bofa_pdf_parser",
+      "parser_version": "1.2.0",
+      "extracted_at": "2025-10-23T14:30:03Z",
+      "warnings": []
+    },
+    {
+      "upload_id": "UL_def456",
+      "row_id": 15,
+      "date": "01/02/2024",
+      "description": "AMAZON.COM",
+      "amount": "-123.45",
+      "currency": "USD",
+      "account": "bofa_credit",
+      "source_type": "bofa_pdf",
+      "parser_id": "bofa_pdf_parser",
+      "parser_version": "1.2.0",
+      "extracted_at": "2025-10-23T15:10:22Z",
+      "warnings": [
+        "Date format ambiguous: 01/02/2024, assuming MM/DD/YYYY"
+      ]
+    }
+  ]
+}

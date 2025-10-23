@@ -1,0 +1,205 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/parse-log.schema.json",
+  "title": "ParseLog",
+  "description": "Structured execution log for parser run. Universal pattern for any async worker execution requiring observability (extraction, OCR, data processing, etc.).",
+  "type": "object",
+  "required": [
+    "upload_id",
+    "parser_id",
+    "parser_version",
+    "started_at",
+    "completed_at",
+    "duration_ms",
+    "success",
+    "rows_extracted",
+    "rows_skipped",
+    "warnings",
+    "errors",
+    "file_size_bytes",
+    "file_hash",
+    "mime_type"
+  ],
+  "properties": {
+    "upload_id": {
+      "type": "string",
+      "pattern": "^UL_[a-zA-Z0-9]+$",
+      "description": "Reference to UploadRecord being parsed"
+    },
+    "parser_id": {
+      "type": "string",
+      "description": "Unique parser identifier. Examples: 'bofa_pdf_parser', 'chase_csv_parser'"
+    },
+    "parser_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of parser used. Example: '1.2.0'"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When parser execution started (ISO 8601 UTC)"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When parser execution completed (ISO 8601 UTC)"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total execution time in milliseconds"
+    },
+    "success": {
+      "type": "boolean",
+      "description": "True if parsing completed without errors, False if failed"
+    },
+    "rows_extracted": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of observations successfully extracted. 0 is valid (empty file)."
+    },
+    "rows_skipped": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of rows skipped (e.g., header rows, footer rows, invalid rows)"
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Non-fatal issues encountered during parsing",
+      "items": {
+        "type": "object",
+        "required": ["message", "severity"],
+        "properties": {
+          "row_id": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Row number where warning occurred (null if file-level warning)"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable warning message"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "Warning severity level"
+          }
+        }
+      },
+      "default": []
+    },
+    "errors": {
+      "type": "array",
+      "description": "Fatal errors that caused parsing to fail",
+      "items": {
+        "type": "object",
+        "required": ["error_code", "message"],
+        "properties": {
+          "row_id": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Row number where error occurred (null if file-level error)"
+          },
+          "error_code": {
+            "type": "string",
+            "description": "Machine-readable error code. Examples: 'PDF_CORRUPT', 'LAYOUT_MISMATCH', 'TIMEOUT'"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable error message"
+          },
+          "stack_trace": {
+            "type": "string",
+            "description": "Full stack trace for debugging (optional)"
+          }
+        }
+      },
+      "default": []
+    },
+    "file_size_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Size of file being parsed (for debugging)"
+    },
+    "file_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "Content hash of file being parsed (for debugging)"
+    },
+    "mime_type": {
+      "type": "string",
+      "description": "MIME type of file being parsed. Examples: 'application/pdf', 'text/csv'"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "upload_id": "UL_abc123",
+      "parser_id": "bofa_pdf_parser",
+      "parser_version": "1.2.0",
+      "started_at": "2025-10-23T14:30:00Z",
+      "completed_at": "2025-10-23T14:30:03Z",
+      "duration_ms": 3421,
+      "success": true,
+      "rows_extracted": 42,
+      "rows_skipped": 1,
+      "warnings": [
+        {
+          "row_id": 15,
+          "message": "Date format ambiguous: 01/02/2024, assuming MM/DD/YYYY",
+          "severity": "low"
+        }
+      ],
+      "errors": [],
+      "file_size_bytes": 245760,
+      "file_hash": "sha256:abc123def456...",
+      "mime_type": "application/pdf"
+    },
+    {
+      "upload_id": "UL_def456",
+      "parser_id": "bofa_pdf_parser",
+      "parser_version": "1.2.0",
+      "started_at": "2025-10-23T15:00:00Z",
+      "completed_at": "2025-10-23T15:00:01Z",
+      "duration_ms": 1234,
+      "success": false,
+      "rows_extracted": 0,
+      "rows_skipped": 0,
+      "warnings": [],
+      "errors": [
+        {
+          "error_code": "PDF_CORRUPT",
+          "message": "Failed to open PDF: Invalid header at byte 0",
+          "stack_trace": "Traceback (most recent call last):\\n  File ..."
+        }
+      ],
+      "file_size_bytes": 1024,
+      "file_hash": "sha256:def456abc123...",
+      "mime_type": "application/pdf"
+    },
+    {
+      "upload_id": "UL_ghi789",
+      "parser_id": "bofa_pdf_parser",
+      "parser_version": "1.2.0",
+      "started_at": "2025-10-23T16:00:00Z",
+      "completed_at": "2025-10-23T16:00:02Z",
+      "duration_ms": 2100,
+      "success": true,
+      "rows_extracted": 0,
+      "rows_skipped": 0,
+      "warnings": [
+        {
+          "message": "No transactions found in statement (empty account)",
+          "severity": "medium"
+        }
+      ],
+      "errors": [],
+      "file_size_bytes": 48000,
+      "file_hash": "sha256:ghi789jkl012...",
+      "mime_type": "application/pdf"
+    }
+  ]
+}

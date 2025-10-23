@@ -7,9 +7,10 @@
 ## 📋 Vertical Specifications
 
 ### Group 1: Upload & Ingestion
-- **[1.1 Upload Flow](verticals/1.1-upload-flow.md)** - Complete upload specification with state machine, contracts, and primitives
+- **[1.1 Upload Flow](verticals/1.1-upload-flow.md)** - File upload with deduplication and state machine
+- **[1.2 Extraction](verticals/1.2-extraction.md)** - Parser execution, raw observation extraction (AS-IS)
 
-*Pending: 1.2 Extraction, 1.3 Normalization*
+*Pending: 1.3 Normalization*
 
 ---
 
@@ -38,9 +39,14 @@ Reusable UI components:
 
 Executable contracts extracted from vertical specifications:
 
+**Vertical 1.1 (Upload):**
 - **[upload-record.schema.json](schemas/upload-record.schema.json)** - UploadRecord state machine contract
 - **[provenance-entry.schema.json](schemas/provenance-entry.schema.json)** - ProvenanceLedger entry format
 - **[upload-error-response.schema.json](schemas/upload-error-response.schema.json)** - Standardized error responses
+
+**Vertical 1.2 (Extraction):**
+- **[observation-transaction.schema.json](schemas/observation-transaction.schema.json)** - Raw extracted observations (AS-IS from parser)
+- **[parse-log.schema.json](schemas/parse-log.schema.json)** - Parser execution log
 
 ---
 
@@ -51,6 +57,7 @@ Key architectural decisions with rationale:
 - **[ADR-0001: Canonical ID Decision](adr/0001-canonical-id-decision.md)** - Why `upload_id` not `file_id`
 - **[ADR-0002: State Machine Global](adr/0002-state-machine-global.md)** - Why single `status` field
 - **[ADR-0003: Runner/Coordinator Split](adr/0003-runner-coordinator-split.md)** - Separation of concerns
+- **[ADR-0004: Raw-First Extraction](adr/0004-raw-first-extraction.md)** - Store AS-IS, validate later
 
 ---
 
@@ -67,7 +74,7 @@ User experience specifications with wireframes and journeys:
 | Group | Vertical | Status |
 |-------|----------|--------|
 | **1. Upload & Ingestion** | 1.1 Upload Flow | ✅ Complete |
-| | 1.2 Extraction | 📝 Pending |
+| | 1.2 Extraction | ✅ Complete |
 | | 1.3 Normalization | 📝 Pending |
 | **2. Exploration & Viz** | 2.1-2.3 | 📝 Pending |
 | **3. Registries** | 3.1-3.9 | 📝 Pending |
