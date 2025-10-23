@@ -22,11 +22,25 @@
 
 These primitives are domain-agnostic - they construct verifiable truth across ANY domain (finance, medicine, legal, etc.). This repository demonstrates their instantiation in the finance domain.
 
+**Vertical 1.1 (Upload Flow):**
 - **[StorageEngine](primitives/ol/StorageEngine.md)** - Content-addressable storage with deduplication
 - **[ProvenanceLedger](primitives/ol/ProvenanceLedger.md)** - Append-only audit trail with cryptographic integrity
 - **[FileArtifact](primitives/ol/FileArtifact.md)** - Internal metadata wrapper for uploaded files
 - **[HashCalculator](primitives/ol/HashCalculator.md)** - Streaming SHA-256 hash calculator
 - **[UploadRecord](primitives/ol/UploadRecord.md)** - State machine orchestrator for upload flow
+
+**Vertical 1.2 (Extraction):**
+- **[Parser](primitives/ol/Parser.md)** - Universal interface for extracting raw observations from documents
+- **[ObservationStore](primitives/ol/ObservationStore.md)** - Persistent storage for raw extracted observations (AS-IS)
+- **[ParserRegistry](primitives/ol/ParserRegistry.md)** - Service discovery for pluggable parser architecture
+- **[ParseLog](primitives/ol/ParseLog.md)** - Structured execution log for parser operations
+
+**Vertical 1.3 (Normalization):**
+- **[Normalizer](primitives/ol/Normalizer.md)** - Universal interface for raw → canonical transformation
+- **[ValidationEngine](primitives/ol/ValidationEngine.md)** - Rule-based validation for individual fields (dates, amounts, etc.)
+- **[CanonicalStore](primitives/ol/CanonicalStore.md)** - Persistent storage for validated canonical records
+- **[NormalizationRuleSet](primitives/ol/NormalizationRuleSet.md)** - Externalized, versioned configuration for normalization rules
+- **[NormalizationLog](primitives/ol/NormalizationLog.md)** - Structured execution log for normalization operations
 
 ### Interface Layer (IL)
 Reusable UI components:
