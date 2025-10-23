@@ -13,10 +13,10 @@
 - **[1.2 Extraction](verticals/1.2-extraction.md)** - Parser execution, raw observation extraction (AS-IS)
 - **[1.3 Normalization](verticals/1.3-normalization.md)** - Raw → canonical transformation, validation, categorization
 
-### Group 2: Exploration & Visualization (Pending 📝)
-- **2.1 Transaction List View** — Next up (pagination & indexing)
-- **2.2 OL Exploration** — Drill-down, decisions, provenance
-- **2.3 Finance Dashboard** — Saved views, exports, snapshots
+### Group 2: Exploration & Visualization
+- **[2.1 Transaction List View](verticals/2.1-transaction-list-view.md)** ✅ Complete - Pagination, filtering, sorting, export
+- **[2.2 OL Exploration](verticals/2.2-ol-exploration.md)** ✅ Complete - Drill-down, decisions, provenance, artifact viewing
+- **2.3 Finance Dashboard** 📝 Pending - Saved views, exports, snapshots
 
 ---
 
@@ -53,11 +53,18 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[IndexStrategy](primitives/ol/IndexStrategy.md)** - Database index suggestion engine based on query patterns
 - **[ExportEngine](primitives/ol/ExportEngine.md)** - Generate CSV/PDF/Excel exports from query results
 
+**Vertical 2.2 (OL Exploration):**
+- **[ProvenanceTracer](primitives/ol/ProvenanceTracer.md)** - Trace complete data lineage (canonical → observation → artifact)
+- **[DecisionExplainer](primitives/ol/DecisionExplainer.md)** - Explain normalization decisions with rules and confidence
+- **[ArtifactRetriever](primitives/ol/ArtifactRetriever.md)** - Retrieve artifacts with signed URLs and access control
+
 ### Interface Layer (IL)
 Reusable UI components:
 
 - **[FileUpload](primitives/il/FileUpload.md)** - Drag & drop component with validation
 - **[TransactionTable](primitives/il/TransactionTable.md)** - Data grid with sorting, pagination, and row selection
+- **[DrillDownPanel](primitives/il/DrillDownPanel.md)** - Slide-in panel for complete drill-down view
+- **[ProvenanceTimeline](primitives/il/ProvenanceTimeline.md)** - Visual timeline for audit trail
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -82,6 +89,10 @@ Executable contracts extracted from vertical specifications:
 **Vertical 2.1 (Transaction List View):**
 - **[transaction-query-response.schema.json](schemas/transaction-query-response.schema.json)** - API response format for paginated query results
 
+**Vertical 2.2 (OL Exploration):**
+- **[drill-down-response.schema.json](schemas/drill-down-response.schema.json)** - Complete data lineage response (canonical + observation + artifact + decisions + provenance)
+- **[decision-explanation.schema.json](schemas/decision-explanation.schema.json)** - Normalization decision explanation format
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -104,6 +115,7 @@ User experience specifications with wireframes and journeys:
 - **[1.2 Extraction Experience](ux-flows/1.2-extraction-experience.md)** - Parsing status, error handling, retry flows
 - **[1.3 Normalization Experience](ux-flows/1.3-normalization-experience.md)** - Validation results, error review, duplicate resolution, categorization
 - **[2.1 Transaction List Experience](ux-flows/2.1-transaction-list-experience.md)** - Filtering, sorting, pagination, export workflows
+- **[2.2 OL Exploration Experience](ux-flows/2.2-ol-exploration-experience.md)** - Drill-down, decision explanations, provenance timeline, artifact viewing
 
 ---
 
@@ -115,7 +127,7 @@ User experience specifications with wireframes and journeys:
 | | 1.2 Extraction | ✅ Complete |
 | | 1.3 Normalization | ✅ Complete |
 | **2. Exploration & Viz** | 2.1 Transaction List View | ✅ Complete |
-| | 2.2 OL Exploration | 📝 Pending |
+| | 2.2 OL Exploration | ✅ Complete |
 | | 2.3 Finance Dashboard | 📝 Pending |
 | **3. Registries** | 3.1-3.9 | 📝 Pending |
 | **4. Derivatives** | 4.1-4.3 | 📝 Pending |

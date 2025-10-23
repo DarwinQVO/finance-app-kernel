@@ -1,13 +1,16 @@
-# IL Components Summary (Vertical 1.1)
+# IL Components Summary
 
 **Status**: Specification complete
-**Last Updated**: 2025-10-22
+**Last Updated**: 2025-05-23
+**Verticals covered**: 1.1, 2.1, 2.2
 
 ---
 
 ## Component Catalog
 
-### 1. FileUpload ✅
+### Vertical 1.1 (Upload Flow)
+
+#### 1. FileUpload ✅
 **Full spec**: [FileUpload.md](FileUpload.md)
 
 **Props**: `accept`, `maxSizeBytes`, `onFileSelect`, `onError`
@@ -150,6 +153,43 @@ interface UploadListProps {
 - Click row → drill-down
 
 **Reusability**: Any list view (transactions, documents, reports, users)
+
+---
+
+### Vertical 2.1 (Transaction List View)
+
+#### 6. TransactionTable ✅
+**Full spec**: [TransactionTable.md](TransactionTable.md)
+
+**Purpose**: Data grid with sorting, pagination, and row selection
+
+**Props**: `rows`, `columns`, `sortField`, `sortOrder`, `onSort`, `pagination`, `onPageChange`, `loading`
+**Features**: Server-side sorting, cursor-based pagination, loading skeletons
+**Reusable across**: Finance transactions, healthcare records, legal documents, research papers
+
+---
+
+### Vertical 2.2 (OL Exploration)
+
+#### 7. DrillDownPanel ✅
+**Full spec**: [DrillDownPanel.md](DrillDownPanel.md)
+
+**Purpose**: Slide-in panel for complete data lineage drill-down
+
+**Props**: `drilldownData`, `loading`, `error`, `onClose`, `onDownloadArtifact`, `defaultTab`, `theme`
+**Features**: Tabbed interface (Overview, Raw Data, Provenance, Artifact), responsive (panel/full-screen), keyboard navigation
+**Reusable across**: Transaction drill-down, lab result inspection, contract clause analysis, citation verification
+
+---
+
+#### 8. ProvenanceTimeline ✅
+**Full spec**: [ProvenanceTimeline.md](ProvenanceTimeline.md)
+
+**Purpose**: Visual timeline for provenance chain (upload → parse → normalize)
+
+**Props**: `entries`, `variant`, `showDurations`, `showMetadata`, `maxHeight`, `theme`
+**Features**: Color-coded events, duration indicators, expandable metadata, responsive (vertical/horizontal)
+**Reusable across**: Any audit trail visualization (upload timeline, approval workflow, processing pipeline)
 
 ---
 

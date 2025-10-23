@@ -105,14 +105,28 @@
 ---
 
 ### **2.2 OL Exploration**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** OL Exploration (drill-down, decisions, provenance)
-**Spec:** TBD
+**Spec:** [docs/verticals/2.2-ol-exploration.md](docs/verticals/2.2-ol-exploration.md)
 
-**Expected Use Cases:**
-- Drill down from canonical → observation → upload artifact
-- View normalization decisions (why was this categorized as X?)
-- Trace provenance chain (who uploaded, when, from where)
+**Primitives Delivered:**
+- ProvenanceTracer (OL) - Trace lineage from canonical → observation → artifact
+- DecisionExplainer (OL) - Explain normalization decisions with rules and confidence
+- ArtifactRetriever (OL) - Retrieve artifacts with signed URLs and access control
+- DrillDownPanel (IL) - Slide-in panel for complete drill-down view
+- ProvenanceTimeline (IL) - Visual timeline for audit trail
+
+**Schemas:** drill-down-response.schema.json, decision-explanation.schema.json
+**UX Flow:** [2.2-ol-exploration-experience.md](docs/ux-flows/2.2-ol-exploration-experience.md)
+
+**Delivered:**
+- Complete data lineage drill-down (canonical → observation → artifact)
+- Normalization decision explanations (rules, confidence, alternatives)
+- Provenance timeline visualization (upload → parse → normalize)
+- Original artifact viewing (PDF viewer with signed URLs)
+- Access control enforcement (user owns transaction)
+- Responsive UI (slide-in panel desktop, full-screen mobile)
+- Keyboard navigation and accessibility support
 
 ---
 
@@ -366,13 +380,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 4 | 1.1, 1.2, 1.3, 2.1 |
-| 📝 Pending | 19 | 2.2-2.3, 3.1-3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 5 | 1.1, 1.2, 1.3, 2.1, 2.2 |
+| 📝 Pending | 18 | 2.3, 3.1-3.9, 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 17% (4/23)
+**Completion:** 22% (5/23)
 
-**Next up:** 2.2 OL Exploration
+**Next up:** 2.3 Finance Dashboard
 
 ---
 

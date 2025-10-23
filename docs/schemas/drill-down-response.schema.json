@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/drill-down-response.schema.json",
+  "title": "Drill-Down Response",
+  "description": "Complete data lineage for a canonical record (canonical → observation → artifact → provenance)",
+  "type": "object",
+  "required": ["canonical", "observation", "artifact", "decisions", "provenance"],
+  "properties": {
+    "canonical": {
+      "$ref": "canonical-transaction.schema.json",
+      "description": "Full canonical transaction data (all fields)"
+    },
+    "observation": {
+      "oneOf": [
+        { "$ref": "observation-transaction.schema.json" },
+        { "type": "null" }
+      ],
+      "description": "Raw observation before normalization (may be null if missing)"
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["upload_id", "filename", "hash"],
+      "properties": {
+        "upload_id": {
+          "type": "string",
+          "description": "Upload ID (canonical identifier)"
+        },
+        "filename": {
+          "type": "string",
+          "description": "Original filename"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hash of file content"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "File size in bytes"
+        },
+        "mime_type": {
+          "type": "string",
+          "description": "MIME type (e.g., application/pdf)"
+        },
+        "uploaded_by": {
+          "type": "string",
+          "description": "User email who uploaded this file"
+        },
+        "uploaded_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Upload timestamp (ISO 8601)"
+        },
+        "source_type": {
+          "type": "string",
+          "description": "Source type (e.g., bofa_pdf, apple_card_csv)"
+        },
+        "status": {
+          "enum": ["available", "deleted"],
+          "description": "Artifact availability status"
+        },
+        "deleted_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Deletion timestamp (if deleted)"
+        },
+        "download_url": {
+          "type": ["string", "null"],
+          "description": "Signed URL for artifact download (null if deleted)"
+        },
+        "view_url": {
+          "type": ["string", "null"],
+          "description": "Signed URL for inline viewing (e.g., PDF viewer)"
+        }
+      },
+      "description": "Artifact metadata (file information)"
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "$ref": "decision-explanation.schema.json"
+      },
+      "description": "Normalization decisions for each field (explains how canonical was created)"
+    },
+    "provenance": {
+      "type": "array",
+      "items": {
+        "$ref": "provenance-entry.schema.json"
+      },
+      "description": "Complete audit trail (upload → parse → normalize)"
+    },
+    "logs": {
+      "type": "object",
+      "properties": {
+        "parse_log_url": {
+          "type": "string",
+          "description": "URL to parser execution log"
+        },
+        "normalization_log_url": {
+          "type": "string",
+          "description": "URL to normalization execution log"
+        }
+      },
+      "description": "URLs to execution logs"
+    },
+    "validation": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "enum": ["valid", "warning", "error"],
+          "description": "Overall validation status"
+        },
+        "checks_performed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["check", "result"],
+            "properties": {
+              "check": {
+                "type": "string",
+                "description": "Validation check name (e.g., date_format, amount_precision)"
+              },
+              "result": {
+                "enum": ["pass", "fail", "warn"],
+                "description": "Check result"
+              }
+            }
+          },
+          "description": "List of validation checks performed"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of warning messages"
+        }
+      },
+      "description": "Validation results for canonical record"
+    }
+  },
+  "examples": [
+    {
+      "canonical": {
+        "canonical_id": "can_bofa_20250426_001",
+        "upload_id": "upl_abc123",
+        "row_id": 1,
+        "transaction_date": "2025-04-26",
+        "merchant": "Aeromexico",
+        "amount": 4516.00,
+        "currency": "MXN",
+        "amount_usd": 231.78,
+        "account_id": "apple_card",
+        "category": "Personal > Travel > Flights",
+        "confidence_score": 0.87
+      },
+      "observation": {
+        "upload_id": "upl_abc123",
+        "row_id": 1,
+        "date_raw": "04/26/2025",
+        "merchant_raw": "AEROMEXICO MEX",
+        "amount_raw": "4,516.00 MXN"
+      },
+      "artifact": {
+        "upload_id": "upl_abc123",
+        "filename": "apple_card_statement_2025-04.pdf",
+        "hash": "a3b5c7d9e1f...",
+        "size_bytes": 245678,
+        "mime_type": "application/pdf",
+        "uploaded_by": "eugenio@example.com",
+        "uploaded_at": "2025-04-27T10:29:30Z",
+        "source_type": "apple_card_pdf",
+        "status": "available",
+        "deleted_at": null,
+        "download_url": "https://api.example.com/uploads/upl_abc123/artifact?sig=abc...",
+        "view_url": "https://api.example.com/uploads/upl_abc123/viewer"
+      },
+      "decisions": [
+        {
+          "field": "merchant",
+          "decision": "Normalized 'AEROMEXICO MEX' → 'Aeromexico'",
+          "rule_applied": "merchant_normalization_v1.2",
+          "confidence": 0.95
+        },
+        {
+          "field": "category",
+          "decision": "Categorized as 'Personal > Travel > Flights'",
+          "rule_applied": "category_merchant_match",
+          "rule_pattern": "merchant='aeromexico' → Travel > Flights",
+          "confidence": 0.87
+        }
+      ],
+      "provenance": [
+        {
+          "event": "uploaded",
+          "timestamp": "2025-04-27T10:29:30Z",
+          "actor": "eugenio@example.com"
+        },
+        {
+          "event": "parsed",
+          "timestamp": "2025-04-27T10:29:45Z",
+          "actor": "system:bofa_pdf_parser_v1.2"
+        },
+        {
+          "event": "normalized",
+          "timestamp": "2025-04-27T10:30:00Z",
+          "actor": "system:normalizer_v1.0"
+        }
+      ],
+      "logs": {
+        "parse_log_url": "/api/logs/parse/upl_abc123",
+        "normalization_log_url": "/api/logs/normalize/upl_abc123"
+      },
+      "validation": {
+        "status": "valid",
+        "checks_performed": [
+          {"check": "date_format", "result": "pass"},
+          {"check": "amount_precision", "result": "pass"},
+          {"check": "currency_code", "result": "pass"}
+        ],
+        "warnings": [
+          "Merchant name normalized from all-caps format"
+        ]
+      }
+    }
+  ]
+}
