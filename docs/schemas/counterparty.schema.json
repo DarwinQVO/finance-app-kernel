@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/counterparty.schema.json",
+  "title": "Counterparty",
+  "description": "Counterparty entity (merchant, person, business, government). Open registry pattern with aliases.",
+  "type": "object",
+  "required": [
+    "counterparty_id",
+    "user_id",
+    "canonical_name",
+    "type",
+    "aliases",
+    "transaction_count",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "counterparty_id": {
+      "type": "string",
+      "pattern": "^cpty_[a-z0-9_]+$",
+      "description": "Unique counterparty identifier. Format: 'cpty_{slug}_{seq}'. Example: 'cpty_openai_1'"
+    },
+    "user_id": {
+      "type": "string",
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "Owner of the counterparty. Foreign key to users table."
+    },
+    "canonical_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "User-friendly canonical name. Examples: 'OpenAI', 'Uber Eats', 'Diana de la Tejera'. Unique per user (case-insensitive)."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["merchant", "person", "business", "government"],
+      "description": "Counterparty type. merchant = store/service, person = individual, business = company, government = government entity."
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "uniqueItems": true,
+      "description": "All variations seen in raw transactions. Examples: ['OPENAI', 'OPENAI INC', 'openai.com', 'OPENAI*']. Used for fuzzy matching.",
+      "examples": [
+        ["UBER EATS *1234", "UBER *5678", "UBEREATS"],
+        ["OPENAI", "OPENAI INC", "openai.com"],
+        ["AMZN MKTP", "AMAZON.COM", "Amazon"]
+      ]
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "maxLength": 1000,
+      "description": "Optional user notes. Examples: 'Freelance designer', 'AI research company', 'Monthly subscription'"
+    },
+    "transaction_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Denormalized count of transactions linked to this counterparty. Updated on transaction create/merge."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when counterparty was created (usually during normalization)"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when counterparty was last updated (edit, merge, alias added)"
+    },
+    "merged_into": {
+      "type": ["string", "null"],
+      "pattern": "^cpty_[a-z0-9_]+$",
+      "description": "If not null, this counterparty was merged into another. Points to primary counterparty_id. Merged counterparties are hidden from UI."
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "counterparty_id": "cpty_openai_1",
+      "user_id": "user_darwin",
+      "canonical_name": "OpenAI",
+      "type": "business",
+      "aliases": ["OPENAI", "OPENAI INC", "openai.com", "OPENAI*"],
+      "notes": "AI research and deployment company - monthly ChatGPT subscription",
+      "transaction_count": 5,
+      "created_at": "2025-05-20T10:00:00Z",
+      "updated_at": "2025-05-21T15:45:00Z",
+      "merged_into": null
+    },
+    {
+      "counterparty_id": "cpty_uber_eats_2",
+      "user_id": "user_darwin",
+      "canonical_name": "Uber Eats",
+      "type": "merchant",
+      "aliases": ["UBER EATS *1234", "UBER *5678", "UBEREATS"],
+      "notes": null,
+      "transaction_count": 8,
+      "created_at": "2025-05-16T09:00:00Z",
+      "updated_at": "2025-05-19T11:15:00Z",
+      "merged_into": null
+    },
+    {
+      "counterparty_id": "cpty_diana_3",
+      "user_id": "user_darwin",
+      "canonical_name": "Diana de la Tejera",
+      "type": "person",
+      "aliases": ["DIANA DE LA TEJERA", "D DE LA TEJERA"],
+      "notes": "Freelance graphic designer - monthly retainer",
+      "transaction_count": 3,
+      "created_at": "2025-05-18T14:00:00Z",
+      "updated_at": "2025-05-18T14:00:00Z",
+      "merged_into": null
+    },
+    {
+      "counterparty_id": "cpty_openai_inc_4",
+      "user_id": "user_darwin",
+      "canonical_name": "OpenAI Inc",
+      "type": "merchant",
+      "aliases": ["OPENAI INC"],
+      "notes": null,
+      "transaction_count": 0,
+      "created_at": "2025-05-20T11:00:00Z",
+      "updated_at": "2025-05-21T16:00:00Z",
+      "merged_into": "cpty_openai_1"
+    }
+  ]
+}

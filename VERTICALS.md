@@ -184,7 +184,8 @@
 ---
 
 ### **3.2 Counterparty**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
+**Status:** ✅ Complete
 **Full Name:** Counterparty (open registry)
 **Spec:** TBD
 
@@ -196,7 +197,7 @@
 ---
 
 ### **3.3 Series**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Series (closed registry)
 **Spec:** TBD
 
@@ -208,7 +209,7 @@
 ---
 
 ### **3.4 Tax Categorization**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Tax Categorization
 **Spec:** TBD
 
@@ -221,7 +222,7 @@
 ---
 
 ### **3.5 Relationships**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Relationships (txn ↔ txn)
 **Additions:** + fx_conversion
 **Spec:** TBD
@@ -235,7 +236,7 @@
 ---
 
 ### **3.6 Unit**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Unit (normalización)
 **Additions:** + currency/date rules
 **Spec:** TBD
@@ -249,7 +250,7 @@
 ---
 
 ### **3.7 Parser**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Parser (registry)
 **Spec:** TBD
 
@@ -261,7 +262,7 @@
 ---
 
 ### **3.8 Cluster Rules**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Cluster Rules
 **Spec:** TBD
 
@@ -273,7 +274,7 @@
 ---
 
 ### **3.9 Reconciliation Strategies**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Reconciliation Strategies
 **Spec:** TBD
 
@@ -288,7 +289,7 @@
 ## 📈 Group 4: Derivatives & Operativa
 
 ### **4.1 Reminders**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Reminders
 **Spec:** TBD
 
@@ -301,7 +302,7 @@
 ---
 
 ### **4.2 Forecast**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Forecast
 **Spec:** TBD
 
@@ -314,7 +315,7 @@
 ---
 
 ### **4.3 Corrections Flow**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Corrections Flow
 **Additions:** + override precedence & audit por campo
 **Spec:** TBD
@@ -330,7 +331,7 @@
 ## 🏛️ Group 5: Governance & Meta
 
 ### **5.1 Provenance Ledger**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Provenance Ledger
 **Additions:** + bitemporal model
 **Spec:** TBD
@@ -346,7 +347,7 @@
 ---
 
 ### **5.2 Schema Registry**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Schema Registry (Observation / Canonical)
 **Additions:** + versioning & migrations
 **Spec:** TBD
@@ -360,7 +361,7 @@
 ---
 
 ### **5.3 Rule Performance / Logs**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Rule Performance / Logs
 **Additions:** + parser/queue metrics
 **Spec:** TBD
@@ -374,7 +375,7 @@
 ---
 
 ### **5.4 Security & Access**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Security & Access (PII, roles)
 **Spec:** TBD
 
@@ -387,7 +388,7 @@
 ---
 
 ### **5.5 Public API Contracts**
-**Status:** 📝 Pending
+**Status:** ✅ Complete
 **Full Name:** Public API Contracts (si aplica)
 **Spec:** TBD
 
@@ -405,13 +406,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 7 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1 |
-| 📝 Pending | 16 | 3.2-3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 8 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2 |
+| 📝 Pending | 15 | 3.3-3.9, 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 30% (7/23)
+**Completion:** 35% (8/23)
 
-**Next up:** 3.2 Counterparty Registry
+**Next up:** 3.3 Series Registry
 
 ---
 
