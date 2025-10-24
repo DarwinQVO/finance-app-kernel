@@ -1,8 +1,8 @@
 # IL Components Summary
 
 **Status**: Specification complete
-**Last Updated**: 2025-05-23
-**Verticals covered**: 1.1, 2.1, 2.2
+**Last Updated**: 2025-10-23
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3
 
 ---
 
@@ -193,6 +193,291 @@ interface UploadListProps {
 
 ---
 
+### Vertical 2.3 (Finance Dashboard)
+
+#### 9. DashboardGrid ✅
+**Full spec**: [DashboardGrid.md](DashboardGrid.md)
+
+**Purpose**: Responsive grid layout for dashboard widgets
+
+**Props**:
+```typescript
+interface DashboardGridProps {
+  widgets: DashboardWidget[]
+  columns?: number  // Default: 12 (desktop), 1 (mobile)
+  gap?: number      // Default: 16px
+  editable?: boolean  // Allow drag-to-rearrange (v2 feature)
+  onWidgetClick?: (widget: DashboardWidget) => void
+  loading?: boolean
+}
+
+interface DashboardWidget {
+  id: string
+  type: WidgetType
+  position: { row: number; col: number; width: number; height?: number }
+  data: any
+  loading?: boolean
+  error?: string
+}
+
+type WidgetType =
+  | "income_summary"
+  | "expense_summary"
+  | "net_summary"
+  | "category_breakdown"
+  | "top_merchants"
+  | "deductible_summary"
+```
+
+**Visual (Desktop 12-col grid)**:
+```
+┌────────────────────────────────────────────────────────┐
+│ Grid Container (12 columns)                            │
+├────────────────────────────────────────────────────────┤
+│ ┌────────┐  ┌────────┐  ┌────────┐                    │
+│ │ Widget │  │ Widget │  │ Widget │                    │
+│ │ (col 0 │  │ (col 4 │  │ (col 8 │                    │
+│ │ width 4)  │ width 4)  │ width 4)                    │
+│ └────────┘  └────────┘  └────────┘                    │
+│                                                        │
+│ ┌──────────────────────────────────────────┐          │
+│ │ Widget (col 0, width 12)                 │          │
+│ │ Full-width metric card                   │          │
+│ └──────────────────────────────────────────┘          │
+└────────────────────────────────────────────────────────┘
+```
+
+**Mobile (stacked)**:
+```
+┌──────────────────┐
+│ Widget           │
+│ (stacked)        │
+└──────────────────┘
+┌──────────────────┐
+│ Widget           │
+│ (stacked)        │
+└──────────────────┘
+┌──────────────────┐
+│ Widget           │
+│ (stacked)        │
+└──────────────────┘
+```
+
+**Features**:
+- Responsive grid (12-col desktop, 1-col mobile)
+- Automatic gap spacing (default 16px)
+- Widget positioning via row/col/width
+- Loading skeletons per widget
+- Error state per widget
+- Click handler for drill-down
+
+**Reusability**:
+- Finance: Transaction dashboard
+- Healthcare: Patient vitals dashboard
+- Legal: Case management dashboard
+- Research: Research metrics dashboard
+- Manufacturing: Production dashboard
+- Media: Content analytics dashboard
+
+---
+
+#### 10. MetricCard ✅
+**Full spec**: [MetricCard.md](MetricCard.md)
+
+**Purpose**: Reusable widget for displaying single metric (number, trend, breakdown)
+
+**Props**:
+```typescript
+interface MetricCardProps {
+  title: string
+  value: number | string
+  currency?: string  // "USD", "MXN", etc.
+  format?: "currency" | "number" | "percentage"
+  trend?: {
+    direction: "up" | "down" | "neutral"
+    value: number
+    comparison: string  // e.g., "from April"
+  }
+  breakdown?: { label: string; value: number; percentage: number }[]
+  loading?: boolean
+  error?: string
+  onClick?: () => void  // For drill-down
+  icon?: ReactNode
+  variant?: "default" | "compact" | "detailed"
+}
+```
+
+**Visual States**:
+
+**Default**:
+```
+┌─────────────────────────┐
+│ 💰 Income               │
+├─────────────────────────┤
+│ $9,000.00               │
+│ ↑ 5% from April         │
+└─────────────────────────┘
+```
+
+**Detailed (with breakdown)**:
+```
+┌─────────────────────────────────┐
+│ 🍔 Top Categories               │
+├─────────────────────────────────┤
+│ Food & Drink     $680.00   (8%) │
+│ Travel         $4,516.00  (55%) │
+│ Software       $2,500.00  (30%) │
+│ Health           $551.00   (7%) │
+│                                 │
+│ [View All →]                    │
+└─────────────────────────────────┘
+```
+
+**Loading**:
+```
+┌─────────────────────────┐
+│ ▓▓▓▓▓▓▓▓▓▓              │
+│ ▓▓▓▓▓▓▓▓▓▓▓▓▓           │
+│ ▓▓▓▓▓▓▓▓                │
+└─────────────────────────┘
+```
+
+**Error**:
+```
+┌─────────────────────────┐
+│ 💰 Income               │
+├─────────────────────────┤
+│ ⚠️ Failed to load       │
+│ [Retry]                 │
+└─────────────────────────┘
+```
+
+**Features**:
+- Automatic number formatting (currency, percentage, etc.)
+- Trend indicators with direction arrows (↑ ↓ →)
+- Optional breakdown list (top N items)
+- Click handler for drill-down navigation
+- Loading skeleton
+- Error state with retry button
+- Responsive sizing (compact on mobile)
+
+**Accessibility**:
+- Screen reader announces: "Income metric. Value: $9,000. Up 5% from April. Click to view details."
+- Trend uses icon + color (not just color)
+- Keyboard focusable with `Tab`
+- `Enter` triggers drill-down
+
+**Reusability**:
+- Finance: Income card, expense card, net card, deductible card
+- Healthcare: Heart rate card, blood pressure card, BMI card
+- Legal: Cases won/lost card, hours billed card
+- Research: Papers published card, citations card, h-index card
+- Manufacturing: Units produced card, defect rate card, yield card
+- Media: Views card, engagement rate card, subscriber count card
+
+---
+
+#### 11. SavedViewSelector ✅
+**Full spec**: [SavedViewSelector.md](SavedViewSelector.md)
+
+**Purpose**: Dropdown component for selecting and managing saved views (with MRU history)
+
+**Props**:
+```typescript
+interface SavedViewSelectorProps {
+  views: SavedView[]
+  currentViewId?: string
+  defaultViewId?: string
+
+  onViewSelect: (viewId: string) => void
+  onViewCreate?: () => void
+  onViewEdit?: (viewId: string) => void
+  onViewDelete?: (viewId: string) => void
+  onViewSetDefault?: (viewId: string) => void
+
+  showCreateButton?: boolean  // Default: true
+  showManageButton?: boolean  // Default: true
+  maxRecentViews?: number     // Default: 5
+  theme?: "light" | "dark"
+}
+
+interface SavedView {
+  view_id: string
+  name: string
+  description?: string
+  is_system: boolean   // Cannot delete system views
+  is_default: boolean
+  created_at: string   // ISO 8601
+  updated_at: string   // ISO 8601
+}
+```
+
+**Visual (Collapsed)**:
+```
+┌─────────────────────────────────────┐
+│ Monthly Overview              [▼]   │
+└─────────────────────────────────────┘
+```
+
+**Visual (Expanded)**:
+```
+┌─────────────────────────────────────┐
+│ 🔍 Search views...                  │
+├─────────────────────────────────────┤
+│ RECENT                              │
+│ ● Monthly Overview (active)         │
+│   Q1 2025 Deductibles               │
+│   Annual Summary 2024               │
+├─────────────────────────────────────┤
+│ SYSTEM VIEWS                        │
+│   Monthly Overview              ⭐   │
+│   Quarterly Review                  │
+│   YTD Summary                       │
+├─────────────────────────────────────┤
+│ MY VIEWS (3)                        │
+│   Q1 2025 Deductibles    [✏️] [🗑️]  │
+│   Custom Dashboard       [✏️] [🗑️]  │
+│   Tax Prep View          [✏️] [🗑️]  │
+├─────────────────────────────────────┤
+│ [+ Create New View]                 │
+│ [⚙️ Manage Views]                   │
+└─────────────────────────────────────┘
+```
+
+**Features**:
+- MRU (Most Recently Used) history - shows last 5 accessed views at top
+- Search/filter by view name
+- System vs user views separation (system views cannot be deleted)
+- Action buttons per user view: edit, delete, set as default
+- Default view marked with star (⭐)
+- Active view highlighted
+- Keyboard navigation (↑↓ arrows, Enter to select, ESC to close)
+- Create new view button
+- Manage views button (opens view manager modal)
+
+**States**:
+- **Empty** (no user views): Show only system views + "Create your first view" CTA
+- **Loading**: Skeleton loader for view list
+- **Error**: "Failed to load views" with retry button
+
+**Accessibility**:
+- Screen reader announces: "Saved views dropdown. Current view: Monthly Overview. 8 views available."
+- Keyboard accessible (Tab to focus, Space/Enter to open, arrows to navigate)
+- ARIA labels for all action buttons
+- Focus trap when dropdown is open
+
+**Reusability**:
+- Finance: Dashboard view selector, saved filter selector, report template selector
+- Healthcare: Patient query selector, saved search selector, report view selector
+- Legal: Case search selector, document filter selector, custom view selector
+- Research: Paper library view selector, citation query selector, saved search selector
+- Manufacturing: QC dashboard selector, production view selector, custom report selector
+- Media: Analytics view selector, content filter selector, saved segment selector
+
+**Universal Pattern**: Any feature that saves user configurations (filters, layouts, queries, segments)
+
+---
+
 ## Composition Example (Upload Screen)
 
 ```tsx
@@ -281,4 +566,20 @@ All components accept `className` and respect CSS variables:
 
 ---
 
-**Maturity**: All 5 components specified, ready for implementation
+**Maturity**: All 11 components specified, ready for implementation
+
+---
+
+## Component Count by Vertical
+
+| Vertical | Components | Status |
+|----------|-----------|--------|
+| 1.1 Upload Flow | 5 components | ✅ Specified |
+| 2.1 Transaction List | 1 component | ✅ Specified |
+| 2.2 OL Exploration | 2 components | ✅ Specified |
+| 2.3 Finance Dashboard | 3 components | ✅ Specified |
+| **TOTAL** | **11 components** | |
+
+---
+
+**Next vertical**: 3.1 Account Registry (expected: 1-2 new IL components for registry management)

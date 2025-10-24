@@ -1,0 +1,145 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/dashboard-config.schema.json",
+  "title": "DashboardConfig",
+  "description": "Dashboard widget layout and filter configuration. This is a universal pattern for configuring dashboards across all domains.",
+  "type": "object",
+  "required": ["widgets"],
+  "properties": {
+    "date_range": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["current_month", "current_quarter", "current_year", "last_30_days", "last_90_days", "last_365_days"],
+          "description": "Relative date range. Example: 'current_month' = first to last day of current month"
+        },
+        {
+          "type": "object",
+          "required": ["from", "to"],
+          "properties": {
+            "from": {
+              "type": "string",
+              "format": "date",
+              "description": "Start date (ISO 8601). Example: '2025-01-01'"
+            },
+            "to": {
+              "type": "string",
+              "format": "date",
+              "description": "End date (ISO 8601). Example: '2025-03-31'"
+            }
+          },
+          "description": "Absolute date range. Must have from <= to"
+        }
+      ],
+      "description": "Date range filter. Can be relative (current_month) or absolute (from/to). Defaults to current_month if not specified."
+    },
+    "filters": {
+      "type": "object",
+      "description": "Additional filters to apply to all widgets (account, category, deductible, etc.)",
+      "properties": {
+        "account_ids": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Filter by specific accounts. Example: ['bofa_debit', 'apple_card']"
+        },
+        "category": {
+          "type": "string",
+          "description": "Filter by category. Example: 'Business > Software'"
+        },
+        "deductible_usa": {
+          "type": "boolean",
+          "description": "Filter for USA tax-deductible transactions"
+        },
+        "deductible_mexico": {
+          "type": "boolean",
+          "description": "Filter for Mexico tax-deductible transactions"
+        },
+        "amount_min": {
+          "type": "number",
+          "description": "Minimum transaction amount (inclusive)"
+        },
+        "amount_max": {
+          "type": "number",
+          "description": "Maximum transaction amount (inclusive)"
+        }
+      },
+      "additionalProperties": true
+    },
+    "widgets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["type", "position"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "income_summary",
+              "expense_summary",
+              "net_summary",
+              "category_breakdown",
+              "top_merchants",
+              "deductible_summary",
+              "trend_chart",
+              "transaction_table"
+            ],
+            "description": "Widget type. Determines which metric/visualization is displayed."
+          },
+          "position": {
+            "type": "object",
+            "required": ["row", "col", "width"],
+            "properties": {
+              "row": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Row index (0-indexed). Widgets on same row are side-by-side."
+              },
+              "col": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 11,
+                "description": "Column index (0-11 for 12-column grid). Widget starts at this column."
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12,
+                "description": "Widget spans this many columns. Example: width=4 takes 4 columns."
+              }
+            }
+          },
+          "config": {
+            "type": "object",
+            "description": "Widget-specific configuration (optional). Example: {limit: 10} for top_merchants",
+            "additionalProperties": true
+          }
+        }
+      },
+      "description": "Array of widgets to display. Each widget has a type and position in 12-column grid."
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "date_range": "current_month",
+      "widgets": [
+        {"type": "income_summary", "position": {"row": 0, "col": 0, "width": 4}},
+        {"type": "expense_summary", "position": {"row": 0, "col": 4, "width": 4}},
+        {"type": "net_summary", "position": {"row": 0, "col": 8, "width": 4}},
+        {"type": "category_breakdown", "position": {"row": 1, "col": 0, "width": 8}},
+        {"type": "top_merchants", "position": {"row": 1, "col": 8, "width": 4}, "config": {"limit": 10}}
+      ]
+    },
+    {
+      "date_range": {"from": "2025-01-01", "to": "2025-03-31"},
+      "filters": {"deductible_usa": true},
+      "widgets": [
+        {"type": "deductible_summary", "position": {"row": 0, "col": 0, "width": 12}},
+        {"type": "category_breakdown", "position": {"row": 1, "col": 0, "width": 8}},
+        {"type": "transaction_table", "position": {"row": 2, "col": 0, "width": 12}}
+      ]
+    }
+  ]
+}

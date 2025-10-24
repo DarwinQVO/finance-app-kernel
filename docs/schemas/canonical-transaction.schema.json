@@ -21,8 +21,8 @@
   "properties": {
     "canonical_id": {
       "type": "string",
-      "pattern": "^CT_[a-zA-Z0-9]+$",
-      "description": "Globally unique canonical transaction ID. Generated deterministically from upload_id + row_id + normalizer_version."
+      "pattern": "^(can_|CT_)[a-zA-Z0-9_]+$",
+      "description": "Globally unique canonical transaction ID. Format: 'can_{source}_{date}_{seq}' or 'CT_{hash}'. Generated deterministically from upload_id + row_id + normalizer_version."
     },
     "upload_id": {
       "type": "string",
@@ -111,7 +111,7 @@
         },
         "duplicate_of": {
           "type": "string",
-          "pattern": "^CT_[a-zA-Z0-9]+$",
+          "pattern": "^(can_|CT_)[a-zA-Z0-9_]+$",
           "description": "Canonical ID of potential duplicate transaction"
         }
       },

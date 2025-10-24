@@ -131,16 +131,29 @@
 ---
 
 ### **2.3 Finance Dashboard**
-**Status:** 📝 Pending
-**Full Name:** Finance Dashboard (saved views)
+**Status:** ✅ Complete
+**Full Name:** Finance Dashboard (saved views, metrics, exports)
 **Additions:** + Exports & Snapshots
-**Spec:** TBD
+**Spec:** [docs/verticals/2.3-finance-dashboard.md](docs/verticals/2.3-finance-dashboard.md)
 
-**Expected Use Cases:**
-- Pre-configured views (monthly spending, income vs expenses)
-- Custom dashboards (user-defined metrics)
-- Saved filters and layouts
-- Snapshot exports (PDF reports for accountant)
+**Primitives Delivered:**
+- SavedViewStore (OL) - Persist saved dashboard configurations
+- DashboardEngine (OL) - Calculate aggregate metrics (sum, count, group by)
+- SnapshotExporter (OL) - Generate PDF snapshots of dashboard state
+- DashboardGrid (IL) - Responsive grid layout for dashboard widgets
+- MetricCard (IL) - Reusable widget for displaying single metric
+- SavedViewSelector (IL) - Dropdown for selecting and managing saved views with MRU
+
+**Schemas:** saved-view.schema.json, dashboard-config.schema.json
+**UX Flow:** [2.3-finance-dashboard-experience.md](docs/ux-flows/2.3-finance-dashboard-experience.md)
+
+**Delivered:**
+- Pre-configured system views (Monthly Overview, Quarterly Summary, Annual Review)
+- Custom dashboard creation with configurable widgets
+- Saved filter combinations as named views
+- Aggregate metrics (income, expenses, net, category breakdown, top merchants, deductibles)
+- PDF snapshot export with view configuration metadata
+- Drill-down integration to Transaction List View (reuses 2.1)
 
 ---
 
@@ -380,13 +393,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 5 | 1.1, 1.2, 1.3, 2.1, 2.2 |
-| 📝 Pending | 18 | 2.3, 3.1-3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 6 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3 |
+| 📝 Pending | 17 | 3.1-3.9, 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 22% (5/23)
+**Completion:** 26% (6/23)
 
-**Next up:** 2.3 Finance Dashboard
+**Next up:** 3.1 Account Registry
 
 ---
 

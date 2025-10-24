@@ -16,7 +16,7 @@
 ### Group 2: Exploration & Visualization
 - **[2.1 Transaction List View](verticals/2.1-transaction-list-view.md)** ✅ Complete - Pagination, filtering, sorting, export
 - **[2.2 OL Exploration](verticals/2.2-ol-exploration.md)** ✅ Complete - Drill-down, decisions, provenance, artifact viewing
-- **2.3 Finance Dashboard** 📝 Pending - Saved views, exports, snapshots
+- **[2.3 Finance Dashboard](verticals/2.3-finance-dashboard.md)** ✅ Complete - Saved views, aggregate metrics, PDF exports
 
 ---
 
@@ -58,6 +58,11 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[DecisionExplainer](primitives/ol/DecisionExplainer.md)** - Explain normalization decisions with rules and confidence
 - **[ArtifactRetriever](primitives/ol/ArtifactRetriever.md)** - Retrieve artifacts with signed URLs and access control
 
+**Vertical 2.3 (Finance Dashboard):**
+- **[SavedViewStore](primitives/ol/SavedViewStore.md)** - Persist saved dashboard view configurations
+- **[DashboardEngine](primitives/ol/DashboardEngine.md)** - Calculate aggregate metrics from canonical data (sum, count, group by)
+- **[SnapshotExporter](primitives/ol/SnapshotExporter.md)** - Generate PDF snapshots of dashboard state with metrics and configuration
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -65,6 +70,9 @@ Reusable UI components:
 - **[TransactionTable](primitives/il/TransactionTable.md)** - Data grid with sorting, pagination, and row selection
 - **[DrillDownPanel](primitives/il/DrillDownPanel.md)** - Slide-in panel for complete drill-down view
 - **[ProvenanceTimeline](primitives/il/ProvenanceTimeline.md)** - Visual timeline for audit trail
+- **[DashboardGrid](primitives/il/DashboardGrid.md)** - Responsive grid layout for dashboard widgets (12-col desktop, stacked mobile)
+- **[MetricCard](primitives/il/MetricCard.md)** - Reusable widget for displaying single metric with trend and drill-down
+- **[SavedViewSelector](primitives/il/SavedViewSelector.md)** - Dropdown component for selecting and managing saved views with MRU history
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -93,6 +101,10 @@ Executable contracts extracted from vertical specifications:
 - **[drill-down-response.schema.json](schemas/drill-down-response.schema.json)** - Complete data lineage response (canonical + observation + artifact + decisions + provenance)
 - **[decision-explanation.schema.json](schemas/decision-explanation.schema.json)** - Normalization decision explanation format
 
+**Vertical 2.3 (Finance Dashboard):**
+- **[saved-view.schema.json](schemas/saved-view.schema.json)** - Saved dashboard view configuration (system + user views)
+- **[dashboard-config.schema.json](schemas/dashboard-config.schema.json)** - Dashboard widget layout, filters, and date range configuration
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -116,6 +128,7 @@ User experience specifications with wireframes and journeys:
 - **[1.3 Normalization Experience](ux-flows/1.3-normalization-experience.md)** - Validation results, error review, duplicate resolution, categorization
 - **[2.1 Transaction List Experience](ux-flows/2.1-transaction-list-experience.md)** - Filtering, sorting, pagination, export workflows
 - **[2.2 OL Exploration Experience](ux-flows/2.2-ol-exploration-experience.md)** - Drill-down, decision explanations, provenance timeline, artifact viewing
+- **[2.3 Finance Dashboard Experience](ux-flows/2.3-finance-dashboard-experience.md)** - Dashboard views, custom view creation, metric drill-down, PDF export
 
 ---
 
@@ -128,7 +141,7 @@ User experience specifications with wireframes and journeys:
 | | 1.3 Normalization | ✅ Complete |
 | **2. Exploration & Viz** | 2.1 Transaction List View | ✅ Complete |
 | | 2.2 OL Exploration | ✅ Complete |
-| | 2.3 Finance Dashboard | 📝 Pending |
+| | 2.3 Finance Dashboard | ✅ Complete |
 | **3. Registries** | 3.1-3.9 | 📝 Pending |
 | **4. Derivatives** | 4.1-4.3 | 📝 Pending |
 | **5. Governance** | 5.1-5.5 | 📝 Pending |

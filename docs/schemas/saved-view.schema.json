@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/saved-view.schema.json",
+  "title": "SavedView",
+  "description": "Saved dashboard view configuration. This is a universal pattern for persisting user-configured dashboard layouts.",
+  "type": "object",
+  "required": ["view_id", "name", "config", "is_system"],
+  "properties": {
+    "view_id": {
+      "type": "string",
+      "pattern": "^view_[a-z0-9_]+$",
+      "description": "Unique view identifier. Format: 'view_{slug}'. Example: 'view_monthly_overview'"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "User-facing view name. Example: 'Monthly Overview', 'Q1 2025 Deductibles'"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Optional description of what this view shows"
+    },
+    "is_default": {
+      "type": "boolean",
+      "description": "Whether this is the default view (loaded on dashboard page load). Only one view can be default per user."
+    },
+    "is_system": {
+      "type": "boolean",
+      "description": "Whether this is a system-provided view (cannot be deleted by user). System views are available to all users."
+    },
+    "user_id": {
+      "type": ["string", "null"],
+      "description": "Owner of this view. Null for system views, user ID for custom views."
+    },
+    "config": {
+      "$ref": "dashboard-config.schema.json",
+      "description": "Dashboard configuration (date range, filters, widget layout)"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when view was created (ISO 8601 UTC)"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when view was last modified (ISO 8601 UTC)"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "view_id": "view_monthly_overview",
+      "name": "Monthly Overview",
+      "description": "Current month income, expenses, net",
+      "is_default": true,
+      "is_system": true,
+      "user_id": null,
+      "config": {
+        "date_range": "current_month",
+        "widgets": [
+          {"type": "income_summary", "position": {"row": 0, "col": 0, "width": 4}},
+          {"type": "expense_summary", "position": {"row": 0, "col": 4, "width": 4}},
+          {"type": "net_summary", "position": {"row": 0, "col": 8, "width": 4}},
+          {"type": "category_breakdown", "position": {"row": 1, "col": 0, "width": 8}}
+        ]
+      },
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    },
+    {
+      "view_id": "view_q1_deductibles",
+      "name": "Q1 2025 Deductibles",
+      "description": "All deductible expenses Q1 2025",
+      "is_default": false,
+      "is_system": false,
+      "user_id": "usr_eugenio",
+      "config": {
+        "date_range": {"from": "2025-01-01", "to": "2025-03-31"},
+        "filters": {"deductible_usa": true},
+        "widgets": [
+          {"type": "deductible_summary", "position": {"row": 0, "col": 0, "width": 8}},
+          {"type": "category_breakdown", "position": {"row": 1, "col": 0, "width": 8}}
+        ]
+      },
+      "created_at": "2025-03-15T10:00:00Z",
+      "updated_at": "2025-03-15T10:00:00Z"
+    }
+  ]
+}
