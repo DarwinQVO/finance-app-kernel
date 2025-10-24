@@ -25,6 +25,7 @@
 - **[3.4 Tax Categorization](verticals/3.4-tax-categorization.md)** ✅ Complete - Multi-jurisdiction (USA+Mexico), hierarchical taxonomy, auto-classification, Factura tracking
 - **[3.5 Relationships](verticals/3.5-relationships.md)** ✅ Complete - Auto-detect transfers, FX conversion tracking, manual linking, analytics exclusion
 - **[3.6 Unit](verticals/3.6-unit.md)** ✅ Complete - Multi-currency normalization, exchange rate caching, date/timezone handling, locale-aware formatting
+- **[3.7 Parser Registry](verticals/3.7-parser-registry.md)** ✅ Complete - Parser discovery, capability tracking, versioning, auto-selection
 
 ---
 
@@ -104,6 +105,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[AmountFormatter](primitives/ol/AmountFormatter.md)** - Locale-aware formatting (en-US, es-MX, de-DE) with currency symbols and precision rules
 - **[ExchangeRateProvider](primitives/ol/ExchangeRateProvider.md)** - Multi-source rate fetching (ECB, Federal Reserve, manual) with caching and staleness detection
 
+**Vertical 3.7 (Parser Registry):**
+- **[ParserRegistry](primitives/ol/ParserRegistry.md)** - CRUD operations for parser registration, discovery, version tracking
+- **[ParserCapabilityStore](primitives/ol/ParserCapabilityStore.md)** - Track extractable fields per parser with confidence scores
+- **[ParserVersionManager](primitives/ol/ParserVersionManager.md)** - Version management with deprecation, breaking changes, sunset dates
+- **[ParserSelector](primitives/ol/ParserSelector.md)** - Auto-select best parser based on file metadata and capabilities
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -131,6 +138,9 @@ Reusable UI components:
 - **[CurrencySelectorDialog](primitives/il/CurrencySelectorDialog.md)** - Modal dialog for selecting base currency with search and popular currencies
 - **[AmountDisplayCard](primitives/il/AmountDisplayCard.md)** - Display original + normalized amounts side-by-side with toggle
 - **[ExchangeRateWidget](primitives/il/ExchangeRateWidget.md)** - Display rate with refresh button, staleness indicator, and source badge
+- **[ParserSelectorDialog](primitives/il/ParserSelectorDialog.md)** - Modal dialog for manual parser selection with capability badges
+- **[ParserCapabilitiesCard](primitives/il/ParserCapabilitiesCard.md)** - Display parser capabilities with confidence indicators
+- **[ParserVersionDropdown](primitives/il/ParserVersionDropdown.md)** - Version selector with deprecation warnings
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -188,6 +198,11 @@ Executable contracts extracted from vertical specifications:
 - **[exchange-rate-record.schema.json](schemas/exchange-rate-record.schema.json)** - Cached exchange rate record with staleness detection
 - **[currency-config.schema.json](schemas/currency-config.schema.json)** - User currency configuration (base currency, timezone, display locale, precision)
 
+**Vertical 3.7 (Parser Registry):**
+- **[parser-registration.schema.json](schemas/parser-registration.schema.json)** - Parser registration record with metadata, version, and capabilities
+- **[parser-capability.schema.json](schemas/parser-capability.schema.json)** - Capability definition for a parser (extractable fields with confidence)
+- **[parser-version.schema.json](schemas/parser-version.schema.json)** - Parser version record with deprecation and compatibility info
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -218,6 +233,7 @@ User experience specifications with wireframes and journeys:
 - **[3.4 Tax Categorization Experience](ux-flows/3.4-tax-categorization-experience.md)** - Classify transactions, upload Factura, create custom categories, auto-suggestions, bulk operations
 - **[3.5 Relationships Experience](ux-flows/3.5-relationships-experience.md)** - Accept transfer suggestion, manual link creation, FX conversion viewing, unlink flow, multiple candidates
 - **[3.6 Unit Experience](ux-flows/3.6-unit-experience.md)** - Set base currency, view dual currencies, refresh stale rates, manual rate override, timezone change
+- **[3.7 Parser Registry Experience](ux-flows/3.7-parser-registry-experience.md)** - Auto-detected parser, manual override, view capabilities, deprecated parser warning, register new parser
 
 ---
 
@@ -237,7 +253,8 @@ User experience specifications with wireframes and journeys:
 | | 3.4 Tax Categorization | ✅ Complete |
 | | 3.5 Relationships | ✅ Complete |
 | | 3.6 Unit | ✅ Complete |
-| | 3.7-3.9 | 📝 Pending |
+| | 3.7 Parser Registry | ✅ Complete |
+| | 3.8-3.9 | 📝 Pending |
 | **4. Derivatives** | 4.1-4.3 | 📝 Pending |
 | **5. Governance** | 5.1-5.5 | 📝 Pending |
 

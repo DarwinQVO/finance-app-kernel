@@ -2,7 +2,7 @@
 
 **Status**: Specification complete
 **Last Updated**: 2025-10-24
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
 
 ---
 
@@ -1692,6 +1692,151 @@ All components accept `className` and respect CSS variables:
 - Manufacturing: Material cost dashboard (supplier currencies → base currency)
 - Treasury: Corporate treasury dashboard (FX exposure monitoring)
 - Banking: Customer-facing rate display (transfers, wire services)
+
+---
+
+### Vertical 3.7 (Parser Registry)
+
+#### 29. ParserSelectorDialog ✅
+**Full spec**: [ParserSelectorDialog.md](ParserSelectorDialog.md)
+
+**Props**: `isOpen`, `file`, `availableParsers[]`, `onSelect`, `onCancel`
+**States**: loading | loaded | selecting | error
+**Reusable across**: Finance PDF/CSV parsers, Healthcare HL7/FHIR parsers, Legal document parsers, Research citation parsers, E-commerce EDI parsers
+
+**Purpose**: Modal dialog for manual parser selection when auto-detection has low confidence or user wants to override. Shows parser list with capability badges and confidence scores.
+
+**Visual (Parser List)**:
+```
+┌─────────────────────────────────────────────────┐
+│  Select Parser                               × │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│  File: BofA_Statement_Nov2024.pdf               │
+│  Type: PDF                                      │
+│                                                 │
+│  Available Parsers:                             │
+│  ┌─────────────────────────────────────────┐   │
+│  │ ● Bank of America PDF Parser        98% │   │
+│  │   v2.1.0 · Latest                       │   │
+│  │   ✓ date, amount, merchant, account     │   │
+│  ├─────────────────────────────────────────┤   │
+│  │   Chase PDF Parser                  45% │   │
+│  │   v1.5.0 · May not match format         │   │
+│  │   ✓ date, amount, merchant              │   │
+│  ├─────────────────────────────────────────┤   │
+│  │   Generic Bank PDF Parser           30% │   │
+│  │   v3.0.0 · Fallback option              │   │
+│  │   ✓ date, amount                        │   │
+│  └─────────────────────────────────────────┘   │
+│                                                 │
+│  ℹ️ Auto-selected: Bank of America PDF Parser  │
+│                                                 │
+│                      [Cancel] [Use Selected]    │
+└─────────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: PDF parsers (BofA, Chase, Scotia), CSV parsers (Apple Card, Mint)
+- Healthcare: HL7 v2.5 ADT parser, FHIR R4 parser, DICOM parser
+- Legal: Court filing PDF parser, contract DOCX parser
+- Research: BibTeX citation parser, LaTeX parser
+- E-commerce: EDI X12 4010 invoice parser, XML invoice parser
+- Any domain: Service/parser selection UI pattern
+
+---
+
+#### 30. ParserCapabilitiesCard ✅
+**Full spec**: [ParserCapabilitiesCard.md](ParserCapabilitiesCard.md)
+
+**Props**: `parser`, `capabilities[]`, `showConfidence`
+**States**: collapsed | expanded | loading
+**Reusable across**: Finance parsers, Healthcare protocol handlers, Legal document parsers, Research format parsers
+
+**Purpose**: Display parser capabilities card showing extractable fields, supported file types, and extraction confidence scores.
+
+**Visual (Expanded)**:
+```
+┌────────────────────────────────────────────┐
+│  Parser Capabilities                       │
+├────────────────────────────────────────────┤
+│                                            │
+│  BofA PDF Parser v2.1.0                    │
+│                                            │
+│  Extractable Fields:                       │
+│  ✓ date          98% confidence            │
+│  ✓ amount        99% confidence            │
+│  ✓ merchant      95% confidence            │
+│  ✓ account       97% confidence            │
+│  ✓ balance       90% confidence            │
+│                                            │
+│  Supported Files:                          │
+│  • PDF (.pdf)                              │
+│                                            │
+│  Filename Patterns:                        │
+│  • *BofA*.pdf                              │
+│  • *Bank of America*.pdf                   │
+│                                            │
+│  [View Version History]                    │
+└────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Display parser capabilities before upload
+- Healthcare: Show protocol handler capabilities (HL7 message types)
+- Legal: Display document parser supported fields
+- Research: Show citation parser extractable metadata
+- E-commerce: Display EDI parser transaction sets
+- Microservices: Show API endpoint capabilities
+
+---
+
+#### 31. ParserVersionDropdown ✅
+**Full spec**: [ParserVersionDropdown.md](ParserVersionDropdown.md)
+
+**Props**: `parserId`, `versions[]`, `currentVersion`, `onVersionChange`, `showDeprecated`
+**States**: idle | loading | deprecated_warning | error
+**Reusable across**: Finance parsers, Healthcare protocol versions, Legal document formats, Research citation formats
+
+**Purpose**: Dropdown for selecting parser version with deprecation warnings and breaking change indicators.
+
+**Visual (Version List)**:
+```
+┌────────────────────────────────────────────┐
+│  Parser Version          ▼                 │
+├────────────────────────────────────────────┤
+│  ● v2.1.0  (Latest) ✨                     │
+│    v2.0.0                                  │
+│    v1.5.0  (Deprecated) ⚠️                 │
+│    v1.0.0  (Breaking changes) 🔴           │
+└────────────────────────────────────────────┘
+```
+
+**Visual (Deprecated Warning)**:
+```
+┌────────────────────────────────────────────┐
+│  ⚠️ Version Deprecated                     │
+├────────────────────────────────────────────┤
+│                                            │
+│  v1.5.0 will be sunset on 2025-12-31      │
+│                                            │
+│  Please upgrade to v2.1.0                  │
+│                                            │
+│  Breaking changes:                         │
+│  • New date format required                │
+│  • Account field now mandatory             │
+│                                            │
+│  [View Migration Guide] [Upgrade Now]      │
+└────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Select parser version for upload
+- Healthcare: Select HL7 version (v2.3, v2.5, v3.0)
+- Legal: Select document schema version
+- Research: Select citation format version (APA 6th vs 7th)
+- E-commerce: Select EDI version (X12 4010 vs 5010)
+- Any domain: Version selection with deprecation warnings
 
 ---
 

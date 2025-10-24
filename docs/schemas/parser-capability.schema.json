@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/parser-capability.schema.json",
+  "title": "ParserCapability",
+  "description": "Capability definition for a parser (what fields it can extract)",
+  "type": "object",
+  "required": ["parser_id", "capability_name", "field_type", "extraction_confidence"],
+  "properties": {
+    "parser_id": {
+      "type": "string",
+      "pattern": "^parser_[a-z0-9_]+$"
+    },
+    "capability_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50,
+      "pattern": "^[a-z_]+$",
+      "description": "Name of extractable field (e.g., 'date', 'amount', 'patient_id')"
+    },
+    "field_type": {
+      "type": "string",
+      "enum": ["string", "number", "date", "boolean", "array"],
+      "description": "Data type of extracted field"
+    },
+    "extraction_confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Confidence that parser can extract this field reliably (0.0-1.0)"
+    },
+    "required_for_success": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, parser fails if this field cannot be extracted"
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 500
+    }
+  },
+  "examples": [
+    {
+      "parser_id": "parser_bofa_pdf",
+      "capability_name": "date",
+      "field_type": "date",
+      "extraction_confidence": 0.98,
+      "required_for_success": true,
+      "notes": "Extracts transaction date in MM/DD/YYYY format"
+    },
+    {
+      "parser_id": "parser_hl7_v2_5_adt",
+      "capability_name": "patient_id",
+      "field_type": "string",
+      "extraction_confidence": 0.99,
+      "required_for_success": true
+    }
+  ]
+}

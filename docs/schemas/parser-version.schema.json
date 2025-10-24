@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/parser-version.schema.json",
+  "title": "ParserVersion",
+  "description": "Parser version record with deprecation and compatibility info",
+  "type": "object",
+  "required": ["parser_id", "version", "released_at"],
+  "properties": {
+    "parser_id": {
+      "type": "string",
+      "pattern": "^parser_[a-z0-9_]+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "released_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deprecated": {
+      "type": "boolean",
+      "default": false
+    },
+    "sunset_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date after which version will be removed"
+    },
+    "breaking_changes": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "List of breaking changes from previous version"
+    },
+    "migration_guide_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "compatible_with": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "List of compatible schema versions"
+    }
+  },
+  "examples": [
+    {
+      "parser_id": "parser_bofa_pdf",
+      "version": "2.1.0",
+      "released_at": "2024-11-01T10:00:00Z",
+      "deprecated": false,
+      "breaking_changes": [],
+      "compatible_with": ["observation-transaction-v2"]
+    },
+    {
+      "parser_id": "parser_bofa_pdf",
+      "version": "1.5.0",
+      "released_at": "2024-06-01T08:00:00Z",
+      "deprecated": true,
+      "sunset_date": "2024-12-31",
+      "breaking_changes": [],
+      "migration_guide_url": "https://docs.example.com/parsers/bofa/v2-migration",
+      "compatible_with": ["observation-transaction-v1"]
+    }
+  ]
+}

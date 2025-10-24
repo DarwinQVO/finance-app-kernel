@@ -317,15 +317,33 @@
 
 ---
 
-### **3.7 Parser**
+### **3.7 Parser Registry**
 **Status:** ✅ Complete
-**Full Name:** Parser (registry)
-**Spec:** TBD
+**Full Name:** Parser Registry (Service Discovery + Capability-Based Selection)
+**Additions:** + capability tracking, auto-selection, versioning
+**Spec:** [docs/verticals/3.7-parser-registry.md](docs/verticals/3.7-parser-registry.md)
 
-**Expected:**
-- Registry of available parsers (BofA PDF, Apple Card CSV, Scotia PDF, etc.)
-- Parser versioning
-- Parser capabilities (what fields can it extract)
+**Primitives Delivered:**
+- ParserRegistry (OL) - CRUD operations for parser registration, discovery, version tracking
+- ParserCapabilityStore (OL) - Track extractable fields per parser with confidence scores
+- ParserVersionManager (OL) - Version management with deprecation, breaking changes, sunset dates
+- ParserSelector (OL) - Auto-select best parser based on file metadata and capabilities
+- ParserSelectorDialog (IL) - Modal dialog for manual parser selection with capability badges
+- ParserCapabilitiesCard (IL) - Display parser capabilities with confidence indicators
+- ParserVersionDropdown (IL) - Version selector with deprecation warnings
+
+**Schemas:** parser-registration.schema.json, parser-capability.schema.json, parser-version.schema.json
+**UX Flow:** [3.7-parser-registry-experience.md](docs/ux-flows/3.7-parser-registry-experience.md)
+
+**Delivered:**
+- Parser discovery and registration (BofA PDF, Apple Card CSV, Scotia PDF, etc.)
+- Capability tracking (which fields each parser extracts: date, amount, merchant, account)
+- Semantic versioning with deprecation support (v1.0.0 → v2.1.0)
+- Auto-selection based on file type, filename patterns, and required capabilities
+- Confidence scoring for parser selection (0.0-1.0)
+- Backward compatibility tracking across versions
+- Migration guides between breaking versions
+- Multi-domain applicability (Finance → PDF/CSV parsers, Healthcare → HL7/FHIR parsers, Legal → document parsers, Research → citation parsers, E-commerce → EDI parsers)
 
 ---
 
@@ -474,13 +492,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 12 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 |
-| 📝 Pending | 11 | 3.7-3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 13 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7 |
+| 📝 Pending | 10 | 3.8-3.9, 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 52% (12/23)
+**Completion:** 57% (13/23)
 
-**Next up:** 3.7 Parser (parser registry)
+**Next up:** 3.8 Cluster Rules (merchant normalization)
 
 ---
 

@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/parser-registration.schema.json",
+  "title": "ParserRegistration",
+  "description": "Parser registration record with metadata, version, and capabilities",
+  "type": "object",
+  "required": ["parser_id", "name", "version", "file_types", "capabilities"],
+  "properties": {
+    "parser_id": {
+      "type": "string",
+      "pattern": "^parser_[a-z0-9_]+$",
+      "description": "Unique parser identifier (e.g., 'parser_bofa_pdf')"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Human-readable parser name (e.g., 'Bank of America PDF Parser')"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version (major.minor.patch, e.g., '2.1.0')"
+    },
+    "file_types": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "enum": ["pdf", "csv", "xlsx", "json", "xml", "txt", "hl7", "edi", "bib"]
+      },
+      "description": "Supported file types"
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"},
+      "description": "List of extractable fields (e.g., ['date', 'amount', 'merchant', 'account'])"
+    },
+    "filename_patterns": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "description": "Regex patterns for filename matching (e.g., ['.*BofA.*\\.pdf', '.*Bank of America.*'])"
+    },
+    "deprecated": {
+      "type": "boolean",
+      "default": false
+    },
+    "sunset_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date after which version will be removed"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "registered_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "examples": [
+    {
+      "parser_id": "parser_bofa_pdf",
+      "name": "Bank of America PDF Parser",
+      "version": "2.1.0",
+      "file_types": ["pdf"],
+      "capabilities": ["date", "amount", "merchant", "account", "balance"],
+      "filename_patterns": [".*BofA.*\\.pdf", ".*Bank of America.*\\.pdf"],
+      "deprecated": false,
+      "registered_at": "2024-11-01T10:00:00Z",
+      "is_active": true
+    },
+    {
+      "parser_id": "parser_hl7_v2_5_adt",
+      "name": "HL7 v2.5 ADT Parser",
+      "version": "3.0.0",
+      "file_types": ["txt", "hl7"],
+      "capabilities": ["patient_id", "visit_number", "admission_date", "diagnosis_code"],
+      "filename_patterns": [".*ADT.*\\.txt", ".*HL7.*\\.hl7"],
+      "deprecated": false,
+      "description": "Parses HL7 v2.5 ADT (Admit/Discharge/Transfer) messages",
+      "registered_at": "2024-10-15T09:00:00Z",
+      "is_active": true
+    }
+  ]
+}
