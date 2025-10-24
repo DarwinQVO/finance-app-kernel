@@ -22,6 +22,7 @@
 - **[3.1 Account Registry](verticals/3.1-account-registry.md)** ✅ Complete - Closed registry pattern, CRUD operations, soft delete
 - **[3.2 Counterparty Registry](verticals/3.2-counterparty-registry.md)** ✅ Complete - Open registry, aliases, fuzzy matching, merge duplicates
 - **[3.3 Series Registry](verticals/3.3-series-registry.md)** ✅ Complete - Recurring payments, template + instance tracking, auto-link, variance detection
+- **[3.4 Tax Categorization](verticals/3.4-tax-categorization.md)** ✅ Complete - Multi-jurisdiction (USA+Mexico), hierarchical taxonomy, auto-classification, Factura tracking
 
 ---
 
@@ -82,6 +83,13 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[RecurrenceEngine](primitives/ol/RecurrenceEngine.md)** - Calculates next expected date based on frequency patterns (daily, weekly, monthly, yearly, custom)
 - **[InstanceTracker](primitives/ol/InstanceTracker.md)** - Auto-links transactions to series instances, detects variances and missing payments
 
+**Vertical 3.4 (Tax Categorization):**
+- **[TaxCategoryStore](primitives/ol/TaxCategoryStore.md)** - CRUD for tax categories (system + custom) with hierarchical support
+- **[TaxonomyEngine](primitives/ol/TaxonomyEngine.md)** - Navigate hierarchical category trees (depth-first, breadth-first)
+- **[TaxCategoryClassifier](primitives/ol/TaxCategoryClassifier.md)** - Auto-suggest categories based on patterns (rules + ML)
+- **[FacturaStore](primitives/ol/FacturaStore.md)** - CRUD for Mexican Factura records (CFDI XML parsing)
+- **[FacturaValidator](primitives/ol/FacturaValidator.md)** - Validate CFDI XML format, RFC, UUID, amount, date
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -100,6 +108,9 @@ Reusable UI components:
 - **[SeriesManager](primitives/il/SeriesManager.md)** - Full CRUD UI for managing recurring payment series with status badges and variance alerts
 - **[SeriesSelector](primitives/il/SeriesSelector.md)** - Dropdown for selecting series to link (used in transaction detail, manual link dialog)
 - **[RecurrenceConfigDialog](primitives/il/RecurrenceConfigDialog.md)** - Dialog for configuring recurrence patterns (daily, weekly, monthly, yearly, custom)
+- **[TaxCategorySelector](primitives/il/TaxCategorySelector.md)** - Dropdown for selecting tax category with hierarchy and search
+- **[TaxCategoryManager](primitives/il/TaxCategoryManager.md)** - Full UI for managing custom tax categories (tree view)
+- **[FacturaUploadDialog](primitives/il/FacturaUploadDialog.md)** - Upload and link Factura XML to transaction (Mexico CFDI)
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -142,6 +153,11 @@ Executable contracts extracted from vertical specifications:
 - **[series.schema.json](schemas/series.schema.json)** - Recurring payment series definition (expected amount, frequency pattern, tolerance)
 - **[series-instance.schema.json](schemas/series-instance.schema.json)** - Instance tracking record (expected vs actual, variance, status)
 
+**Vertical 3.4 (Tax Categorization):**
+- **[tax-category.schema.json](schemas/tax-category.schema.json)** - Tax category definition (multi-jurisdiction, hierarchical, deduction rate)
+- **[tax-classification.schema.json](schemas/tax-classification.schema.json)** - Transaction tax classification (category, deduction rate, confidence)
+- **[factura-record.schema.json](schemas/factura-record.schema.json)** - Mexican Factura (CFDI) record (RFC, UUID, amount, date)
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -169,6 +185,7 @@ User experience specifications with wireframes and journeys:
 - **[3.1 Account Registry Experience](ux-flows/3.1-account-registry-experience.md)** - Account creation, editing, archiving, selector dropdown, immutability patterns
 - **[3.2 Counterparty Registry Experience](ux-flows/3.2-counterparty-registry-experience.md)** - Auto-creation, fuzzy matching, merge duplicates, alias management
 - **[3.3 Series Registry Experience](ux-flows/3.3-series-registry-experience.md)** - Create recurring series, view status badges, manual link, variance alerts, archive series
+- **[3.4 Tax Categorization Experience](ux-flows/3.4-tax-categorization-experience.md)** - Classify transactions, upload Factura, create custom categories, auto-suggestions, bulk operations
 
 ---
 
@@ -185,6 +202,7 @@ User experience specifications with wireframes and journeys:
 | **3. Registries** | 3.1 Account Registry | ✅ Complete |
 | | 3.2 Counterparty Registry | ✅ Complete |
 | | 3.3 Series Registry | ✅ Complete |
+| | 3.4 Tax Categorization | ✅ Complete |
 | | 3.4-3.9 | 📝 Pending |
 | **4. Derivatives** | 4.1-4.3 | 📝 Pending |
 | **5. Governance** | 5.1-5.5 | 📝 Pending |

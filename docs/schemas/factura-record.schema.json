@@ -1,0 +1,205 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/factura-record.schema.json",
+  "title": "FacturaRecord",
+  "description": "Mexican Factura (CFDI) record linked to transaction. Stores RFC, UUID, and validates against SAT requirements. CFDI = Comprobante Fiscal Digital por Internet (Mexico's electronic invoice standard).",
+  "type": "object",
+  "required": [
+    "factura_id",
+    "user_id",
+    "rfc",
+    "uuid",
+    "amount",
+    "currency",
+    "issued_date",
+    "xml_file_id",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "factura_id": {
+      "type": "string",
+      "pattern": "^factura_[a-z0-9_]+$",
+      "description": "Unique factura identifier. Format: 'factura_{rfc}_{seq}'. Example: 'factura_abc123456xyz_1'"
+    },
+    "user_id": {
+      "type": "string",
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "Owner of the factura. Foreign key to users table."
+    },
+    "transaction_id": {
+      "type": ["string", "null"],
+      "pattern": "^txn_[a-z0-9_]+$",
+      "description": "Linked transaction. null if orphan factura (uploaded before transaction exists). Foreign key to transactions table."
+    },
+    "rfc": {
+      "type": "string",
+      "pattern": "^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$",
+      "minLength": 12,
+      "maxLength": 13,
+      "description": "RFC (Registro Federal de Contribuyentes) - Mexican tax ID. 12 chars (person) or 13 chars (company). Example: 'ABC123456XYZ' or 'ABCD123456XY1'"
+    },
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Folio Fiscal (UUID v4) - Unique factura identifier assigned by SAT. Example: '12345678-1234-1234-1234-123456789012'"
+    },
+    "amount": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "minimum": 0.01,
+      "maximum": 999999.99,
+      "description": "Total amount on factura (Importe Total). 2 decimal places. Example: 500.00"
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "ISO 4217 currency code (usually MXN for Mexico). Examples: 'MXN', 'USD'"
+    },
+    "issued_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date factura was issued (Fecha de Emisión). ISO 8601 format (YYYY-MM-DD). Example: '2024-11-01'"
+    },
+    "xml_file_id": {
+      "type": "string",
+      "pattern": "^file_artifact_[a-z0-9_]+$",
+      "description": "CFDI XML file stored in artifact storage. Foreign key to file_artifacts table."
+    },
+    "pdf_file_id": {
+      "type": ["string", "null"],
+      "pattern": "^file_artifact_[a-z0-9_]+$",
+      "description": "Optional PDF representation (if provided by issuer). Foreign key to file_artifacts table."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["valid", "invalid", "pending_validation", "cancelled"],
+      "description": "Validation status: 'valid' = passed all checks, 'invalid' = validation failed, 'pending_validation' = awaiting SAT API check, 'cancelled' = factura cancelled in SAT system"
+    },
+    "validation_errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of validation error messages (if status='invalid'). Examples: ['RFC format invalid', 'Amount mismatch: expected $500.00, got $520.00']"
+    },
+    "cfdi_version": {
+      "type": ["string", "null"],
+      "enum": ["3.3", "4.0", null],
+      "description": "CFDI version extracted from XML. '3.3' or '4.0' (current SAT standards)."
+    },
+    "serie": {
+      "type": ["string", "null"],
+      "maxLength": 25,
+      "description": "Factura series (Serie). Optional, extracted from XML."
+    },
+    "folio": {
+      "type": ["string", "null"],
+      "maxLength": 40,
+      "description": "Factura folio number (Folio). Optional, extracted from XML."
+    },
+    "emisor_nombre": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "description": "Issuer name (Nombre del Emisor). Extracted from XML. Example: 'Acme Corp SA de CV'"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when factura was uploaded"
+    },
+    "validated_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when factura was validated (SAT API check). null if not yet validated."
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "factura_id": "factura_abc123456xyz_1",
+      "user_id": "user_darwin",
+      "transaction_id": "txn_67890",
+      "rfc": "ABC123456XYZ",
+      "uuid": "12345678-1234-1234-1234-123456789012",
+      "amount": 500.00,
+      "currency": "MXN",
+      "issued_date": "2024-11-01",
+      "xml_file_id": "file_artifact_123",
+      "pdf_file_id": "file_artifact_124",
+      "status": "valid",
+      "validation_errors": [],
+      "cfdi_version": "4.0",
+      "serie": "A",
+      "folio": "12345",
+      "emisor_nombre": "Acme Corp SA de CV",
+      "created_at": "2024-11-01T10:00:00Z",
+      "validated_at": "2024-11-01T10:01:30Z"
+    },
+    {
+      "factura_id": "factura_def987654abc_2",
+      "user_id": "user_darwin",
+      "transaction_id": null,
+      "rfc": "DEF987654ABC",
+      "uuid": "87654321-4321-4321-4321-210987654321",
+      "amount": 1200.00,
+      "currency": "MXN",
+      "issued_date": "2024-11-05",
+      "xml_file_id": "file_artifact_125",
+      "pdf_file_id": null,
+      "status": "pending_validation",
+      "validation_errors": [],
+      "cfdi_version": "3.3",
+      "serie": null,
+      "folio": null,
+      "emisor_nombre": "Proveedor XYZ SA",
+      "created_at": "2024-11-05T14:00:00Z",
+      "validated_at": null
+    },
+    {
+      "factura_id": "factura_ghi555555jkl_3",
+      "user_id": "user_darwin",
+      "transaction_id": "txn_99999",
+      "rfc": "GHI555555JKL",
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "amount": 800.00,
+      "currency": "MXN",
+      "issued_date": "2024-10-28",
+      "xml_file_id": "file_artifact_126",
+      "pdf_file_id": null,
+      "status": "invalid",
+      "validation_errors": [
+        "Amount mismatch: transaction shows $750.00 MXN, factura shows $800.00 MXN (variance: 6.7%)",
+        "Date mismatch: transaction date 2024-11-05 is +8 days from factura date 2024-10-28 (tolerance: ±7 days)"
+      ],
+      "cfdi_version": "4.0",
+      "serie": "B",
+      "folio": "67890",
+      "emisor_nombre": "Servicios ABC SA",
+      "created_at": "2024-11-05T16:00:00Z",
+      "validated_at": "2024-11-05T16:00:10Z"
+    },
+    {
+      "factura_id": "factura_mno222222pqr_4",
+      "user_id": "user_darwin",
+      "transaction_id": "txn_88888",
+      "rfc": "MNO222222PQR",
+      "uuid": "99999999-8888-7777-6666-555555555555",
+      "amount": 350.00,
+      "currency": "MXN",
+      "issued_date": "2024-11-10",
+      "xml_file_id": "file_artifact_127",
+      "pdf_file_id": "file_artifact_128",
+      "status": "cancelled",
+      "validation_errors": [
+        "Factura cancelled in SAT system on 2024-11-12"
+      ],
+      "cfdi_version": "4.0",
+      "serie": "C",
+      "folio": "54321",
+      "emisor_nombre": "Consultores LMN SA",
+      "created_at": "2024-11-10T11:00:00Z",
+      "validated_at": "2024-11-12T09:00:00Z"
+    }
+  ]
+}

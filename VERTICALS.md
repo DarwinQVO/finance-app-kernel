@@ -226,14 +226,31 @@
 
 ### **3.4 Tax Categorization**
 **Status:** ✅ Complete
-**Full Name:** Tax Categorization
-**Spec:** TBD
+**Full Name:** Tax Categorization (Regulatory Classification System)
+**Spec:** [docs/verticals/3.4-tax-categorization.md](docs/verticals/3.4-tax-categorization.md)
 
-**Expected:**
-- Dual tax jurisdiction support (USA + Mexico)
-- Deductible tagging (100%, 50%, 0%)
-- Schedule C categories (USA), SAT categories (Mexico)
-- Factura tracking (Mexico)
+**Primitives Delivered:**
+- TaxCategoryStore (OL) - CRUD for tax categories (system + custom) with hierarchical support
+- TaxonomyEngine (OL) - Navigate hierarchical category trees (depth-first, breadth-first)
+- TaxCategoryClassifier (OL) - Auto-suggest categories based on patterns (rules + ML)
+- FacturaStore (OL) - CRUD for Mexican Factura records (CFDI XML parsing)
+- FacturaValidator (OL) - Validate CFDI XML format, RFC, UUID, amount, date
+- TaxCategorySelector (IL) - Dropdown for selecting tax category with hierarchy and search
+- TaxCategoryManager (IL) - Full UI for managing custom categories (tree view)
+- FacturaUploadDialog (IL) - Upload and link Factura XML to transaction
+
+**Schemas:** tax-category.schema.json, tax-classification.schema.json, factura-record.schema.json
+**UX Flow:** [3.4-tax-categorization-experience.md](docs/ux-flows/3.4-tax-categorization-experience.md)
+
+**Delivered:**
+- Multi-jurisdiction support (USA Schedule C, Mexico SAT, extensible to other jurisdictions)
+- Hierarchical taxonomy navigation (parent-child categories)
+- Deduction rate tagging (100%, 50%, 0% = compliance levels)
+- Factura (CFDI) tracking for Mexico transactions (RFC, UUID validation)
+- Auto-classification based on merchant patterns (confidence scoring ≥70%)
+- Custom category creation within jurisdictions
+- Bulk classification operations
+- Multi-domain applicability (Finance → tax, Healthcare → CPT/ICD-10, Legal → case categories, Research → grant compliance)
 
 ---
 
@@ -422,13 +439,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 9 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3 |
-| 📝 Pending | 14 | 3.4-3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 10 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4 |
+| 📝 Pending | 13 | 3.5-3.9, 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 39% (9/23)
+**Completion:** 43% (10/23)
 
-**Next up:** 3.4 Tax Categorization
+**Next up:** 3.5 Relationships (transaction linking, transfers, FX conversion)
 
 ---
 

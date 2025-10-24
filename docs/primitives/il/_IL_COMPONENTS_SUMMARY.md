@@ -2,7 +2,7 @@
 
 **Status**: Specification complete
 **Last Updated**: 2025-10-24
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4
 
 ---
 
@@ -992,3 +992,173 @@ All components accept `className` and respect CSS variables:
 - Media: Configure content publication schedules, license renewals
 
 ---
+
+### Vertical 3.4 (Tax Categorization)
+
+#### 20. TaxCategorySelector ✅
+**Full spec**: [TaxCategorySelector.md](TaxCategorySelector.md)
+
+**Purpose**: Dropdown for selecting tax category with hierarchical display and auto-suggestions
+
+**Key Features**:
+- Hierarchical category display (parent → children indentation)
+- Full-text search across category names and descriptions
+- Jurisdiction filter (USA Federal, Mexico Federal, etc.)
+- Deduction rate badges (100%, 50%, 0%)
+- Auto-suggestions with confidence scores (95% = very high, 70-79% = medium)
+- Group by taxonomy (Schedule C, SAT, etc.)
+- Keyboard navigation (↑↓ select, Enter confirm, Esc close)
+- Category path display ("Schedule C > Office Expenses > Software")
+- Size variants (small, medium, large)
+
+**Visual (Expanded with Auto-Suggestions)**:
+```
+┌──────────────────────────────────────────┐
+│ 🔍 Search categories...                  │
+├──────────────────────────────────────────┤
+│ 💡 SUGGESTED (based on "Uber")           │
+│ ● Travel (95% confidence)      100% 📗   │
+│   Car and Truck (65%)          100% 📗   │
+├──────────────────────────────────────────┤
+│ SCHEDULE C (USA FEDERAL)                 │
+│   Advertising                  100% 📗   │
+│   Office Expenses              100% 📗   │
+│   Meals (Business)              50% 📒   │
+│   Travel                       100% 📗   │
+│   Personal (Non-Deductible)      0% 📕   │
+├──────────────────────────────────────────┤
+│ SAT (MEXICO FEDERAL)                     │
+│   Gastos de Publicidad         100% 📗   │
+│   Gastos de Gestión            100% 📗   │
+└──────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Select tax category (Schedule C, SAT)
+- Healthcare: Select CPT code, ICD-10 diagnosis code
+- Legal: Select case category, filing type
+- Research: Select grant expense category, compliance classification
+- Manufacturing: Select safety category, environmental classification
+- Media: Select content classification, licensing category
+
+---
+
+#### 21. TaxCategoryManager ✅
+**Full spec**: [TaxCategoryManager.md](TaxCategoryManager.md)
+
+**Purpose**: Full UI for managing custom tax categories with tree view
+
+**Key Features**:
+- Tree view of categories (hierarchical display with expand/collapse)
+- Create/edit custom categories modal (within jurisdiction)
+- System vs user category distinction (🔒 system, ✏️ custom)
+- Deduction rate editor with visual slider
+- Category search and filter by jurisdiction
+- Usage statistics (transaction count per category)
+- Bulk operations (merge, archive)
+- Parent category selector (must be in same jurisdiction)
+- SAT code field for Mexico categories
+- Empty states ("No custom categories yet - create your first!")
+- Keyboard shortcuts (N = new category, ESC = close)
+
+**Visual (Tree View)**:
+```
+┌──────────────────────────────────────────────────────────┐
+│ 🔍 Search categories...           [+ New Category]       │
+├──────────────────────────────────────────────────────────┤
+│ Jurisdiction: [USA Federal ▼]     Show: [All ▼]          │
+├──────────────────────────────────────────────────────────┤
+│ 📁 SCHEDULE C (USA FEDERAL)                              │
+│   ├─ 🔒 Advertising (100%)                    42 txns    │
+│   ├─ 🔒 Office Expenses (100%)                28 txns    │
+│   │   └─ ✏️ Software Subscriptions (100%)     15 txns    │
+│   ├─ 🔒 Meals (Business) (50%)                18 txns    │
+│   ├─ 🔒 Travel (100%)                         35 txns    │
+│   │   ├─ ✏️ Client Meetings (100%)            20 txns    │
+│   │   └─ ✏️ Conferences (100%)                 8 txns    │
+│   └─ 🔒 Personal (Non-Deductible) (0%)        12 txns    │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Manage tax categories (Schedule C, SAT)
+- Healthcare: Manage CPT/ICD-10 codes, custom billing categories
+- Legal: Manage case types, jurisdiction-specific filings
+- Research: Manage grant categories, custom compliance classifications
+- Manufacturing: Manage safety categories, environmental permits
+- Media: Manage content categories, licensing classifications
+
+---
+
+#### 22. FacturaUploadDialog ✅
+**Full spec**: [FacturaUploadDialog.md](FacturaUploadDialog.md)
+
+**Purpose**: Upload and link regulatory documents (Factura XML) to transactions
+
+**Key Features**:
+- Drag-drop XML file upload (CFDI 3.3 and 4.0)
+- Real-time XML parsing and validation
+- Display Factura details (RFC, UUID, amount, date, emisor)
+- Validation feedback with specific error messages:
+  - RFC format validation (12-13 alphanumeric)
+  - UUID format validation (UUID v4)
+  - Amount tolerance check (±5% variance allowed)
+  - Date tolerance check (±7 days from transaction)
+  - Digital signature validation (optional)
+- Transaction linking (auto or manual)
+- Force link option for manual override (amount/date mismatch)
+- Orphan Factura support (upload before transaction exists)
+- Download original XML and PDF
+- Loading states, error states, success states
+- Keyboard navigation (Tab, Enter, Esc)
+
+**Visual (Upload Success with Validation)**:
+```
+┌──────────────────────────────────────────────────┐
+│ Upload Factura (CFDI)                      [×]   │
+├──────────────────────────────────────────────────┤
+│ ✅ Factura validated successfully                │
+│                                                  │
+│ RFC: ABC123456XYZ             ✓ Valid format    │
+│ UUID: 12345678-1234...        ✓ Valid format    │
+│ Amount: $500.00 MXN           ✓ Matches ($500)  │
+│ Date: 2024-11-01              ✓ Within ±7 days  │
+│ Emisor: Acme Corp SA de CV                       │
+│ CFDI Version: 4.0                                │
+│                                                  │
+│ Linked Transaction:                              │
+│ 2024-11-01 · Acme Corp · -$500.00 MXN            │
+│                                                  │
+│ [Download XML] [Download PDF]    [Done]         │
+└──────────────────────────────────────────────────┘
+```
+
+**Visual (Validation Error - Amount Mismatch)**:
+```
+┌──────────────────────────────────────────────────┐
+│ Upload Factura (CFDI)                      [×]   │
+├──────────────────────────────────────────────────┤
+│ ⚠️ Validation warnings detected                  │
+│                                                  │
+│ RFC: DEF987654ABC             ✓ Valid format    │
+│ UUID: 87654321-4321...        ✓ Valid format    │
+│ Amount: $520.00 MXN           ⚠️ Variance: 4.0% │
+│   Transaction shows: $500.00 MXN                 │
+│ Date: 2024-11-01              ✓ Within ±7 days  │
+│                                                  │
+│ ☐ Force link despite amount mismatch            │
+│                                                  │
+│ [Cancel]             [Force Link Anyway]         │
+└──────────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Upload Factura (Mexico CFDI), tax receipts
+- Healthcare: Upload CMS-1500 claim forms, EOB (Explanation of Benefits)
+- Legal: Upload court filings (XML), legal briefs
+- Research: Upload budget justifications, grant agreements
+- Manufacturing: Upload safety inspection reports, environmental permits
+- Media: Upload licensing agreements, content rights documentation
+
+---
+

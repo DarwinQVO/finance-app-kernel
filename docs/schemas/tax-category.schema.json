@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/tax-category.schema.json",
+  "title": "TaxCategory",
+  "description": "Tax category definition for regulatory classification (multi-jurisdiction support). Hierarchical taxonomy with parent-child relationships.",
+  "type": "object",
+  "required": [
+    "category_id",
+    "name",
+    "jurisdiction",
+    "taxonomy",
+    "deduction_rate",
+    "is_system",
+    "created_at"
+  ],
+  "properties": {
+    "category_id": {
+      "type": "string",
+      "pattern": "^tax_cat_[a-z0-9_]+$",
+      "description": "Unique category identifier. Format: 'tax_cat_{jurisdiction}_{taxonomy}_{slug}'. Example: 'tax_cat_usa_schedule_c_travel'"
+    },
+    "user_id": {
+      "type": ["string", "null"],
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "Owner of custom category. null for system categories."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Category display name. Must be unique per user+jurisdiction (case-insensitive). Examples: 'Travel', 'Gastos de Publicidad', 'Office Expenses'"
+    },
+    "jurisdiction": {
+      "type": "string",
+      "enum": ["usa_federal", "usa_state_ca", "usa_state_ny", "mexico_federal", "canada_federal"],
+      "description": "Regulatory framework this category belongs to. Examples: 'usa_federal', 'mexico_federal', 'canada_federal'"
+    },
+    "taxonomy": {
+      "type": "string",
+      "description": "Classification system within jurisdiction. Examples: 'schedule_c' (USA), 'sat' (Mexico), 'cra' (Canada)"
+    },
+    "code": {
+      "type": ["string", "null"],
+      "maxLength": 50,
+      "description": "Official code within taxonomy. Examples: 'line_8' (Schedule C), '84111506' (SAT product code). null for custom categories."
+    },
+    "parent_id": {
+      "type": ["string", "null"],
+      "pattern": "^tax_cat_[a-z0-9_]+$",
+      "description": "Parent category for hierarchical taxonomy. null for top-level categories. Must be in same jurisdiction."
+    },
+    "deduction_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "multipleOf": 0.01,
+      "description": "Deduction/eligibility rate as decimal. Examples: 1.0 = 100% deductible, 0.5 = 50% deductible, 0.0 = non-deductible"
+    },
+    "is_system": {
+      "type": "boolean",
+      "description": "If true, this is a system-defined category (read-only). If false, user-created custom category."
+    },
+    "description": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Optional detailed description of category purpose and rules."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when category was created"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "category_id": "tax_cat_usa_schedule_c_travel",
+      "user_id": null,
+      "name": "Travel",
+      "jurisdiction": "usa_federal",
+      "taxonomy": "schedule_c",
+      "code": "line_24a",
+      "parent_id": null,
+      "deduction_rate": 1.0,
+      "is_system": true,
+      "description": "Business travel expenses (Schedule C Line 24a)",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "category_id": "tax_cat_usa_schedule_c_meals",
+      "user_id": null,
+      "name": "Meals (Business)",
+      "jurisdiction": "usa_federal",
+      "taxonomy": "schedule_c",
+      "code": "line_24b",
+      "parent_id": null,
+      "deduction_rate": 0.5,
+      "is_system": true,
+      "description": "Business meals (50% deductible per IRS rules)",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "category_id": "tax_cat_mx_sat_publicidad",
+      "user_id": null,
+      "name": "Gastos de Publicidad",
+      "jurisdiction": "mexico_federal",
+      "taxonomy": "sat",
+      "code": "84111506",
+      "parent_id": null,
+      "deduction_rate": 1.0,
+      "is_system": true,
+      "description": "Gastos de publicidad y marketing (SAT)",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "category_id": "tax_cat_usa_schedule_c_custom_social_media",
+      "user_id": "user_darwin",
+      "name": "Social Media Advertising",
+      "jurisdiction": "usa_federal",
+      "taxonomy": "schedule_c",
+      "code": null,
+      "parent_id": "tax_cat_usa_schedule_c_advertising",
+      "deduction_rate": 1.0,
+      "is_system": false,
+      "description": "Custom category for social media ad expenses (Facebook, LinkedIn, Twitter)",
+      "created_at": "2024-05-15T10:00:00Z"
+    },
+    {
+      "category_id": "tax_cat_usa_schedule_c_personal",
+      "user_id": null,
+      "name": "Personal (Non-Deductible)",
+      "jurisdiction": "usa_federal",
+      "taxonomy": "schedule_c",
+      "code": null,
+      "parent_id": null,
+      "deduction_rate": 0.0,
+      "is_system": true,
+      "description": "Personal expenses (0% deductible)",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ]
+}

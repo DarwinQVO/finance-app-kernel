@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/tax-classification.schema.json",
+  "title": "TaxClassification",
+  "description": "Tax classification record for transaction (embedded in transaction.tax_classification JSONB field). Stores category, deduction rate, and classification metadata.",
+  "type": "object",
+  "required": [
+    "category_id",
+    "category_name",
+    "jurisdiction",
+    "deduction_rate",
+    "classified_at",
+    "classified_by",
+    "classification_method"
+  ],
+  "properties": {
+    "category_id": {
+      "type": "string",
+      "pattern": "^tax_cat_[a-z0-9_]+$",
+      "description": "Foreign key to tax_categories table. Example: 'tax_cat_usa_schedule_c_travel'"
+    },
+    "category_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Denormalized category name for display (cached from TaxCategory). Example: 'Travel'"
+    },
+    "jurisdiction": {
+      "type": "string",
+      "description": "Regulatory framework (cached from TaxCategory). Example: 'usa_federal', 'mexico_federal'"
+    },
+    "taxonomy": {
+      "type": ["string", "null"],
+      "description": "Classification system (cached from TaxCategory). Example: 'schedule_c', 'sat'"
+    },
+    "deduction_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "multipleOf": 0.01,
+      "description": "Point-in-time deduction rate when classification was applied. Decimal [0.0, 1.0]. Examples: 1.0 = 100%, 0.5 = 50%, 0.0 = 0%"
+    },
+    "allocated_amount": {
+      "type": ["number", "null"],
+      "multipleOf": 0.01,
+      "description": "Amount allocated to this category (for split classifications). null if entire transaction amount applies. Sum of all allocated_amounts must equal transaction.amount."
+    },
+    "classified_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when classification was applied"
+    },
+    "classified_by": {
+      "type": "string",
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "User who applied classification (for audit trail)"
+    },
+    "classification_method": {
+      "type": "string",
+      "enum": ["manual", "auto_suggested", "auto_applied", "bulk"],
+      "description": "How category was assigned: 'manual' = user selected, 'auto_suggested' = user accepted suggestion, 'auto_applied' = system auto-classified with high confidence, 'bulk' = bulk operation"
+    },
+    "confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "multipleOf": 0.01,
+      "description": "Confidence score for auto-classification [0.0, 1.0]. null if manual. Example: 0.95 = 95% confident"
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Optional user note explaining classification. Example: 'Client meeting in SF', 'Project XYZ expense'"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "category_id": "tax_cat_usa_schedule_c_travel",
+      "category_name": "Travel",
+      "jurisdiction": "usa_federal",
+      "taxonomy": "schedule_c",
+      "deduction_rate": 1.0,
+      "allocated_amount": null,
+      "classified_at": "2024-11-01T10:30:00Z",
+      "classified_by": "user_darwin",
+      "classification_method": "manual",
+      "confidence": null,
+      "notes": "Client meeting in San Francisco"
+    },
+    {
+      "category_id": "tax_cat_usa_schedule_c_meals",
+      "category_name": "Meals (Business)",
+      "jurisdiction": "usa_federal",
+      "taxonomy": "schedule_c",
+      "deduction_rate": 0.5,
+      "allocated_amount": null,
+      "classified_at": "2024-11-01T14:20:00Z",
+      "classified_by": "user_darwin",
+      "classification_method": "auto_suggested",
+      "confidence": 0.85,
+      "notes": null
+    },
+    {
+      "category_id": "tax_cat_mx_sat_publicidad",
+      "category_name": "Gastos de Publicidad",
+      "jurisdiction": "mexico_federal",
+      "taxonomy": "sat",
+      "deduction_rate": 1.0,
+      "allocated_amount": 500.00,
+      "classified_at": "2024-11-01T16:00:00Z",
+      "classified_by": "user_darwin",
+      "classification_method": "manual",
+      "confidence": null,
+      "notes": "Facebook Ads campaign Q4"
+    },
+    {
+      "category_id": "tax_cat_usa_schedule_c_personal",
+      "category_name": "Personal (Non-Deductible)",
+      "jurisdiction": "usa_federal",
+      "taxonomy": "schedule_c",
+      "deduction_rate": 0.0,
+      "allocated_amount": null,
+      "classified_at": "2024-11-01T18:45:00Z",
+      "classified_by": "user_darwin",
+      "classification_method": "manual",
+      "confidence": null,
+      "notes": "Personal grocery shopping"
+    }
+  ]
+}
