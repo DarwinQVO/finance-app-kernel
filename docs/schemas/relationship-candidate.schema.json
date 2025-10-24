@@ -1,0 +1,235 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/relationship-candidate.schema.json",
+  "title": "Relationship Candidate",
+  "description": "Auto-detection result suggesting potential relationship between two transactions. Returned by TransferDetector.detect_on_upload() and similar methods.",
+  "type": "object",
+  "required": [
+    "candidate_txn_id",
+    "relationship_type",
+    "confidence",
+    "match_details"
+  ],
+  "properties": {
+    "candidate_txn_id": {
+      "type": "string",
+      "pattern": "^txn_[a-z0-9_]+$",
+      "description": "Transaction ID of potential match. Foreign key to canonical_transactions table."
+    },
+    "relationship_type": {
+      "type": "string",
+      "enum": ["transfer", "fx_conversion", "reimbursement", "split", "correction", "other"],
+      "description": "Suggested relationship type based on transaction characteristics. transfer=same currency, fx_conversion=different currencies, etc."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Confidence score (0.0 to 1.0). ≥0.90=high confidence, 0.70-0.89=medium, 0.50-0.69=low, <0.50=not suggested"
+    },
+    "match_details": {
+      "type": "object",
+      "description": "Breakdown of why this match was suggested",
+      "required": ["amount_score", "date_score", "sign_score", "account_score"],
+      "properties": {
+        "amount_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Amount similarity score (40% weight). 1.0=exact match, <1.0=difference within tolerance"
+        },
+        "date_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Date proximity score (30% weight). 1.0=same day, linear decay to 0.0 at 7 days"
+        },
+        "sign_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Sign match score (20% weight). 1.0=opposite signs (required for transfer), 0.0=same sign"
+        },
+        "account_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Account relationship score (10% weight). 1.0=different accounts same user, 0.0=same account or different user"
+        },
+        "amount_diff": {
+          "type": "number",
+          "description": "Absolute difference between amounts. Example: $1000 vs $998 = 2.00"
+        },
+        "amount_diff_pct": {
+          "type": "number",
+          "multipleOf": 0.01,
+          "description": "Amount difference as percentage. Example: 2/1000 = 0.20%"
+        },
+        "date_diff_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Days between transactions. 0=same day, 1=next day, etc."
+        },
+        "same_currency": {
+          "type": "boolean",
+          "description": "Whether transactions have same currency. true=transfer candidate, false=fx_conversion candidate"
+        }
+      },
+      "additionalProperties": false
+    },
+    "fx_details": {
+      "type": ["object", "null"],
+      "description": "Calculated FX details if relationship_type='fx_conversion'. NULL for other types.",
+      "required": ["from_currency", "to_currency", "from_amount", "to_amount", "calculated_rate"],
+      "properties": {
+        "from_currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "ISO 4217 currency code for source transaction"
+        },
+        "to_currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "ISO 4217 currency code for destination transaction"
+        },
+        "from_amount": {
+          "type": "number",
+          "multipleOf": 0.01,
+          "description": "Source transaction amount (absolute value)"
+        },
+        "to_amount": {
+          "type": "number",
+          "multipleOf": 0.01,
+          "description": "Destination transaction amount (absolute value)"
+        },
+        "calculated_rate": {
+          "type": "number",
+          "multipleOf": 0.0001,
+          "minimum": 0,
+          "description": "Calculated exchange rate (to_amount / from_amount). 4 decimal places."
+        },
+        "market_rate": {
+          "type": ["number", "null"],
+          "multipleOf": 0.0001,
+          "minimum": 0,
+          "description": "Market rate on transaction date (from API). NULL if unavailable."
+        },
+        "rate_variance_pct": {
+          "type": ["number", "null"],
+          "multipleOf": 0.01,
+          "description": "Variance from market rate as percentage. NULL if market_rate unavailable. Used to flag unreasonable rates."
+        }
+      },
+      "additionalProperties": false
+    },
+    "warning": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "description": "Optional warning for user. Examples: 'Amount mismatch ($2 difference)', 'Delayed transfer (4 days)', 'Unreasonable exchange rate (>10% from market)'"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "candidate_txn_id": "txn_002",
+      "relationship_type": "transfer",
+      "confidence": 0.95,
+      "match_details": {
+        "amount_score": 1.0,
+        "date_score": 1.0,
+        "sign_score": 1.0,
+        "account_score": 1.0,
+        "amount_diff": 0.0,
+        "amount_diff_pct": 0.0,
+        "date_diff_days": 0,
+        "same_currency": true
+      },
+      "fx_details": null,
+      "warning": null
+    },
+    {
+      "candidate_txn_id": "txn_004",
+      "relationship_type": "fx_conversion",
+      "confidence": 0.98,
+      "match_details": {
+        "amount_score": 0.95,
+        "date_score": 1.0,
+        "sign_score": 1.0,
+        "account_score": 1.0,
+        "amount_diff": 0.0,
+        "amount_diff_pct": 0.0,
+        "date_diff_days": 0,
+        "same_currency": false
+      },
+      "fx_details": {
+        "from_currency": "USD",
+        "to_currency": "MXN",
+        "from_amount": 1000.00,
+        "to_amount": 18500.00,
+        "calculated_rate": 18.5000,
+        "market_rate": 18.3000,
+        "rate_variance_pct": 1.09
+      },
+      "warning": null
+    },
+    {
+      "candidate_txn_id": "txn_006",
+      "relationship_type": "transfer",
+      "confidence": 0.80,
+      "match_details": {
+        "amount_score": 0.95,
+        "date_score": 1.0,
+        "sign_score": 1.0,
+        "account_score": 1.0,
+        "amount_diff": 2.00,
+        "amount_diff_pct": 0.20,
+        "date_diff_days": 0,
+        "same_currency": true
+      },
+      "fx_details": null,
+      "warning": "Amount mismatch ($2 difference - possible transfer fee)"
+    },
+    {
+      "candidate_txn_id": "txn_008",
+      "relationship_type": "transfer",
+      "confidence": 0.85,
+      "match_details": {
+        "amount_score": 1.0,
+        "date_score": 0.70,
+        "sign_score": 1.0,
+        "account_score": 1.0,
+        "amount_diff": 0.0,
+        "amount_diff_pct": 0.0,
+        "date_diff_days": 4,
+        "same_currency": true
+      },
+      "fx_details": null,
+      "warning": "Delayed transfer (4 days)"
+    },
+    {
+      "candidate_txn_id": "txn_010",
+      "relationship_type": "fx_conversion",
+      "confidence": 0.72,
+      "match_details": {
+        "amount_score": 0.85,
+        "date_score": 0.90,
+        "sign_score": 1.0,
+        "account_score": 1.0,
+        "amount_diff": 50.00,
+        "amount_diff_pct": 2.70,
+        "date_diff_days": 1,
+        "same_currency": false
+      },
+      "fx_details": {
+        "from_currency": "USD",
+        "to_currency": "EUR",
+        "from_amount": 1000.00,
+        "to_amount": 1100.00,
+        "calculated_rate": 1.1000,
+        "market_rate": 0.9500,
+        "rate_variance_pct": 15.79
+      },
+      "warning": "Unreasonable exchange rate (>15% from market - verify before linking)"
+    }
+  ]
+}

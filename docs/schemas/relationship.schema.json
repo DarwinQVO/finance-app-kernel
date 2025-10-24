@@ -1,0 +1,221 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/relationship.schema.json",
+  "title": "Relationship",
+  "description": "Transaction-to-transaction relationship entity (transfer, fx_conversion, reimbursement, split, correction, other). Paired record linking pattern with confidence scoring.",
+  "type": "object",
+  "required": [
+    "relationship_id",
+    "user_id",
+    "txn_1_id",
+    "txn_2_id",
+    "type",
+    "detection_method",
+    "linked_at"
+  ],
+  "properties": {
+    "relationship_id": {
+      "type": "string",
+      "pattern": "^rel_[a-z0-9_]+$",
+      "description": "Unique relationship identifier. Format: 'rel_{uuid}'. Example: 'rel_abc123'"
+    },
+    "user_id": {
+      "type": "string",
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "Owner of both transactions. Foreign key to users table."
+    },
+    "txn_1_id": {
+      "type": "string",
+      "pattern": "^txn_[a-z0-9_]+$",
+      "description": "First transaction in relationship. Foreign key to canonical_transactions table."
+    },
+    "txn_2_id": {
+      "type": "string",
+      "pattern": "^txn_[a-z0-9_]+$",
+      "description": "Second transaction in relationship. Foreign key to canonical_transactions table. Must be different from txn_1_id."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["transfer", "fx_conversion", "reimbursement", "split", "correction", "other"],
+      "description": "Relationship type. transfer=money moved between accounts, fx_conversion=currency exchange, reimbursement=expense reimbursed, split=single expense split across accounts, correction=adjustment/reversal, other=custom (requires notes)"
+    },
+    "confidence": {
+      "type": ["number", "null"],
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Confidence score for auto-detected links (0.0 to 1.0). NULL for manual links. ≥0.90=high, 0.70-0.89=medium, 0.50-0.69=low, <0.50=no suggest"
+    },
+    "detection_method": {
+      "type": "string",
+      "enum": ["auto", "manual"],
+      "description": "How relationship was created. 'auto'=auto-detected by TransferDetector, 'manual'=user-created. Determines confidence: auto requires confidence, manual requires NULL."
+    },
+    "fx_details": {
+      "type": ["object", "null"],
+      "description": "Foreign exchange conversion details. Required for type='fx_conversion', NULL otherwise. See fx-details.schema.json for structure.",
+      "required": ["from_currency", "to_currency", "from_amount", "to_amount", "exchange_rate", "rate_source"],
+      "properties": {
+        "from_currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "ISO 4217 currency code for source transaction"
+        },
+        "to_currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "ISO 4217 currency code for destination transaction"
+        },
+        "from_amount": {
+          "type": "number",
+          "multipleOf": 0.01,
+          "description": "Source transaction amount (absolute value, positive)"
+        },
+        "to_amount": {
+          "type": "number",
+          "multipleOf": 0.01,
+          "description": "Destination transaction amount (absolute value, positive)"
+        },
+        "exchange_rate": {
+          "type": "number",
+          "multipleOf": 0.0001,
+          "minimum": 0,
+          "description": "Exchange rate (to_amount / from_amount). Example: 18.5000 MXN/USD. 4 decimal places."
+        },
+        "rate_source": {
+          "type": "string",
+          "enum": ["calculated", "manual", "market"],
+          "description": "Source of exchange rate. 'calculated'=derived from amounts, 'manual'=user-entered, 'market'=from external API"
+        },
+        "market_rate": {
+          "type": ["number", "null"],
+          "multipleOf": 0.0001,
+          "minimum": 0,
+          "description": "Market exchange rate on transaction date (from external API). NULL if unavailable. Used for FX gain/loss calculation."
+        },
+        "fx_gain_loss": {
+          "type": ["number", "null"],
+          "description": "FX gain/loss in destination currency. Positive=gain, negative=loss. NULL if market_rate unavailable. Formula: actual_amount - expected_amount"
+        },
+        "fx_gain_loss_pct": {
+          "type": ["number", "null"],
+          "multipleOf": 0.01,
+          "description": "FX gain/loss as percentage. Formula: (actual_rate - market_rate) / market_rate * 100. NULL if market_rate unavailable."
+        }
+      },
+      "additionalProperties": false
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Optional notes explaining relationship. Required for type='other'. Examples: 'Employer rounds reimbursements to $5', 'Split dinner bill 60/40'"
+    },
+    "linked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when relationship was created"
+    },
+    "linked_by": {
+      "type": ["string", "null"],
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "User who created manual link. NULL for auto-detected links. Foreign key to users table."
+    },
+    "deleted_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when relationship was deleted (soft delete). NULL = active."
+    },
+    "deleted_by": {
+      "type": ["string", "null"],
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "User who unlinked relationship. NULL = not deleted. Foreign key to users table."
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "relationship_id": "rel_001",
+      "user_id": "user_darwin",
+      "txn_1_id": "txn_001",
+      "txn_2_id": "txn_002",
+      "type": "transfer",
+      "confidence": 0.95,
+      "detection_method": "auto",
+      "fx_details": null,
+      "notes": null,
+      "linked_at": "2025-10-15T14:30:00Z",
+      "linked_by": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    {
+      "relationship_id": "rel_002",
+      "user_id": "user_darwin",
+      "txn_1_id": "txn_003",
+      "txn_2_id": "txn_004",
+      "type": "fx_conversion",
+      "confidence": 0.98,
+      "detection_method": "auto",
+      "fx_details": {
+        "from_currency": "USD",
+        "to_currency": "MXN",
+        "from_amount": 1000.00,
+        "to_amount": 18500.00,
+        "exchange_rate": 18.5000,
+        "rate_source": "calculated",
+        "market_rate": 18.3000,
+        "fx_gain_loss": 200.00,
+        "fx_gain_loss_pct": 1.09
+      },
+      "notes": null,
+      "linked_at": "2025-10-16T09:15:00Z",
+      "linked_by": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    {
+      "relationship_id": "rel_003",
+      "user_id": "user_darwin",
+      "txn_1_id": "txn_005",
+      "txn_2_id": "txn_006",
+      "type": "reimbursement",
+      "confidence": null,
+      "detection_method": "manual",
+      "fx_details": null,
+      "notes": "Employer rounds reimbursements to nearest $5",
+      "linked_at": "2025-10-21T16:00:00Z",
+      "linked_by": "user_darwin",
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    {
+      "relationship_id": "rel_004",
+      "user_id": "user_darwin",
+      "txn_1_id": "txn_001",
+      "txn_2_id": "txn_002",
+      "type": "transfer",
+      "confidence": 0.95,
+      "detection_method": "auto",
+      "fx_details": null,
+      "notes": null,
+      "linked_at": "2025-10-15T14:30:00Z",
+      "linked_by": null,
+      "deleted_at": "2025-10-22T10:00:00Z",
+      "deleted_by": "user_darwin"
+    },
+    {
+      "relationship_id": "rel_005",
+      "user_id": "user_darwin",
+      "txn_1_id": "txn_007",
+      "txn_2_id": "txn_008",
+      "type": "transfer",
+      "confidence": 0.80,
+      "detection_method": "auto",
+      "fx_details": null,
+      "notes": null,
+      "linked_at": "2025-10-15T14:35:00Z",
+      "linked_by": null,
+      "deleted_at": null,
+      "deleted_by": null
+    }
+  ]
+}

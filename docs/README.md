@@ -23,6 +23,7 @@
 - **[3.2 Counterparty Registry](verticals/3.2-counterparty-registry.md)** ✅ Complete - Open registry, aliases, fuzzy matching, merge duplicates
 - **[3.3 Series Registry](verticals/3.3-series-registry.md)** ✅ Complete - Recurring payments, template + instance tracking, auto-link, variance detection
 - **[3.4 Tax Categorization](verticals/3.4-tax-categorization.md)** ✅ Complete - Multi-jurisdiction (USA+Mexico), hierarchical taxonomy, auto-classification, Factura tracking
+- **[3.5 Relationships](verticals/3.5-relationships.md)** ✅ Complete - Auto-detect transfers, FX conversion tracking, manual linking, analytics exclusion
 
 ---
 
@@ -90,6 +91,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[FacturaStore](primitives/ol/FacturaStore.md)** - CRUD for Mexican Factura records (CFDI XML parsing)
 - **[FacturaValidator](primitives/ol/FacturaValidator.md)** - Validate CFDI XML format, RFC, UUID, amount, date
 
+**Vertical 3.5 (Relationships):**
+- **[RelationshipStore](primitives/ol/RelationshipStore.md)** - CRUD for transaction relationships (transfer, fx_conversion, reimbursement, split, correction, other)
+- **[TransferDetector](primitives/ol/TransferDetector.md)** - Auto-detect transfer pairs with confidence scoring
+- **[FXConverter](primitives/ol/FXConverter.md)** - Calculate exchange rates and FX gain/loss
+- **[RelationshipMatcher](primitives/ol/RelationshipMatcher.md)** - Fuzzy matching with configurable thresholds
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -111,6 +118,9 @@ Reusable UI components:
 - **[TaxCategorySelector](primitives/il/TaxCategorySelector.md)** - Dropdown for selecting tax category with hierarchy and search
 - **[TaxCategoryManager](primitives/il/TaxCategoryManager.md)** - Full UI for managing custom tax categories (tree view)
 - **[FacturaUploadDialog](primitives/il/FacturaUploadDialog.md)** - Upload and link Factura XML to transaction (Mexico CFDI)
+- **[RelationshipPanel](primitives/il/RelationshipPanel.md)** - Display linked transactions in detail view
+- **[TransferLinkDialog](primitives/il/TransferLinkDialog.md)** - Manual link creation UI with transaction search
+- **[FXConversionCard](primitives/il/FXConversionCard.md)** - FX conversion details display with market rate comparison
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -158,6 +168,11 @@ Executable contracts extracted from vertical specifications:
 - **[tax-classification.schema.json](schemas/tax-classification.schema.json)** - Transaction tax classification (category, deduction rate, confidence)
 - **[factura-record.schema.json](schemas/factura-record.schema.json)** - Mexican Factura (CFDI) record (RFC, UUID, amount, date)
 
+**Vertical 3.5 (Relationships):**
+- **[relationship.schema.json](schemas/relationship.schema.json)** - Transaction relationship entity (transfer, fx_conversion, reimbursement, split, correction, other)
+- **[relationship-candidate.schema.json](schemas/relationship-candidate.schema.json)** - Auto-detection result with confidence score and match details
+- **[fx-details.schema.json](schemas/fx-details.schema.json)** - FX conversion details (exchange rate, market rate, gain/loss)
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -186,6 +201,7 @@ User experience specifications with wireframes and journeys:
 - **[3.2 Counterparty Registry Experience](ux-flows/3.2-counterparty-registry-experience.md)** - Auto-creation, fuzzy matching, merge duplicates, alias management
 - **[3.3 Series Registry Experience](ux-flows/3.3-series-registry-experience.md)** - Create recurring series, view status badges, manual link, variance alerts, archive series
 - **[3.4 Tax Categorization Experience](ux-flows/3.4-tax-categorization-experience.md)** - Classify transactions, upload Factura, create custom categories, auto-suggestions, bulk operations
+- **[3.5 Relationships Experience](ux-flows/3.5-relationships-experience.md)** - Accept transfer suggestion, manual link creation, FX conversion viewing, unlink flow, multiple candidates
 
 ---
 
@@ -200,6 +216,10 @@ User experience specifications with wireframes and journeys:
 | | 2.2 OL Exploration | ✅ Complete |
 | | 2.3 Finance Dashboard | ✅ Complete |
 | **3. Registries** | 3.1 Account Registry | ✅ Complete |
+| | 3.2 Counterparty Registry | ✅ Complete |
+| | 3.3 Series Registry | ✅ Complete |
+| | 3.4 Tax Categorization | ✅ Complete |
+| | 3.5 Relationships | ✅ Complete |
 | | 3.2 Counterparty Registry | ✅ Complete |
 | | 3.3 Series Registry | ✅ Complete |
 | | 3.4 Tax Categorization | ✅ Complete |

@@ -1,0 +1,183 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/fx-details.schema.json",
+  "title": "FX Details",
+  "description": "Foreign exchange conversion details embedded in relationship.fx_details JSONB field. Used for relationship type='fx_conversion'.",
+  "type": "object",
+  "required": [
+    "from_currency",
+    "to_currency",
+    "from_amount",
+    "to_amount",
+    "exchange_rate",
+    "rate_source"
+  ],
+  "properties": {
+    "from_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "ISO 4217 currency code for source transaction. Examples: USD, EUR, GBP, MXN, JPY, CNY",
+      "examples": ["USD", "EUR", "GBP", "MXN", "JPY", "CNY", "CAD", "AUD", "CHF", "HKD"]
+    },
+    "to_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "ISO 4217 currency code for destination transaction. Must be different from from_currency.",
+      "examples": ["USD", "EUR", "GBP", "MXN", "JPY", "CNY", "CAD", "AUD", "CHF", "HKD"]
+    },
+    "from_amount": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "minimum": 0,
+      "exclusiveMinimum": true,
+      "description": "Source transaction amount (absolute value, positive). 2 decimal places for most currencies, 0 for zero-decimal currencies (JPY, KRW)."
+    },
+    "to_amount": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "minimum": 0,
+      "exclusiveMinimum": true,
+      "description": "Destination transaction amount (absolute value, positive). 2 decimal places for most currencies, 0 for zero-decimal currencies."
+    },
+    "exchange_rate": {
+      "type": "number",
+      "multipleOf": 0.0001,
+      "minimum": 0,
+      "exclusiveMinimum": true,
+      "description": "Exchange rate (to_amount / from_amount). Precision: 4 decimal places. Example: 18.5000 MXN/USD means 1 USD = 18.50 MXN. Format: {to_currency}/{from_currency}"
+    },
+    "rate_source": {
+      "type": "string",
+      "enum": ["calculated", "manual", "market"],
+      "description": "Source of exchange rate. 'calculated'=derived from transaction amounts (most common), 'manual'=user-entered custom rate, 'market'=fetched from external rate API"
+    },
+    "market_rate": {
+      "type": ["number", "null"],
+      "multipleOf": 0.0001,
+      "minimum": 0,
+      "description": "Market exchange rate on transaction date from external API (e.g., exchangerate.host, fixer.io). NULL if API unavailable or rate not found. Used for FX gain/loss calculation. 4 decimal places."
+    },
+    "market_rate_provider": {
+      "type": ["string", "null"],
+      "maxLength": 100,
+      "description": "Name of market rate API provider. NULL if market_rate is NULL. Examples: 'exchangerate.host', 'fixer.io', 'currencylayer.com'"
+    },
+    "fx_gain_loss": {
+      "type": ["number", "null"],
+      "multipleOf": 0.01,
+      "description": "FX gain/loss in destination currency. Positive=favorable rate (gain), negative=unfavorable rate (loss). NULL if market_rate unavailable. Formula: actual_to_amount - expected_to_amount, where expected_to_amount = from_amount * market_rate"
+    },
+    "fx_gain_loss_pct": {
+      "type": ["number", "null"],
+      "multipleOf": 0.01,
+      "description": "FX gain/loss as percentage of expected amount. Formula: (actual_rate - market_rate) / market_rate * 100. NULL if market_rate unavailable. Example: 1.09% means actual rate was 1.09% better than market rate."
+    },
+    "rate_variance_warning": {
+      "type": ["boolean", "null"],
+      "description": "Warning flag if calculated rate differs significantly from market rate (>10%). Used to detect data entry errors or unusual market conditions. NULL if market_rate unavailable."
+    },
+    "conversion_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Date of conversion (ISO 8601 YYYY-MM-DD). Typically same as transaction date. Used for historical market rate lookup. NULL if not specified."
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Optional notes about conversion. Examples: 'Wise fee included', 'Corporate rate from bank', 'Crypto exchange rate from Coinbase'"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "from_currency": "USD",
+      "to_currency": "MXN",
+      "from_amount": 1000.00,
+      "to_amount": 18500.00,
+      "exchange_rate": 18.5000,
+      "rate_source": "calculated",
+      "market_rate": 18.3000,
+      "market_rate_provider": "exchangerate.host",
+      "fx_gain_loss": 200.00,
+      "fx_gain_loss_pct": 1.09,
+      "rate_variance_warning": false,
+      "conversion_date": "2025-10-16",
+      "notes": null
+    },
+    {
+      "from_currency": "USD",
+      "to_currency": "EUR",
+      "from_amount": 5000.00,
+      "to_amount": 4750.00,
+      "exchange_rate": 0.9500,
+      "rate_source": "calculated",
+      "market_rate": 0.9200,
+      "market_rate_provider": "fixer.io",
+      "fx_gain_loss": -150.00,
+      "fx_gain_loss_pct": -3.26,
+      "rate_variance_warning": false,
+      "conversion_date": "2025-10-10",
+      "notes": "Wise transfer with fee"
+    },
+    {
+      "from_currency": "GBP",
+      "to_currency": "USD",
+      "from_amount": 2000.00,
+      "to_amount": 2600.00,
+      "exchange_rate": 1.3000,
+      "rate_source": "calculated",
+      "market_rate": null,
+      "market_rate_provider": null,
+      "fx_gain_loss": null,
+      "fx_gain_loss_pct": null,
+      "rate_variance_warning": null,
+      "conversion_date": "2025-10-05",
+      "notes": null
+    },
+    {
+      "from_currency": "USD",
+      "to_currency": "JPY",
+      "from_amount": 1000.00,
+      "to_amount": 148500,
+      "exchange_rate": 148.5000,
+      "rate_source": "calculated",
+      "market_rate": 149.2000,
+      "market_rate_provider": "exchangerate.host",
+      "fx_gain_loss": -700,
+      "fx_gain_loss_pct": -0.47,
+      "rate_variance_warning": false,
+      "conversion_date": "2025-10-12",
+      "notes": "Zero-decimal currency (JPY)"
+    },
+    {
+      "from_currency": "EUR",
+      "to_currency": "CHF",
+      "from_amount": 3000.00,
+      "to_amount": 2850.00,
+      "exchange_rate": 0.9500,
+      "rate_source": "manual",
+      "market_rate": 1.0500,
+      "market_rate_provider": "currencylayer.com",
+      "fx_gain_loss": -300.00,
+      "fx_gain_loss_pct": -9.52,
+      "rate_variance_warning": true,
+      "conversion_date": "2025-09-15",
+      "notes": "Corporate rate from company bank - verify before linking"
+    },
+    {
+      "from_currency": "USD",
+      "to_currency": "CNY",
+      "from_amount": 10000.00,
+      "to_amount": 72800.00,
+      "exchange_rate": 7.2800,
+      "rate_source": "calculated",
+      "market_rate": 7.2500,
+      "market_rate_provider": "exchangerate.host",
+      "fx_gain_loss": 300.00,
+      "fx_gain_loss_pct": 0.41,
+      "rate_variance_warning": false,
+      "conversion_date": "2025-10-20",
+      "notes": "China import payment"
+    }
+  ]
+}

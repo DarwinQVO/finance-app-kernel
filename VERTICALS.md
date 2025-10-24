@@ -256,15 +256,32 @@
 
 ### **3.5 Relationships**
 **Status:** ✅ Complete
-**Full Name:** Relationships (txn ↔ txn)
-**Additions:** + fx_conversion
-**Spec:** TBD
+**Full Name:** Relationships (Transaction-to-Transaction Linking)
+**Additions:** + fx_conversion, confidence scoring
+**Spec:** [docs/verticals/3.5-relationships.md](docs/verticals/3.5-relationships.md)
 
-**Expected:**
-- Link paired transactions (BofA → Wise, Wise → Scotia)
-- Foreign exchange conversion tracking
-- Transfer detection and reconciliation
-- **NOTE:** This likely covers the "Transfer Linking" concept previously mentioned as "1.4"
+**Primitives Delivered:**
+- RelationshipStore (OL) - CRUD for transaction relationships (transfer, fx_conversion, reimbursement, split, correction, other)
+- TransferDetector (OL) - Auto-detect transfer pairs with confidence scoring (≥0.90 high, 0.70-0.89 medium, 0.50-0.69 low)
+- FXConverter (OL) - Calculate exchange rates and FX gain/loss
+- RelationshipMatcher (OL) - Fuzzy matching with configurable thresholds
+- RelationshipPanel (IL) - Display linked transactions in detail view
+- TransferLinkDialog (IL) - Manual link creation UI with search
+- FXConversionCard (IL) - FX conversion details display
+
+**Schemas:** relationship.schema.json, relationship-candidate.schema.json, fx-details.schema.json
+**UX Flow:** [3.5-relationships-experience.md](docs/ux-flows/3.5-relationships-experience.md)
+
+**Delivered:**
+- Auto-detect transfers (same amount, opposite accounts, ±3 days)
+- FX conversion tracking with exchange rates and gain/loss
+- Manual link creation for edge cases (reimbursements, splits)
+- Confidence scoring (0.0-1.0) with weighted features (40% amount, 30% date, 20% signs, 10% accounts)
+- Analytics exclusion (prevent double-counting in dashboards)
+- Relationship types: transfer, fx_conversion, reimbursement, split, correction, other
+- Multi-domain applicability (Finance → transfers, Healthcare → claim-payment, Legal → case relationships, Research → citations, E-commerce → order-return)
+
+**NOTE:** This vertical covers the "Transfer Linking" concept previously mentioned as "1.4"
 
 ---
 
@@ -439,13 +456,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 10 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4 |
-| 📝 Pending | 13 | 3.5-3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 11 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5 |
+| 📝 Pending | 12 | 3.6-3.9, 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 43% (10/23)
+**Completion:** 48% (11/23)
 
-**Next up:** 3.5 Relationships (transaction linking, transfers, FX conversion)
+**Next up:** 3.6 Unit (currency/date normalization)
 
 ---
 
