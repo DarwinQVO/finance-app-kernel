@@ -349,13 +349,32 @@
 
 ### **3.8 Cluster Rules**
 **Status:** ✅ Complete
-**Full Name:** Cluster Rules
-**Spec:** TBD
+**Full Name:** Cluster Rules (Merchant Normalization & Transaction Clustering)
+**Additions:** + fuzzy matching, rule engine, clustering
+**Spec:** [docs/verticals/3.8-cluster-rules.md](docs/verticals/3.8-cluster-rules.md)
 
-**Expected:**
-- Merchant name normalization rules ("UBER EATS PENDING" → "Uber Eats")
-- Clustering similar transactions
-- Auto-categorization rules
+**Primitives Delivered:**
+- MerchantNormalizer (OL) - Apply normalization rules to merchant names with batch processing
+- ClusteringEngine (OL) - Create clusters of similar transactions using threshold-based grouping
+- NormalizationRuleStore (OL) - CRUD operations for user-defined normalization rules with precedence
+- FuzzyMatcher (OL) - Text similarity calculation with multiple algorithms (Levenshtein, Jaro-Winkler, Soundex, Metaphone)
+- MerchantRulesManager (IL) - Full CRUD UI for managing normalization rules with priority
+- ClusterViewer (IL) - Display transaction clusters with expand/collapse and manual adjustments
+- RuleEditorDialog (IL) - Create/edit rule dialog with pattern testing and preview
+
+**Schemas:** normalization-rule.schema.json, merchant-cluster.schema.json, rule-execution-log.schema.json
+**UX Flow:** [3.8-cluster-rules-experience.md](docs/ux-flows/3.8-cluster-rules-experience.md)
+
+**Delivered:**
+- Merchant name normalization ("UBER EATS PENDING" → "Uber Eats", "AMZN MKTP US" → "Amazon Marketplace")
+- User-defined normalization rules with regex, exact match, fuzzy, soundex support
+- Rule precedence system (0-100, higher = applied first)
+- Fuzzy text matching with multiple algorithms and configurable thresholds
+- Transaction clustering based on normalized names (confidence scores ≥0.85)
+- Batch normalization processing for performance
+- Rule execution logging with audit trail
+- Manual cluster adjustments (split clusters, merge clusters, exclude transactions)
+- Multi-domain applicability (Finance → merchant names, Healthcare → provider names, Legal → case names, Research → institution names, E-commerce → vendor names)
 
 ---
 
@@ -492,13 +511,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 13 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7 |
-| 📝 Pending | 10 | 3.8-3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 14 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8 |
+| 📝 Pending | 9 | 3.9, 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 57% (13/23)
+**Completion:** 61% (14/23)
 
-**Next up:** 3.8 Cluster Rules (merchant normalization)
+**Next up:** 3.9 Reconciliation Strategies (fuzzy matching, confidence scoring)
 
 ---
 

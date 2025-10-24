@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/merchant-cluster.schema.json",
+  "title": "MerchantCluster",
+  "description": "Cluster of similar entity names (merchants, providers, institutions) for bulk normalization and deduplication",
+  "type": "object",
+  "required": ["cluster_id", "canonical_name", "variants", "similarity_score", "transaction_count"],
+  "properties": {
+    "cluster_id": {
+      "type": "string",
+      "pattern": "^cluster_[a-z0-9_]+$",
+      "description": "Unique cluster identifier (e.g., 'cluster_amazon_1')",
+      "examples": ["cluster_amazon_1", "cluster_walmart_1"]
+    },
+    "user_id": {
+      "type": "string",
+      "description": "User who owns this cluster",
+      "examples": ["user_darwin", "user_admin"]
+    },
+    "canonical_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Representative name for cluster (e.g., 'Amazon'). Usually the most frequent or cleanest variant.",
+      "examples": ["Amazon", "Walmart", "Uber", "McDonald's"]
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 2,
+      "description": "All variants in this cluster",
+      "items": {
+        "type": "object",
+        "required": ["raw_name", "frequency", "similarity_to_canonical"],
+        "properties": {
+          "raw_name": {
+            "type": "string",
+            "description": "Original entity name (e.g., 'AMZN MKTP US')",
+            "examples": ["AMAZON.COM", "AMZN MKTP US", "AMAZON PRIME"]
+          },
+          "frequency": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Count of occurrences / transactions",
+            "examples": [23, 45, 12]
+          },
+          "similarity_to_canonical": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "Similarity score to canonical_name [0.0, 1.0]. Values <0.70 are outliers.",
+            "examples": [0.92, 0.78, 0.65]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "similarity_score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Average similarity within cluster [0.0, 1.0]. Higher = tighter cluster.",
+      "examples": [0.85, 0.78, 0.91]
+    },
+    "transaction_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Total transactions across all variants",
+      "examples": [88, 34, 23]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected", "split"],
+      "default": "pending",
+      "description": "Cluster lifecycle status. pending=awaiting review, accepted=merged into rules, rejected=user dismissed, split=user split into multiple clusters"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when cluster was generated"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last update"
+    }
+  },
+  "examples": [
+    {
+      "cluster_id": "cluster_amazon_1",
+      "user_id": "user_darwin",
+      "canonical_name": "Amazon",
+      "variants": [
+        {
+          "raw_name": "AMAZON.COM",
+          "frequency": 23,
+          "similarity_to_canonical": 0.92
+        },
+        {
+          "raw_name": "AMZN MKTP US",
+          "frequency": 45,
+          "similarity_to_canonical": 0.78
+        },
+        {
+          "raw_name": "AMAZON PRIME",
+          "frequency": 12,
+          "similarity_to_canonical": 0.85
+        },
+        {
+          "raw_name": "Amazon Web Services",
+          "frequency": 8,
+          "similarity_to_canonical": 0.65
+        }
+      ],
+      "similarity_score": 0.81,
+      "transaction_count": 88,
+      "status": "pending",
+      "created_at": "2025-10-24T02:00:00Z",
+      "updated_at": "2025-10-24T02:00:00Z"
+    },
+    {
+      "cluster_id": "cluster_walmart_1",
+      "user_id": "user_darwin",
+      "canonical_name": "Walmart",
+      "variants": [
+        {
+          "raw_name": "WALMART",
+          "frequency": 20,
+          "similarity_to_canonical": 0.88
+        },
+        {
+          "raw_name": "WAL-MART SUPERCENTER",
+          "frequency": 14,
+          "similarity_to_canonical": 0.88
+        }
+      ],
+      "similarity_score": 0.88,
+      "transaction_count": 34,
+      "status": "accepted",
+      "created_at": "2025-10-24T02:00:00Z",
+      "updated_at": "2025-10-24T10:00:00Z"
+    }
+  ],
+  "additionalProperties": false
+}

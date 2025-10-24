@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/rule-execution-log.schema.json",
+  "title": "RuleExecutionLog",
+  "description": "Audit trail log of normalization rule execution for provenance and debugging",
+  "type": "object",
+  "required": ["log_id", "rule_id", "input_text", "output_text", "executed_at"],
+  "properties": {
+    "log_id": {
+      "type": "string",
+      "pattern": "^log_[a-z0-9_]+$",
+      "description": "Unique log entry identifier",
+      "examples": ["log_12345", "log_67890"]
+    },
+    "rule_id": {
+      "type": "string",
+      "pattern": "^rule_[a-z0-9_]+$",
+      "description": "ID of rule that was executed",
+      "examples": ["rule_uber_all_1", "rule_amazon_exact_1"]
+    },
+    "user_id": {
+      "type": "string",
+      "description": "User who owns the rule",
+      "examples": ["user_darwin", "user_admin"]
+    },
+    "transaction_id": {
+      "type": "string",
+      "description": "Transaction ID where normalization was applied (optional, for linking)",
+      "examples": ["txn_12345", "txn_67890"]
+    },
+    "input_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Original raw text before normalization",
+      "examples": ["UBER EATS PENDING", "AMZN MKTP US", "MCDONALDS #1234"]
+    },
+    "output_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Normalized text after rule applied",
+      "examples": ["Uber", "Amazon", "McDonald's"]
+    },
+    "match_type": {
+      "type": "string",
+      "enum": ["exact", "regex", "fuzzy", "soundex"],
+      "description": "Type of matching that succeeded"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Confidence score [0.0, 1.0]. Exact/regex = 1.0, fuzzy = similarity score",
+      "examples": [1.0, 0.87, 0.92]
+    },
+    "latency_ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Execution time in milliseconds (for performance monitoring)",
+      "examples": [5, 12, 3]
+    },
+    "executed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when rule was executed"
+    }
+  },
+  "examples": [
+    {
+      "log_id": "log_12345",
+      "rule_id": "rule_uber_all_1",
+      "user_id": "user_darwin",
+      "transaction_id": "txn_98765",
+      "input_text": "UBER EATS PENDING",
+      "output_text": "Uber",
+      "match_type": "regex",
+      "confidence": 1.0,
+      "latency_ms": 5,
+      "executed_at": "2025-10-24T10:05:00Z"
+    },
+    {
+      "log_id": "log_67890",
+      "rule_id": "rule_mcdonalds_fuzzy",
+      "user_id": "user_darwin",
+      "transaction_id": "txn_54321",
+      "input_text": "MCDONALDS #1234",
+      "output_text": "McDonald's",
+      "match_type": "fuzzy",
+      "confidence": 0.87,
+      "latency_ms": 12,
+      "executed_at": "2025-10-24T10:10:00Z"
+    },
+    {
+      "log_id": "log_11111",
+      "rule_id": "rule_amazon_exact",
+      "user_id": "user_darwin",
+      "transaction_id": "txn_11111",
+      "input_text": "AMZN MKTP US",
+      "output_text": "Amazon",
+      "match_type": "exact",
+      "confidence": 1.0,
+      "latency_ms": 3,
+      "executed_at": "2025-10-24T10:15:00Z"
+    }
+  ],
+  "additionalProperties": false
+}

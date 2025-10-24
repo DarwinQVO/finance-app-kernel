@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/normalization-rule.schema.json",
+  "title": "NormalizationRule",
+  "description": "Text normalization rule with pattern matching and precedence for entity name standardization across domains (merchants, providers, institutions, etc.)",
+  "type": "object",
+  "required": ["rule_id", "pattern", "replacement", "rule_type", "priority"],
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "pattern": "^rule_[a-z0-9_]+$",
+      "description": "Unique rule identifier (e.g., 'rule_uber_all_1')",
+      "examples": ["rule_uber_all_1", "rule_amazon_exact_1"]
+    },
+    "user_id": {
+      "type": "string",
+      "description": "User who created the rule (null for system rules)",
+      "examples": ["user_darwin", "user_admin"]
+    },
+    "pattern": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Pattern to match (exact string, regex, or fuzzy template)",
+      "examples": ["UBER.*", "AMZN MKTP US", "McDonald's"]
+    },
+    "replacement": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Normalized output (e.g., 'Uber Eats')",
+      "examples": ["Uber", "Amazon", "McDonald's"]
+    },
+    "rule_type": {
+      "type": "string",
+      "enum": ["exact", "regex", "fuzzy", "soundex"],
+      "description": "Type of matching: exact (case-insensitive), regex (pattern), fuzzy (similarity), soundex (phonetic)"
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Execution priority (higher executes first). Recommended: exact=95, regex=90, fuzzy=85, soundex=80",
+      "examples": [95, 90, 85, 80]
+    },
+    "similarity_threshold": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Minimum similarity for fuzzy matching (required if rule_type=fuzzy). Recommended: ≥0.70",
+      "examples": [0.80, 0.75, 0.70]
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether rule is active. False = soft deleted"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when rule was created"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last update"
+    },
+    "match_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Count of times rule has matched (for analytics and delete protection)"
+    }
+  },
+  "examples": [
+    {
+      "rule_id": "rule_uber_all",
+      "user_id": "user_darwin",
+      "pattern": "UBER.*",
+      "replacement": "Uber",
+      "rule_type": "regex",
+      "priority": 90,
+      "similarity_threshold": null,
+      "enabled": true,
+      "created_at": "2025-10-24T10:00:00Z",
+      "updated_at": "2025-10-24T10:00:00Z",
+      "match_count": 47
+    },
+    {
+      "rule_id": "rule_amazon_exact",
+      "user_id": "user_darwin",
+      "pattern": "AMZN MKTP US",
+      "replacement": "Amazon",
+      "rule_type": "exact",
+      "priority": 95,
+      "similarity_threshold": null,
+      "enabled": true,
+      "created_at": "2025-10-23T15:30:00Z",
+      "updated_at": "2025-10-23T15:30:00Z",
+      "match_count": 45
+    },
+    {
+      "rule_id": "rule_mcdonalds_fuzzy",
+      "user_id": "user_darwin",
+      "pattern": "McDonald's",
+      "replacement": "McDonald's",
+      "rule_type": "fuzzy",
+      "priority": 85,
+      "similarity_threshold": 0.80,
+      "enabled": true,
+      "created_at": "2025-10-22T09:00:00Z",
+      "updated_at": "2025-10-22T09:00:00Z",
+      "match_count": 23
+    }
+  ],
+  "additionalProperties": false
+}

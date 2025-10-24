@@ -26,6 +26,7 @@
 - **[3.5 Relationships](verticals/3.5-relationships.md)** ✅ Complete - Auto-detect transfers, FX conversion tracking, manual linking, analytics exclusion
 - **[3.6 Unit](verticals/3.6-unit.md)** ✅ Complete - Multi-currency normalization, exchange rate caching, date/timezone handling, locale-aware formatting
 - **[3.7 Parser Registry](verticals/3.7-parser-registry.md)** ✅ Complete - Parser discovery, capability tracking, versioning, auto-selection
+- **[3.8 Cluster Rules](verticals/3.8-cluster-rules.md)** ✅ Complete - Merchant name normalization, fuzzy matching, transaction clustering, rule engine
 
 ---
 
@@ -111,6 +112,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[ParserVersionManager](primitives/ol/ParserVersionManager.md)** - Version management with deprecation, breaking changes, sunset dates
 - **[ParserSelector](primitives/ol/ParserSelector.md)** - Auto-select best parser based on file metadata and capabilities
 
+**Vertical 3.8 (Cluster Rules):**
+- **[MerchantNormalizer](primitives/ol/MerchantNormalizer.md)** - Apply normalization rules to merchant names with batch processing
+- **[ClusteringEngine](primitives/ol/ClusteringEngine.md)** - Create clusters of similar transactions using threshold-based grouping
+- **[NormalizationRuleStore](primitives/ol/NormalizationRuleStore.md)** - CRUD operations for user-defined normalization rules with precedence
+- **[FuzzyMatcher](primitives/ol/FuzzyMatcher.md)** - Text similarity calculation with multiple algorithms (Levenshtein, Jaro-Winkler, Soundex, Metaphone)
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -141,6 +148,9 @@ Reusable UI components:
 - **[ParserSelectorDialog](primitives/il/ParserSelectorDialog.md)** - Modal dialog for manual parser selection with capability badges
 - **[ParserCapabilitiesCard](primitives/il/ParserCapabilitiesCard.md)** - Display parser capabilities with confidence indicators
 - **[ParserVersionDropdown](primitives/il/ParserVersionDropdown.md)** - Version selector with deprecation warnings
+- **[MerchantRulesManager](primitives/il/MerchantRulesManager.md)** - Full CRUD UI for managing normalization rules with priority
+- **[ClusterViewer](primitives/il/ClusterViewer.md)** - Display transaction clusters with expand/collapse and manual adjustments
+- **[RuleEditorDialog](primitives/il/RuleEditorDialog.md)** - Create/edit rule dialog with pattern testing and preview
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -203,6 +213,11 @@ Executable contracts extracted from vertical specifications:
 - **[parser-capability.schema.json](schemas/parser-capability.schema.json)** - Capability definition for a parser (extractable fields with confidence)
 - **[parser-version.schema.json](schemas/parser-version.schema.json)** - Parser version record with deprecation and compatibility info
 
+**Vertical 3.8 (Cluster Rules):**
+- **[normalization-rule.schema.json](schemas/normalization-rule.schema.json)** - User-defined normalization rule (pattern, replacement, type, priority)
+- **[merchant-cluster.schema.json](schemas/merchant-cluster.schema.json)** - Transaction cluster entity with normalized name, member transactions, confidence
+- **[rule-execution-log.schema.json](schemas/rule-execution-log.schema.json)** - Rule execution log with match details and performance metrics
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -234,6 +249,7 @@ User experience specifications with wireframes and journeys:
 - **[3.5 Relationships Experience](ux-flows/3.5-relationships-experience.md)** - Accept transfer suggestion, manual link creation, FX conversion viewing, unlink flow, multiple candidates
 - **[3.6 Unit Experience](ux-flows/3.6-unit-experience.md)** - Set base currency, view dual currencies, refresh stale rates, manual rate override, timezone change
 - **[3.7 Parser Registry Experience](ux-flows/3.7-parser-registry-experience.md)** - Auto-detected parser, manual override, view capabilities, deprecated parser warning, register new parser
+- **[3.8 Cluster Rules Experience](ux-flows/3.8-cluster-rules-experience.md)** - Create normalization rule, view clusters, test rule pattern, manual cluster adjustments, bulk apply rules
 
 ---
 
@@ -254,7 +270,8 @@ User experience specifications with wireframes and journeys:
 | | 3.5 Relationships | ✅ Complete |
 | | 3.6 Unit | ✅ Complete |
 | | 3.7 Parser Registry | ✅ Complete |
-| | 3.8-3.9 | 📝 Pending |
+| | 3.8 Cluster Rules | ✅ Complete |
+| | 3.9 | 📝 Pending |
 | **4. Derivatives** | 4.1-4.3 | 📝 Pending |
 | **5. Governance** | 5.1-5.5 | 📝 Pending |
 

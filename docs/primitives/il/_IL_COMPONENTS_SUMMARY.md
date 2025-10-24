@@ -2,7 +2,7 @@
 
 **Status**: Specification complete
 **Last Updated**: 2025-10-24
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8
 
 ---
 
@@ -1840,3 +1840,145 @@ All components accept `className` and respect CSS variables:
 
 ---
 
+
+### Vertical 3.8 (Cluster Rules)
+
+#### 32. MerchantRulesManager ✅
+**Full spec**: [MerchantRulesManager.md](MerchantRulesManager.md)
+
+**Props**: `rules[]`, `onRuleCreate`, `onRuleEdit`, `onRuleDelete`, `onRuleToggle`
+**States**: idle | loading | editing | testing
+**Reusable across**: Finance merchant normalization, Healthcare provider normalization, Legal case name normalization, Research institution normalization
+
+**Purpose**: Full CRUD UI for managing normalization rules with priority ordering, pattern testing, and bulk operations.
+
+**Visual (Rules List)**:
+```
+┌────────────────────────────────────────────┐
+│  Merchant Normalization Rules              │
+│  [+ Create Rule]                [Test All] │
+├────────────────────────────────────────────┤
+│                                            │
+│  🔹 Priority 95 - ENABLED                  │
+│  Pattern: UBER EATS.*                      │
+│  Replacement: Uber Eats                    │
+│  Type: regex                               │
+│  [Edit] [Delete] [Toggle]                  │
+│                                            │
+│  🔹 Priority 90 - ENABLED                  │
+│  Pattern: AMZN MKTP US                     │
+│  Replacement: Amazon Marketplace           │
+│  Type: exact                               │
+│  [Edit] [Delete] [Toggle]                  │
+│                                            │
+│  🔸 Priority 50 - DISABLED                 │
+│  Pattern: STARBUCKS.*                      │
+│  Replacement: Starbucks                    │
+│  Type: regex                               │
+│  [Edit] [Delete] [Toggle]                  │
+└────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Normalize merchant names ("UBER EATS PENDING" → "Uber Eats")
+- Healthcare: Normalize provider names ("ST MARY'S HOSP" → "St. Mary's Hospital")
+- Legal: Normalize case names ("DOE V. SMITH" → "Doe v. Smith")
+- Research: Normalize institution names ("MIT CSAIL" → "MIT CSAIL")
+- E-commerce: Normalize vendor names
+- Any domain: Text normalization rule management
+
+---
+
+#### 33. ClusterViewer ✅
+**Full spec**: [ClusterViewer.md](ClusterViewer.md)
+
+**Props**: `clusters[]`, `onClusterExpand`, `onClusterSplit`, `onClusterMerge`, `onTransactionExclude`
+**States**: collapsed | expanded | loading | editing
+**Reusable across**: Finance transaction clustering, Healthcare claim clustering, Legal case clustering, Research paper clustering
+
+**Purpose**: Display transaction clusters with expand/collapse, manual split/merge operations, and transaction exclusion.
+
+**Visual (Cluster List)**:
+```
+┌────────────────────────────────────────────┐
+│  Transaction Clusters                      │
+│  [Refresh] [Settings]                      │
+├────────────────────────────────────────────┤
+│                                            │
+│  ▸ Uber Eats (15 transactions)             │
+│    Confidence: 95% | Last: 2024-11-01      │
+│                                            │
+│  ▾ Amazon Marketplace (8 transactions)     │
+│    Confidence: 92% | Last: 2024-10-28      │
+│    ├─ AMZN MKTP US       $45.00  Oct 28    │
+│    ├─ AMZN.COM/BILL      $32.50  Oct 25    │
+│    ├─ AMAZON MKTPLC      $67.00  Oct 22    │
+│    └─ ...5 more                            │
+│    [Split Cluster] [Exclude Transaction]   │
+│                                            │
+│  ▸ Starbucks (22 transactions)             │
+│    Confidence: 98% | Last: 2024-11-02      │
+└────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Group similar merchant transactions
+- Healthcare: Cluster similar claims by provider
+- Legal: Group related case filings
+- Research: Cluster papers by institution/author
+- E-commerce: Group orders by vendor
+- Any domain: Similarity-based grouping with manual adjustments
+
+---
+
+#### 34. RuleEditorDialog ✅
+**Full spec**: [RuleEditorDialog.md](RuleEditorDialog.md)
+
+**Props**: `rule`, `mode`, `onSave`, `onCancel`, `testData[]`
+**States**: idle | testing | saving | error
+**Reusable across**: Finance normalization rules, Healthcare mapping rules, Legal redaction rules, Research parsing rules
+
+**Purpose**: Create/edit normalization rule dialog with pattern testing, preview, and validation.
+
+**Visual (Create Rule Dialog)**:
+```
+┌────────────────────────────────────────────┐
+│  Create Normalization Rule            [X]  │
+├────────────────────────────────────────────┤
+│                                            │
+│  Pattern *                                 │
+│  [UBER EATS.*                        ]     │
+│                                            │
+│  Replacement *                             │
+│  [Uber Eats                          ]     │
+│                                            │
+│  Rule Type *                               │
+│  [ regex ▼ ]                               │
+│    • exact - Exact string match            │
+│    • regex - Regular expression            │
+│    • fuzzy - Fuzzy matching (≥80%)         │
+│    • soundex - Phonetic matching           │
+│                                            │
+│  Priority *                                │
+│  [90                                 ]     │
+│  (0-100, higher = applied first)           │
+│                                            │
+│  [Test Pattern]                            │
+│                                            │
+│  ✓ Matches: "UBER EATS PENDING"            │
+│  ✓ Matches: "UBER EATS 123"                │
+│  ✗ No match: "UBER"                        │
+│                                            │
+│  [Cancel]              [Create Rule]       │
+└────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Create merchant normalization rules
+- Healthcare: Create provider name mapping rules
+- Legal: Create document redaction rules
+- Research: Create citation parsing rules
+- E-commerce: Create product category mapping rules
+- Any domain: Pattern-based rule creation with validation
+
+---
