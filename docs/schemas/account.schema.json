@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/account.schema.json",
+  "title": "Account",
+  "description": "User account entity (bank account, credit card, payment processor). Closed registry pattern.",
+  "type": "object",
+  "required": [
+    "account_id",
+    "user_id",
+    "name",
+    "type",
+    "currency",
+    "is_active",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "pattern": "^acc_[a-z0-9_]+$",
+      "description": "Unique account identifier. Format: 'acc_{slug}_{seq}'. Example: 'acc_bofa_checking_1'"
+    },
+    "user_id": {
+      "type": "string",
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "Owner of the account. Foreign key to users table."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[A-Za-z0-9\\s\\-']+$",
+      "description": "Display name for account. Must be unique per user (case-insensitive). Examples: 'BofA Checking', 'Apple Card', 'Wise USD'"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["checking", "savings", "credit", "debit", "investment", "loan"],
+      "description": "Account type. Immutable after creation."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "ISO 4217 currency code (USD, MXN, EUR, etc.). Immutable after creation.",
+      "examples": ["USD", "MXN", "EUR", "GBP", "CAD", "JPY"]
+    },
+    "institution": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "description": "Optional institution name. Examples: 'Bank of America', 'Wise', 'Apple'"
+    },
+    "is_active": {
+      "type": "boolean",
+      "description": "Active status. false = archived (soft delete). Archived accounts hidden from UI but preserve transaction history."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when account was created"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when account was last updated"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "account_id": "acc_bofa_checking_1",
+      "user_id": "user_darwin",
+      "name": "BofA Checking",
+      "type": "checking",
+      "currency": "USD",
+      "institution": "Bank of America",
+      "is_active": true,
+      "created_at": "2025-05-15T10:00:00Z",
+      "updated_at": "2025-05-15T10:00:00Z"
+    },
+    {
+      "account_id": "acc_apple_card_2",
+      "user_id": "user_darwin",
+      "name": "Apple Card",
+      "type": "credit",
+      "currency": "USD",
+      "institution": "Apple",
+      "is_active": false,
+      "created_at": "2025-05-15T10:05:00Z",
+      "updated_at": "2025-06-01T09:00:00Z"
+    },
+    {
+      "account_id": "acc_wise_usd_3",
+      "user_id": "user_darwin",
+      "name": "Wise USD",
+      "type": "debit",
+      "currency": "USD",
+      "institution": "Wise",
+      "is_active": true,
+      "created_at": "2025-05-15T10:10:00Z",
+      "updated_at": "2025-05-15T10:10:00Z"
+    },
+    {
+      "account_id": "acc_scotia_mxn_4",
+      "user_id": "user_darwin",
+      "name": "Scotia MXN",
+      "type": "checking",
+      "currency": "MXN",
+      "institution": "Scotiabank",
+      "is_active": true,
+      "created_at": "2025-05-15T10:15:00Z",
+      "updated_at": "2025-05-15T10:15:00Z"
+    }
+  ]
+}

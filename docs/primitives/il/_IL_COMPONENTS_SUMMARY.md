@@ -2,7 +2,7 @@
 
 **Status**: Specification complete
 **Last Updated**: 2025-10-23
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1
 
 ---
 
@@ -478,6 +478,167 @@ interface SavedView {
 
 ---
 
+### Vertical 3.1 (Account Registry)
+
+#### 12. AccountManager ✅
+**Full spec**: [AccountManager.md](AccountManager.md)
+
+**Purpose**: Full CRUD UI for managing user accounts (create, edit, archive, search, filter)
+
+**Props**:
+```typescript
+interface AccountManagerProps {
+  accounts: Account[];
+  onAccountCreate: (account: CreateAccountInput) => Promise<Account>;
+  onAccountUpdate: (accountId: string, updates: Partial<Account>) => Promise<Account>;
+  onAccountArchive: (accountId: string) => Promise<void>;
+  onAccountUnarchive: (accountId: string) => Promise<void>;
+
+  loading?: boolean;
+  error?: string | null;
+
+  // UI customization
+  showArchived?: boolean;  // Default: false
+  groupBy?: "type" | "currency" | null;  // Default: null
+  defaultSort?: "name" | "created_at";  // Default: "name"
+}
+
+interface Account {
+  account_id: string;
+  name: string;
+  type: AccountType;  // "checking", "savings", "credit", "debit", "investment", "loan"
+  currency: string;   // ISO 4217
+  institution?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+```
+
+**Features**:
+- List view with search (real-time filtering by name)
+- Filter by type, currency, active status
+- Sort by name, created date
+- Create account modal (name, type, currency, institution)
+- Edit account modal (name, institution only - type/currency immutable)
+- Archive confirmation dialog (shows transaction count)
+- Empty state ("Add your first account" CTA)
+- Keyboard shortcuts (N = new account, ESC = close modal)
+
+**Visual (List View)**:
+```
+┌──────────────────────────────────────────────────────────┐
+│ 🔍 Search accounts...                  [+ New Account]   │
+├──────────────────────────────────────────────────────────┤
+│ CHECKING ACCOUNTS (2)                                    │
+│   ┌────────────────────────────────────────────────┐     │
+│   │ 🏦 BofA Personal Checking         USD    [⚙️]  │     │
+│   │    Bank of America                              │     │
+│   └────────────────────────────────────────────────┘     │
+│   ┌────────────────────────────────────────────────┐     │
+│   │ 🏦 Scotia MXN                     MXN    [⚙️]  │     │
+│   │    Scotiabank                                   │     │
+│   └────────────────────────────────────────────────┘     │
+│                                                          │
+│ CREDIT CARDS (2)                                         │
+│   ┌────────────────────────────────────────────────┐     │
+│   │ 💳 BofA Credit                    USD    [⚙️]  │     │
+│   │    Bank of America                              │     │
+│   └────────────────────────────────────────────────┘     │
+│   ┌────────────────────────────────────────────────┐     │
+│   │ 💳 Apple Card                     USD    [⚙️]  │     │
+│   │    Apple                                        │     │
+│   └────────────────────────────────────────────────┘     │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Manage bank accounts, credit cards
+- Healthcare: Manage insurance providers, medical facilities
+- Legal: Manage trust accounts, client accounts
+- Research: Manage funding sources, grants
+- Manufacturing: Manage cost centers, departments
+- Media: Manage revenue streams, ad accounts
+
+---
+
+#### 13. AccountSelector ✅
+**Full spec**: [AccountSelector.md](AccountSelector.md)
+
+**Purpose**: Reusable dropdown for selecting account (used in transaction editing, filtering, reports)
+
+**Props**:
+```typescript
+interface AccountSelectorProps {
+  accounts: Account[];
+  currentAccountId?: string;
+  onAccountSelect: (accountId: string) => void;
+
+  // Optional features
+  onAccountCreate?: () => void;  // Show "Create New Account" button
+  showCreateButton?: boolean;    // Default: false
+  groupBy?: "type" | "currency" | null;  // Default: "type"
+  showCurrencyBadge?: boolean;   // Default: true
+  showInstitution?: boolean;     // Default: true
+
+  // For transfer flows (exclude same account)
+  excludeAccountId?: string;     // Don't show this account in list
+
+  // States
+  loading?: boolean;
+  error?: string | null;
+  disabled?: boolean;
+  placeholder?: string;  // Default: "Select account..."
+}
+```
+
+**Visual (Collapsed)**:
+```
+┌─────────────────────────────────────┐
+│ 🏦 BofA Personal Checking     [▼]   │
+└─────────────────────────────────────┘
+```
+
+**Visual (Expanded with Grouping)**:
+```
+┌─────────────────────────────────────┐
+│ 🔍 Search accounts...               │
+├─────────────────────────────────────┤
+│ CHECKING ACCOUNTS                   │
+│ ● 🏦 BofA Personal Checking   USD   │
+│   🏦 Scotia MXN                MXN   │
+├─────────────────────────────────────┤
+│ CREDIT CARDS                        │
+│   💳 BofA Credit               USD   │
+│   💳 Apple Card                USD   │
+├─────────────────────────────────────┤
+│ DEBIT CARDS                         │
+│   💳 Wise USD                  USD   │
+├─────────────────────────────────────┤
+│ [+ Create New Account]              │
+└─────────────────────────────────────┘
+```
+
+**Features**:
+- Search/filter by account name
+- Group by type or currency
+- Show currency badge
+- Show institution name (optional)
+- Keyboard navigation (↑↓ arrows, Enter to select, ESC to close)
+- Create account inline (opens modal, auto-selects new account)
+- Exclude specific accounts (for transfers - can't select same account twice)
+- Empty state with "Create first account" CTA
+
+**Reusability**:
+- Finance: Select account in transaction edit, filter transactions by account, select account for transfer
+- Healthcare: Select insurance provider in claim edit
+- Legal: Select trust account in transaction allocation
+- Research: Select funding source in expense reporting
+- Manufacturing: Select cost center in work order
+- Media: Select revenue stream in content analytics
+
+---
+
 ## Composition Example (Upload Screen)
 
 ```tsx
@@ -566,7 +727,7 @@ All components accept `className` and respect CSS variables:
 
 ---
 
-**Maturity**: All 11 components specified, ready for implementation
+**Maturity**: All 13 components specified, ready for implementation
 
 ---
 
@@ -578,8 +739,9 @@ All components accept `className` and respect CSS variables:
 | 2.1 Transaction List | 1 component | ✅ Specified |
 | 2.2 OL Exploration | 2 components | ✅ Specified |
 | 2.3 Finance Dashboard | 3 components | ✅ Specified |
-| **TOTAL** | **11 components** | |
+| 3.1 Account Registry | 2 components | ✅ Specified |
+| **TOTAL** | **13 components** | |
 
 ---
 
-**Next vertical**: 3.1 Account Registry (expected: 1-2 new IL components for registry management)
+**Next vertical**: 3.2 Counterparty Registry (expected: 2-3 new IL components for open registry management)

@@ -17,6 +17,7 @@
 - **[2.1 Transaction List View](verticals/2.1-transaction-list-view.md)** ✅ Complete - Pagination, filtering, sorting, export
 - **[2.2 OL Exploration](verticals/2.2-ol-exploration.md)** ✅ Complete - Drill-down, decisions, provenance, artifact viewing
 - **[2.3 Finance Dashboard](verticals/2.3-finance-dashboard.md)** ✅ Complete - Saved views, aggregate metrics, PDF exports
+- **[3.1 Account Registry](verticals/3.1-account-registry.md)** ✅ Complete - Closed registry pattern, CRUD operations, soft delete
 
 ---
 
@@ -63,6 +64,10 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[DashboardEngine](primitives/ol/DashboardEngine.md)** - Calculate aggregate metrics from canonical data (sum, count, group by)
 - **[SnapshotExporter](primitives/ol/SnapshotExporter.md)** - Generate PDF snapshots of dashboard state with metrics and configuration
 
+**Vertical 3.1 (Account Registry):**
+- **[AccountStore](primitives/ol/AccountStore.md)** - CRUD operations for user accounts with uniqueness validation and soft delete
+- **[AccountValidator](primitives/ol/AccountValidator.md)** - Validates account data (names, types, currencies) before persistence
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -73,6 +78,8 @@ Reusable UI components:
 - **[DashboardGrid](primitives/il/DashboardGrid.md)** - Responsive grid layout for dashboard widgets (12-col desktop, stacked mobile)
 - **[MetricCard](primitives/il/MetricCard.md)** - Reusable widget for displaying single metric with trend and drill-down
 - **[SavedViewSelector](primitives/il/SavedViewSelector.md)** - Dropdown component for selecting and managing saved views with MRU history
+- **[AccountManager](primitives/il/AccountManager.md)** - Full CRUD UI for managing user accounts (create, edit, archive, search, filter)
+- **[AccountSelector](primitives/il/AccountSelector.md)** - Reusable dropdown for selecting account (used in transaction editing, filtering, reports)
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -105,6 +112,9 @@ Executable contracts extracted from vertical specifications:
 - **[saved-view.schema.json](schemas/saved-view.schema.json)** - Saved dashboard view configuration (system + user views)
 - **[dashboard-config.schema.json](schemas/dashboard-config.schema.json)** - Dashboard widget layout, filters, and date range configuration
 
+**Vertical 3.1 (Account Registry):**
+- **[account.schema.json](schemas/account.schema.json)** - User account entity (name, type, currency, institution, active status)
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -129,6 +139,7 @@ User experience specifications with wireframes and journeys:
 - **[2.1 Transaction List Experience](ux-flows/2.1-transaction-list-experience.md)** - Filtering, sorting, pagination, export workflows
 - **[2.2 OL Exploration Experience](ux-flows/2.2-ol-exploration-experience.md)** - Drill-down, decision explanations, provenance timeline, artifact viewing
 - **[2.3 Finance Dashboard Experience](ux-flows/2.3-finance-dashboard-experience.md)** - Dashboard views, custom view creation, metric drill-down, PDF export
+- **[3.1 Account Registry Experience](ux-flows/3.1-account-registry-experience.md)** - Account creation, editing, archiving, selector dropdown, immutability patterns
 
 ---
 

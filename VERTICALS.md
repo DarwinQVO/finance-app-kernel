@@ -160,14 +160,26 @@
 ## 🗂️ Group 3: Registries (Finance Domain)
 
 ### **3.1 Account**
-**Status:** 📝 Pending
-**Full Name:** Account (closed registry)
-**Spec:** TBD
+**Status:** ✅ Complete
+**Full Name:** Account Registry (closed registry)
+**Spec:** [docs/verticals/3.1-account-registry.md](docs/verticals/3.1-account-registry.md)
 
-**Expected:**
-- Closed registry = fixed list of user's accounts
-- Examples: BofA Debit, BofA Credit, Apple Card, Scotia, Wise, Stripe
-- Attributes: account_id, name, type (checking, credit, etc.), currency, institution
+**Primitives Delivered:**
+- AccountStore (OL) - CRUD operations for user accounts with uniqueness validation
+- AccountValidator (OL) - Validates account data (names, types, currencies)
+- AccountManager (IL) - Full CRUD UI for managing accounts
+- AccountSelector (IL) - Reusable dropdown for selecting account
+
+**Schema:** account.schema.json
+**UX Flow:** [3.1-account-registry-experience.md](docs/ux-flows/3.1-account-registry-experience.md)
+
+**Delivered:**
+- Closed registry pattern (user manually creates accounts)
+- CRUD operations (create, edit, archive/unarchive)
+- Unique name enforcement (case-insensitive per user)
+- Immutable fields (currency, type cannot change after creation)
+- Soft delete (archive preserves transaction history)
+- Multi-domain applicability (finance accounts, healthcare providers, legal trust accounts, research funding sources)
 
 ---
 
@@ -393,13 +405,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 6 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3 |
-| 📝 Pending | 17 | 3.1-3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 7 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1 |
+| 📝 Pending | 16 | 3.2-3.9, 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 26% (6/23)
+**Completion:** 30% (7/23)
 
-**Next up:** 3.1 Account Registry
+**Next up:** 3.2 Counterparty Registry
 
 ---
 
