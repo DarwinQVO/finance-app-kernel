@@ -1,0 +1,299 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/series.schema.json",
+  "title": "Series",
+  "description": "Recurring payment series entity (subscriptions, bills, salary). Closed registry pattern with template-based instance tracking.",
+  "type": "object",
+  "required": [
+    "series_id",
+    "user_id",
+    "name",
+    "account_id",
+    "counterparty_id",
+    "expected_amount",
+    "tolerance",
+    "frequency",
+    "start_date",
+    "is_active",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "series_id": {
+      "type": "string",
+      "pattern": "^series_[a-z0-9_]+$",
+      "description": "Unique series identifier. Format: 'series_{slug}_{seq}'. Example: 'series_openai_chatgpt_1'"
+    },
+    "user_id": {
+      "type": "string",
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "Owner of the series. Foreign key to users table."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[A-Za-z0-9\\s\\-'()]+$",
+      "description": "Display name for series. Must be unique per user (case-insensitive). Examples: 'OpenAI ChatGPT Plus', 'Rent - Monthly', 'Netflix'"
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^acc_[a-z0-9_]+$",
+      "description": "Account where payment is expected. Foreign key to accounts table. Immutable after creation."
+    },
+    "counterparty_id": {
+      "type": "string",
+      "pattern": "^cpty_[a-z0-9_]+$",
+      "description": "Expected counterparty (merchant, person). Foreign key to counterparties table. Immutable after creation."
+    },
+    "expected_amount": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "minimum": -999999.99,
+      "maximum": 999999.99,
+      "description": "Expected amount for each instance. Negative for expenses, positive for income. 2 decimal places max."
+    },
+    "tolerance": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "minimum": 0,
+      "maximum": 999999.99,
+      "description": "Acceptable variance from expected amount (±). Used for auto-matching. Example: tolerance=2.00 means $20.00±$2.00 = [$18.00, $22.00]"
+    },
+    "frequency": {
+      "type": "object",
+      "description": "Recurrence pattern defining when payment is expected",
+      "oneOf": [
+        {
+          "title": "Daily Pattern",
+          "required": ["type", "interval"],
+          "properties": {
+            "type": {"const": "daily"},
+            "interval": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "description": "Repeat every N days. Example: interval=1 for daily, interval=7 for weekly (alternative to weekly pattern)"
+            }
+          }
+        },
+        {
+          "title": "Weekly Pattern",
+          "required": ["type", "day_of_week", "interval"],
+          "properties": {
+            "type": {"const": "weekly"},
+            "day_of_week": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6,
+              "description": "Day of week (0=Monday, 1=Tuesday, ..., 6=Sunday)"
+            },
+            "interval": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 52,
+              "description": "Repeat every N weeks. Example: interval=1 for weekly, interval=2 for bi-weekly"
+            }
+          }
+        },
+        {
+          "title": "Monthly Pattern",
+          "required": ["type", "day_of_month", "interval"],
+          "properties": {
+            "type": {"const": "monthly"},
+            "day_of_month": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31,
+              "description": "Day of month (1-31). Values >28 will adjust to last day of month in short months (e.g., day 31 → Feb 28/29)"
+            },
+            "interval": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12,
+              "description": "Repeat every N months. Example: interval=1 for monthly, interval=3 for quarterly"
+            }
+          }
+        },
+        {
+          "title": "Yearly Pattern",
+          "required": ["type", "month", "day"],
+          "properties": {
+            "type": {"const": "yearly"},
+            "month": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12,
+              "description": "Month (1=January, 2=February, ..., 12=December)"
+            },
+            "day": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31,
+              "description": "Day of month (1-31). Feb 29 handled for leap years."
+            }
+          }
+        },
+        {
+          "title": "Custom Pattern",
+          "required": ["type", "dates"],
+          "properties": {
+            "type": {"const": "custom"},
+            "dates": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "format": "date",
+                "description": "ISO 8601 date (YYYY-MM-DD)"
+              },
+              "description": "Explicit list of expected dates. Used for irregular schedules (e.g., quarterly grants on specific dates)"
+            }
+          }
+        }
+      ]
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date",
+      "description": "ISO 8601 date when series starts. Cannot be in the future (max today). First expected instance is calculated from this date."
+    },
+    "end_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "ISO 8601 date when series ended (archived). null = active. Set when series is archived."
+    },
+    "category": {
+      "type": ["string", "null"],
+      "maxLength": 50,
+      "description": "Optional category for grouping series. Examples: 'subscriptions', 'bills', 'income', 'healthcare', 'legal_fees'"
+    },
+    "is_active": {
+      "type": "boolean",
+      "description": "Active status. false = archived (soft delete). Archived series stop generating expected instances but preserve history."
+    },
+    "next_expected_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Next expected occurrence date. Calculated by RecurrenceEngine. Updated after each instance match. null if series ended."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when series was created"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when series was last updated"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "series_id": "series_openai_chatgpt_1",
+      "user_id": "user_darwin",
+      "name": "OpenAI ChatGPT Plus",
+      "account_id": "acc_chase_credit_1",
+      "counterparty_id": "cpty_openai_1",
+      "expected_amount": -20.00,
+      "tolerance": 2.00,
+      "frequency": {
+        "type": "monthly",
+        "day_of_month": 5,
+        "interval": 1
+      },
+      "start_date": "2024-01-05",
+      "end_date": null,
+      "category": "subscriptions",
+      "is_active": true,
+      "next_expected_date": "2025-11-05",
+      "created_at": "2024-01-03T10:00:00Z",
+      "updated_at": "2024-01-03T10:00:00Z"
+    },
+    {
+      "series_id": "series_rent_monthly_2",
+      "user_id": "user_darwin",
+      "name": "Rent - Monthly",
+      "account_id": "acc_bofa_checking_1",
+      "counterparty_id": "cpty_landlord_1",
+      "expected_amount": -1200.00,
+      "tolerance": 50.00,
+      "frequency": {
+        "type": "monthly",
+        "day_of_month": 1,
+        "interval": 1
+      },
+      "start_date": "2024-01-01",
+      "end_date": null,
+      "category": "bills",
+      "is_active": true,
+      "next_expected_date": "2025-12-01",
+      "created_at": "2024-01-01T08:00:00Z",
+      "updated_at": "2024-01-01T08:00:00Z"
+    },
+    {
+      "series_id": "series_netflix_3",
+      "user_id": "user_darwin",
+      "name": "Netflix Premium",
+      "account_id": "acc_chase_credit_1",
+      "counterparty_id": "cpty_netflix_1",
+      "expected_amount": -15.99,
+      "tolerance": 1.00,
+      "frequency": {
+        "type": "monthly",
+        "day_of_month": 15,
+        "interval": 1
+      },
+      "start_date": "2023-05-15",
+      "end_date": "2024-08-15",
+      "category": "subscriptions",
+      "is_active": false,
+      "next_expected_date": null,
+      "created_at": "2023-05-10T10:00:00Z",
+      "updated_at": "2024-08-15T12:00:00Z"
+    },
+    {
+      "series_id": "series_salary_4",
+      "user_id": "user_darwin",
+      "name": "Salary - Bi-weekly",
+      "account_id": "acc_bofa_checking_1",
+      "counterparty_id": "cpty_employer_1",
+      "expected_amount": 3000.00,
+      "tolerance": 500.00,
+      "frequency": {
+        "type": "weekly",
+        "day_of_week": 5,
+        "interval": 2
+      },
+      "start_date": "2024-01-05",
+      "end_date": null,
+      "category": "income",
+      "is_active": true,
+      "next_expected_date": "2025-11-07",
+      "created_at": "2024-01-01T10:00:00Z",
+      "updated_at": "2024-01-01T10:00:00Z"
+    },
+    {
+      "series_id": "series_insurance_premium_5",
+      "user_id": "user_darwin",
+      "name": "Health Insurance Premium",
+      "account_id": "acc_bofa_checking_1",
+      "counterparty_id": "cpty_cigna_1",
+      "expected_amount": -450.00,
+      "tolerance": 10.00,
+      "frequency": {
+        "type": "monthly",
+        "day_of_month": 1,
+        "interval": 1
+      },
+      "start_date": "2024-01-01",
+      "end_date": null,
+      "category": "healthcare",
+      "is_active": true,
+      "next_expected_date": "2025-12-01",
+      "created_at": "2024-01-01T10:00:00Z",
+      "updated_at": "2024-01-01T10:00:00Z"
+    }
+  ]
+}

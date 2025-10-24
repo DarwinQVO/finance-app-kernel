@@ -2,7 +2,7 @@
 
 **Status**: Specification complete
 **Last Updated**: 2025-10-24
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3
 
 ---
 
@@ -817,5 +817,178 @@ All components accept `className` and respect CSS variables:
 - Research: Merge duplicate publishers ("Nature" + "Nature Publishing")
 - Manufacturing: Merge duplicate suppliers ("Acme Corp" + "ACME")
 - Media: Merge duplicate advertisers ("YouTube" + "YouTube Inc")
+
+---
+
+### Vertical 3.3 (Series Registry)
+
+#### 17. SeriesManager ✅
+**Full spec**: [SeriesManager.md](SeriesManager.md)
+
+**Purpose**: Full CRUD UI for managing recurring payment series with status badges and variance alerts
+
+**Key Features**:
+- List view with status badges (✅ Paid on time, ⚠️ Amount variance, 🔴 Missing, 📅 Upcoming)
+- Create/Edit modal with RecurrenceConfigDialog integration (2-step flow)
+- Instance history view (last 12 months of expected vs actual)
+- Variance alerts panel (dashboard widget showing overdue/missing payments)
+- Filter by account, category, status
+- Search by series name
+- Group by category, account, or status
+- Archive confirmation dialog (preserves instance history)
+- Manual link transaction to series
+- Keyboard shortcuts (N = new series, ESC = close)
+
+**Visual (List View with Status)**:
+```
+┌──────────────────────────────────────────────────────────┐
+│ 🔍 Search series...                    [+ New Series]    │
+├──────────────────────────────────────────────────────────┤
+│ SUBSCRIPTIONS (3)                                        │
+│   ┌────────────────────────────────────────────────┐     │
+│   │ 💻 OpenAI ChatGPT Plus    ✅ Paid on time      │     │
+│   │    $20.00/month · Next: Nov 5, 2024       [⚙️]  │     │
+│   └────────────────────────────────────────────────┘     │
+│   ┌────────────────────────────────────────────────┐     │
+│   │ 📺 Netflix Premium        🔴 Missing (3 days)  │     │
+│   │    $15.99/month · Expected: Nov 15         [⚙️]  │     │
+│   └────────────────────────────────────────────────┘     │
+│   ┌────────────────────────────────────────────────┐     │
+│   │ 🎵 Spotify Premium        ⚠️ Amount variance   │     │
+│   │    $9.99/month · Paid $10.99              [⚙️]  │     │
+│   └────────────────────────────────────────────────┘     │
+│                                                          │
+│ BILLS (2)                                                │
+│   ┌────────────────────────────────────────────────┐     │
+│   │ 🏠 Rent - Monthly         ✅ Paid on time      │     │
+│   │    $1,200.00/month · Next: Dec 1          [⚙️]  │     │
+│   └────────────────────────────────────────────────┘     │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Manage subscriptions, bills, recurring income
+- Healthcare: Manage insurance premiums, prescription refills
+- Legal: Manage monthly retainers, recurring court fees
+- Research: Manage recurring grant disbursements, lab subscriptions
+- Manufacturing: Manage equipment lease payments, maintenance schedules
+- Media: Manage licensing fees, hosting subscriptions
+
+---
+
+#### 18. SeriesSelector ✅
+**Full spec**: [SeriesSelector.md](SeriesSelector.md)
+
+**Purpose**: Dropdown for selecting series to link to transaction (used in transaction detail, manual link dialog)
+
+**Key Features**:
+- Search by series name (fuzzy matching)
+- Group by category (subscriptions, bills, income, other)
+- Show next expected date + amount for each series
+- "Create new series" inline option
+- Filter by account (optional prop)
+- Show transaction count per series (optional)
+- Keyboard navigation (↑↓ select, Enter confirm, Esc close)
+- Auto-suggest based on counterparty + amount
+- Size variants (small, medium, large)
+
+**Visual (Expanded)**:
+```
+┌─────────────────────────────────────┐
+│ 🔍 Search series...                 │
+├─────────────────────────────────────┤
+│ SUBSCRIPTIONS                       │
+│ ● 💻 OpenAI ChatGPT Plus            │
+│      $20.00/month · Next: Nov 5     │
+│   📺 Netflix Premium                │
+│      $15.99/month · Next: Nov 15    │
+├─────────────────────────────────────┤
+│ BILLS                               │
+│   🏠 Rent - Monthly                 │
+│      $1,200.00/month · Next: Dec 1  │
+│   ⚡ Electricity (CFE)              │
+│      ~$80.00/month · Next: Nov 20   │
+├─────────────────────────────────────┤
+│ [+ Create New Series]               │
+└─────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Select series in transaction edit, link payment to subscription
+- Healthcare: Select insurance premium series in claim edit
+- Legal: Select retainer series in payment allocation
+- Research: Select grant series in expense reporting
+- Manufacturing: Select lease series in accounting entry
+- Media: Select license series in revenue tracking
+
+---
+
+#### 19. RecurrenceConfigDialog ✅
+**Full spec**: [RecurrenceConfigDialog.md](RecurrenceConfigDialog.md)
+
+**Purpose**: Dialog for configuring recurrence patterns (daily, weekly, monthly, yearly, custom)
+
+**Key Features**:
+- Frequency type selector with visual icons (Daily, Weekly, Monthly, Yearly, Custom)
+- Conditional fields based on type:
+  - **Daily**: Interval (every N days)
+  - **Weekly**: Day of week + interval (every N weeks on Tuesday)
+  - **Monthly**: Day of month + interval (every N months on 5th)
+  - **Yearly**: Month + day (every year on Jan 15)
+  - **Custom**: Date list (explicit dates for irregular schedules)
+- Preview next 3 occurrences (validates pattern before saving)
+- Edge case warnings:
+  - "Day 31 will adjust to last day of month in Feb (Feb 28/29)"
+  - "Feb 29 only occurs in leap years (next: 2028)"
+- Validation rules:
+  - Prevent invalid dates (e.g., Feb 30)
+  - Interval must be > 0
+  - Custom dates must be chronological
+- Keyboard navigation (Tab through fields, Enter to save, Esc to cancel)
+
+**Visual (Monthly Pattern)**:
+```
+┌──────────────────────────────────────────────────┐
+│ Configure Recurrence                             │
+├──────────────────────────────────────────────────┤
+│ Frequency Type                                   │
+│ [ Daily ] [ Weekly ] [Monthly*] [Yearly] [Custom]│
+│                                                  │
+│ Day of Month: [5]                                │
+│ Every: [1] month(s)                              │
+│                                                  │
+│ Preview Next 3 Occurrences:                      │
+│ · Dec 5, 2024                                    │
+│ · Jan 5, 2025                                    │
+│ · Feb 5, 2025                                    │
+│                                                  │
+│           [Cancel]         [Save]                │
+└──────────────────────────────────────────────────┘
+```
+
+**Visual (Edge Case Warning)**:
+```
+┌──────────────────────────────────────────────────┐
+│ Configure Recurrence                             │
+├──────────────────────────────────────────────────┤
+│ Day of Month: [31]                               │
+│                                                  │
+│ ⚠️ Note: Day 31 will adjust to the last day of  │
+│ months with fewer days (e.g., Feb 28/29, Apr 30) │
+│                                                  │
+│ Preview Next 3 Occurrences:                      │
+│ · Dec 31, 2024                                   │
+│ · Jan 31, 2025                                   │
+│ · Feb 28, 2025 (adjusted)                        │
+└──────────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Configure payment schedules, income patterns
+- Healthcare: Configure medication refill schedules, therapy sessions
+- Legal: Configure recurring court dates, retainer billing
+- Research: Configure grant disbursement schedules, lab maintenance
+- Manufacturing: Configure equipment maintenance schedules, inventory audits
+- Media: Configure content publication schedules, license renewals
 
 ---

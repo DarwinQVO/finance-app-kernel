@@ -198,13 +198,29 @@
 
 ### **3.3 Series**
 **Status:** ✅ Complete
-**Full Name:** Series (closed registry)
-**Spec:** TBD
+**Full Name:** Series Registry (closed registry, recurring payments)
+**Spec:** [docs/verticals/3.3-series-registry.md](docs/verticals/3.3-series-registry.md)
 
-**Expected:**
-- Closed registry = user-defined recurring payment series
-- Examples: "OpenAI Subscription", "Rent", "Electricity (CFE)"
-- Attributes: series_id, name, expected_amount, frequency, account
+**Primitives Delivered:**
+- SeriesStore (OL) - CRUD operations for recurring payment series
+- RecurrenceEngine (OL) - Calculates next expected date based on frequency patterns
+- InstanceTracker (OL) - Auto-links transactions to series instances, detects variances
+- SeriesManager (IL) - Full CRUD UI for managing series with status badges
+- SeriesSelector (IL) - Dropdown for selecting series to link
+- RecurrenceConfigDialog (IL) - Dialog for configuring recurrence patterns
+
+**Schemas:** series.schema.json, series-instance.schema.json
+**UX Flow:** [3.3-series-registry-experience.md](docs/ux-flows/3.3-series-registry-experience.md)
+
+**Delivered:**
+- Closed registry pattern (user defines recurring payment templates)
+- Template + instance tracking (expected vs actual)
+- Auto-link transactions to series based on matching criteria (account + counterparty + amount ± tolerance + date ± 3 days)
+- Missing payment detection and variance alerts
+- Recurrence patterns: daily, weekly, monthly, yearly, custom
+- Edge case handling: last day of month (Jan 31 → Feb 28), leap years
+- Status badges: ✅ Paid, ⚠️ Variance, 🔴 Missing, 📅 Upcoming
+- Multi-domain applicability (finance subscriptions, healthcare premiums, legal retainers, research grants)
 
 ---
 
@@ -406,13 +422,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 8 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2 |
-| 📝 Pending | 15 | 3.3-3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 9 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3 |
+| 📝 Pending | 14 | 3.4-3.9, 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 35% (8/23)
+**Completion:** 39% (9/23)
 
-**Next up:** 3.3 Series Registry
+**Next up:** 3.4 Tax Categorization
 
 ---
 

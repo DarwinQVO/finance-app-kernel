@@ -1,0 +1,202 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/series-instance.schema.json",
+  "title": "SeriesInstance",
+  "description": "Instance record linking actual transaction to expected series occurrence. Tracks expected vs actual (date, amount) and variance status.",
+  "type": "object",
+  "required": [
+    "instance_id",
+    "series_id",
+    "user_id",
+    "expected_date",
+    "expected_amount",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "instance_id": {
+      "type": "string",
+      "pattern": "^instance_series_[a-z0-9_]+_[0-9]{6,8}$",
+      "description": "Unique instance identifier. Format: 'instance_{series_id}_{YYYYMM}' or 'instance_{series_id}_{seq}'. Example: 'instance_series_openai_chatgpt_1_202402'"
+    },
+    "series_id": {
+      "type": "string",
+      "pattern": "^series_[a-z0-9_]+$",
+      "description": "Parent series this instance belongs to. Foreign key to series table."
+    },
+    "user_id": {
+      "type": "string",
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "Owner of the instance (same as series owner). Denormalized for query performance."
+    },
+    "transaction_id": {
+      "type": ["string", "null"],
+      "pattern": "^txn_[a-z0-9_]+$",
+      "description": "Actual transaction linked to this instance. null if status='missing' or status='upcoming'. Foreign key to transactions table."
+    },
+    "expected_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when payment was expected (calculated by RecurrenceEngine). ISO 8601 format (YYYY-MM-DD)."
+    },
+    "actual_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Date of actual transaction. null if no transaction linked (status='missing' or status='upcoming'). ISO 8601 format (YYYY-MM-DD)."
+    },
+    "expected_amount": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "minimum": -999999.99,
+      "maximum": 999999.99,
+      "description": "Expected amount (copied from series.expected_amount at time of instance creation). 2 decimal places max."
+    },
+    "actual_amount": {
+      "type": ["number", "null"],
+      "multipleOf": 0.01,
+      "minimum": -999999.99,
+      "maximum": 999999.99,
+      "description": "Actual transaction amount. null if no transaction linked. 2 decimal places max."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["upcoming", "matched", "matched_manual", "variance", "missing", "skipped"],
+      "description": "Instance status. Lifecycle: upcoming → (matched | missing) → (variance | skipped). 'matched'=auto-linked within tolerance, 'matched_manual'=user linked, 'variance'=matched but amount outside tolerance, 'missing'=expected_date passed with no match, 'upcoming'=expected in future, 'skipped'=user marked as intentionally skipped"
+    },
+    "variance": {
+      "type": ["number", "null"],
+      "multipleOf": 0.01,
+      "description": "Amount variance (actual - expected). null if no transaction linked. Positive = overpaid, negative = underpaid. Example: expected -20.00, actual -22.00 → variance = -2.00"
+    },
+    "link_type": {
+      "type": ["string", "null"],
+      "enum": ["auto", "manual", null],
+      "description": "How transaction was linked. 'auto'=InstanceTracker.auto_link(), 'manual'=user via UI, null=not linked"
+    },
+    "force_linked": {
+      "type": "boolean",
+      "description": "If true, instance was manually linked with force=true (bypassed tolerance check). Only applicable when link_type='manual'.",
+      "default": false
+    },
+    "skip_reason": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Optional user note when marking instance as 'skipped'. Example: 'Cancelled subscription this month'"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when instance was created (either expected instance generated or transaction linked)"
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when instance was last updated (status change, unlink, etc.). null if never updated."
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "instance_id": "instance_series_openai_chatgpt_1_202402",
+      "series_id": "series_openai_chatgpt_1",
+      "user_id": "user_darwin",
+      "transaction_id": "txn_12345",
+      "expected_date": "2024-02-05",
+      "actual_date": "2024-02-05",
+      "expected_amount": -20.00,
+      "actual_amount": -20.00,
+      "status": "matched",
+      "variance": 0.00,
+      "link_type": "auto",
+      "force_linked": false,
+      "skip_reason": null,
+      "created_at": "2024-02-06T08:00:00Z",
+      "updated_at": null
+    },
+    {
+      "instance_id": "instance_series_rent_monthly_2_202411",
+      "series_id": "series_rent_monthly_2",
+      "user_id": "user_darwin",
+      "transaction_id": "txn_67890",
+      "expected_date": "2024-11-01",
+      "actual_date": "2024-10-31",
+      "expected_amount": -1200.00,
+      "actual_amount": -1250.00,
+      "status": "variance",
+      "variance": -50.00,
+      "link_type": "manual",
+      "force_linked": true,
+      "skip_reason": null,
+      "created_at": "2024-11-01T00:00:00Z",
+      "updated_at": "2024-11-01T10:30:00Z"
+    },
+    {
+      "instance_id": "instance_series_netflix_3_202411",
+      "series_id": "series_netflix_3",
+      "user_id": "user_darwin",
+      "transaction_id": null,
+      "expected_date": "2024-11-15",
+      "actual_date": null,
+      "expected_amount": -15.99,
+      "actual_amount": null,
+      "status": "missing",
+      "variance": null,
+      "link_type": null,
+      "force_linked": false,
+      "skip_reason": null,
+      "created_at": "2024-10-15T00:00:00Z",
+      "updated_at": "2024-11-18T00:00:00Z"
+    },
+    {
+      "instance_id": "instance_series_salary_4_202412",
+      "series_id": "series_salary_4",
+      "user_id": "user_darwin",
+      "transaction_id": null,
+      "expected_date": "2024-12-06",
+      "actual_date": null,
+      "expected_amount": 3000.00,
+      "actual_amount": null,
+      "status": "upcoming",
+      "variance": null,
+      "link_type": null,
+      "force_linked": false,
+      "skip_reason": null,
+      "created_at": "2024-11-06T00:00:00Z",
+      "updated_at": null
+    },
+    {
+      "instance_id": "instance_series_netflix_3_202408",
+      "series_id": "series_netflix_3",
+      "user_id": "user_darwin",
+      "transaction_id": null,
+      "expected_date": "2024-08-15",
+      "actual_date": null,
+      "expected_amount": -15.99,
+      "actual_amount": null,
+      "status": "skipped",
+      "variance": null,
+      "link_type": null,
+      "force_linked": false,
+      "skip_reason": "Cancelled subscription, moved to Disney+",
+      "created_at": "2024-07-15T00:00:00Z",
+      "updated_at": "2024-08-16T14:20:00Z"
+    },
+    {
+      "instance_id": "instance_series_insurance_premium_5_202411",
+      "series_id": "series_insurance_premium_5",
+      "user_id": "user_darwin",
+      "transaction_id": "txn_11111",
+      "expected_date": "2024-11-01",
+      "actual_date": "2024-11-01",
+      "expected_amount": -450.00,
+      "actual_amount": -460.00,
+      "status": "matched",
+      "variance": -10.00,
+      "link_type": "auto",
+      "force_linked": false,
+      "skip_reason": null,
+      "created_at": "2024-11-02T08:00:00Z",
+      "updated_at": null
+    }
+  ]
+}

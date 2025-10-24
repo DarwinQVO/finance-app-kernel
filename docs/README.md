@@ -17,8 +17,11 @@
 - **[2.1 Transaction List View](verticals/2.1-transaction-list-view.md)** ✅ Complete - Pagination, filtering, sorting, export
 - **[2.2 OL Exploration](verticals/2.2-ol-exploration.md)** ✅ Complete - Drill-down, decisions, provenance, artifact viewing
 - **[2.3 Finance Dashboard](verticals/2.3-finance-dashboard.md)** ✅ Complete - Saved views, aggregate metrics, PDF exports
+
+### Group 3: Registries (Finance Domain)
 - **[3.1 Account Registry](verticals/3.1-account-registry.md)** ✅ Complete - Closed registry pattern, CRUD operations, soft delete
-- **[3.2 Counterparty Registry](verticals/3.2-counterparty-registry.md)** ✅ Complete - Open registry, aliases, fuzzy matching, merge duplicates(verticals/3.1-account-registry.md)** ✅ Complete - Closed registry pattern, CRUD operations, soft delete
+- **[3.2 Counterparty Registry](verticals/3.2-counterparty-registry.md)** ✅ Complete - Open registry, aliases, fuzzy matching, merge duplicates
+- **[3.3 Series Registry](verticals/3.3-series-registry.md)** ✅ Complete - Recurring payments, template + instance tracking, auto-link, variance detection
 
 ---
 
@@ -70,12 +73,14 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[AccountValidator](primitives/ol/AccountValidator.md)** - Validates account data (names, types, currencies) before persistence
 
 **Vertical 3.2 (Counterparty Registry):**
-- **[counterparty.schema.json](schemas/counterparty.schema.json)** - Counterparty entity with canonical name, aliases array, merge support
-
-**Vertical 3.2 (Counterparty Registry):**
 - **[CounterpartyStore](primitives/ol/CounterpartyStore.md)** - CRUD operations with find_or_create pattern, alias management, merge support
 - **[CounterpartyMatcher](primitives/ol/CounterpartyMatcher.md)** - Fuzzy matching engine (Levenshtein, Jaro-Winkler, token-based)
 - **[AliasMerger](primitives/ol/AliasMerger.md)** - Safe merge operations with transaction migration and rollback
+
+**Vertical 3.3 (Series Registry):**
+- **[SeriesStore](primitives/ol/SeriesStore.md)** - CRUD operations for recurring payment series with uniqueness validation
+- **[RecurrenceEngine](primitives/ol/RecurrenceEngine.md)** - Calculates next expected date based on frequency patterns (daily, weekly, monthly, yearly, custom)
+- **[InstanceTracker](primitives/ol/InstanceTracker.md)** - Auto-links transactions to series instances, detects variances and missing payments
 
 ### Interface Layer (IL)
 Reusable UI components:
@@ -92,6 +97,9 @@ Reusable UI components:
 - **[CounterpartyManager](primitives/il/CounterpartyManager.md)** - Full CRUD UI for counterparties with duplicate suggestions and bulk merge
 - **[CounterpartySelector](primitives/il/CounterpartySelector.md)** - Dropdown for selecting counterparty with alias search and grouping
 - **[MergeCounterpartiesDialog](primitives/il/MergeCounterpartiesDialog.md)** - 5-step wizard for merging duplicate counterparties
+- **[SeriesManager](primitives/il/SeriesManager.md)** - Full CRUD UI for managing recurring payment series with status badges and variance alerts
+- **[SeriesSelector](primitives/il/SeriesSelector.md)** - Dropdown for selecting series to link (used in transaction detail, manual link dialog)
+- **[RecurrenceConfigDialog](primitives/il/RecurrenceConfigDialog.md)** - Dialog for configuring recurrence patterns (daily, weekly, monthly, yearly, custom)
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -130,10 +138,9 @@ Executable contracts extracted from vertical specifications:
 **Vertical 3.2 (Counterparty Registry):**
 - **[counterparty.schema.json](schemas/counterparty.schema.json)** - Counterparty entity with canonical name, aliases array, merge support
 
-**Vertical 3.2 (Counterparty Registry):**
-- **[CounterpartyStore](primitives/ol/CounterpartyStore.md)** - CRUD operations with find_or_create pattern, alias management, merge support
-- **[CounterpartyMatcher](primitives/ol/CounterpartyMatcher.md)** - Fuzzy matching engine (Levenshtein, Jaro-Winkler, token-based)
-- **[AliasMerger](primitives/ol/AliasMerger.md)** - Safe merge operations with transaction migration and rollback
+**Vertical 3.3 (Series Registry):**
+- **[series.schema.json](schemas/series.schema.json)** - Recurring payment series definition (expected amount, frequency pattern, tolerance)
+- **[series-instance.schema.json](schemas/series-instance.schema.json)** - Instance tracking record (expected vs actual, variance, status)
 
 ---
 
@@ -161,6 +168,7 @@ User experience specifications with wireframes and journeys:
 - **[2.3 Finance Dashboard Experience](ux-flows/2.3-finance-dashboard-experience.md)** - Dashboard views, custom view creation, metric drill-down, PDF export
 - **[3.1 Account Registry Experience](ux-flows/3.1-account-registry-experience.md)** - Account creation, editing, archiving, selector dropdown, immutability patterns
 - **[3.2 Counterparty Registry Experience](ux-flows/3.2-counterparty-registry-experience.md)** - Auto-creation, fuzzy matching, merge duplicates, alias management
+- **[3.3 Series Registry Experience](ux-flows/3.3-series-registry-experience.md)** - Create recurring series, view status badges, manual link, variance alerts, archive series
 
 ---
 
@@ -174,7 +182,10 @@ User experience specifications with wireframes and journeys:
 | **2. Exploration & Viz** | 2.1 Transaction List View | ✅ Complete |
 | | 2.2 OL Exploration | ✅ Complete |
 | | 2.3 Finance Dashboard | ✅ Complete |
-| **3. Registries** | 3.1-3.9 | 📝 Pending |
+| **3. Registries** | 3.1 Account Registry | ✅ Complete |
+| | 3.2 Counterparty Registry | ✅ Complete |
+| | 3.3 Series Registry | ✅ Complete |
+| | 3.4-3.9 | 📝 Pending |
 | **4. Derivatives** | 4.1-4.3 | 📝 Pending |
 | **5. Governance** | 5.1-5.5 | 📝 Pending |
 
