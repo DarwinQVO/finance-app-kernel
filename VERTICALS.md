@@ -287,15 +287,33 @@
 
 ### **3.6 Unit**
 **Status:** ✅ Complete
-**Full Name:** Unit (normalización)
-**Additions:** + currency/date rules
-**Spec:** TBD
+**Full Name:** Unit (Currency & Date Normalization)
+**Additions:** + currency/date rules, exchange rate caching
+**Spec:** [docs/verticals/3.6-unit.md](docs/verticals/3.6-unit.md)
 
-**Expected:**
-- Currency normalization (USD, MXN → base currency)
-- Date format normalization (MM/DD/YYYY vs DD/MM/YYYY)
-- Amount precision rules
-- Exchange rate sources
+**Primitives Delivered:**
+- CurrencyConverter (OL) - Multi-currency normalization with batch conversion
+- DateNormalizer (OL) - Timezone conversion (UTC storage, user display), DST handling
+- AmountFormatter (OL) - Locale-aware formatting (en-US, es-MX, de-DE) with currency symbols
+- ExchangeRateProvider (OL) - Multi-source rate fetching (ECB, Federal Reserve, manual) with caching
+- CurrencySelectorDialog (IL) - Modal dialog for selecting base currency with search
+- AmountDisplayCard (IL) - Display original + normalized amounts side-by-side
+- ExchangeRateWidget (IL) - Display rate with refresh button and staleness indicator
+
+**Schemas:** normalized-amount.schema.json, exchange-rate-record.schema.json, currency-config.schema.json
+**UX Flow:** [3.6-unit-experience.md](docs/ux-flows/3.6-unit-experience.md)
+
+**Delivered:**
+- Multi-currency normalization (USD, EUR, MXN, 150+ currencies)
+- Original + normalized amount preservation
+- Exchange rate fetching with fallback sources (ECB primary, Federal Reserve fallback)
+- Rate caching with 24h staleness detection
+- Manual rate override with audit trail
+- Date normalization (UTC storage, user timezone display)
+- ISO 8601 compliance and DST handling
+- Amount precision rules (2 decimals for fiat, 4-8 for crypto)
+- Locale-aware display formatting (thousands separators, decimal symbols)
+- Multi-domain applicability (Finance → multi-currency, Healthcare → international claims, E-commerce → product pricing, Travel → expense reporting, Legal → international billing)
 
 ---
 
@@ -456,13 +474,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 11 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5 |
-| 📝 Pending | 12 | 3.6-3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 12 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 |
+| 📝 Pending | 11 | 3.7-3.9, 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 48% (11/23)
+**Completion:** 52% (12/23)
 
-**Next up:** 3.6 Unit (currency/date normalization)
+**Next up:** 3.7 Parser (parser registry)
 
 ---
 

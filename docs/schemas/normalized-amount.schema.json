@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/normalized-amount.schema.json",
+  "title": "NormalizedAmount",
+  "description": "Amount with original + normalized values and exchange rate metadata. Preserves context for audit and provenance.",
+  "type": "object",
+  "required": [
+    "original_amount",
+    "original_currency",
+    "normalized_amount",
+    "base_currency",
+    "exchange_rate",
+    "rate_date"
+  ],
+  "properties": {
+    "original_amount": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "description": "Original transaction amount as extracted from source (can be negative for expenses)"
+    },
+    "original_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "ISO 4217 currency code of original amount (e.g., 'USD', 'EUR', 'MXN')",
+      "examples": ["USD", "EUR", "MXN", "GBP", "JPY", "BTC"]
+    },
+    "normalized_amount": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "description": "Converted amount in user's base currency (for aggregation and reporting)"
+    },
+    "base_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "User's base currency for normalization (ISO 4217)",
+      "examples": ["MXN", "USD", "EUR"]
+    },
+    "exchange_rate": {
+      "type": "number",
+      "minimum": 0.0001,
+      "multipleOf": 0.0001,
+      "description": "Exchange rate used for conversion (to_currency / from_currency). 6 decimal precision.",
+      "examples": [18.5000, 0.9200, 1.0000]
+    },
+    "rate_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of exchange rate (YYYY-MM-DD). Important for historical accuracy.",
+      "examples": ["2024-11-01"]
+    },
+    "rate_source": {
+      "type": "string",
+      "enum": ["ecb", "federal_reserve", "manual", "calculated"],
+      "description": "Source of exchange rate: ecb=European Central Bank, federal_reserve=US Federal Reserve, manual=user override, calculated=inverse/cross-rate",
+      "default": "ecb"
+    },
+    "override_reason": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Optional: Reason for manual rate override (if rate_source='manual')",
+      "examples": [
+        "Bank charged higher rate due to foreign transaction fee",
+        "Negotiated rate with vendor",
+        "Credit card issuer's conversion rate"
+      ]
+    },
+    "converted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when conversion was performed (ISO 8601 UTC)",
+      "examples": ["2024-11-01T10:00:00Z"]
+    },
+    "is_stale": {
+      "type": "boolean",
+      "description": "True if exchange rate is stale (>24h old for fiat, >1h for crypto)",
+      "default": false
+    }
+  },
+  "examples": [
+    {
+      "original_amount": 100.00,
+      "original_currency": "USD",
+      "normalized_amount": 1850.00,
+      "base_currency": "MXN",
+      "exchange_rate": 18.5000,
+      "rate_date": "2024-11-01",
+      "rate_source": "ecb",
+      "converted_at": "2024-11-01T10:00:00Z",
+      "is_stale": false
+    },
+    {
+      "original_amount": -100.00,
+      "original_currency": "USD",
+      "normalized_amount": -1900.00,
+      "base_currency": "MXN",
+      "exchange_rate": 19.0000,
+      "rate_date": "2024-11-01",
+      "rate_source": "manual",
+      "override_reason": "Bank charged higher rate due to foreign transaction fee",
+      "converted_at": "2024-11-01T10:30:00Z",
+      "is_stale": false
+    },
+    {
+      "original_amount": 500.00,
+      "original_currency": "EUR",
+      "normalized_amount": 530.00,
+      "base_currency": "USD",
+      "exchange_rate": 1.0600,
+      "rate_date": "2024-11-01",
+      "rate_source": "ecb",
+      "converted_at": "2024-11-01T08:00:00Z",
+      "is_stale": false
+    },
+    {
+      "original_amount": 0.12345678,
+      "original_currency": "BTC",
+      "normalized_amount": 8024.69,
+      "base_currency": "USD",
+      "exchange_rate": 65000.0000,
+      "rate_date": "2024-11-01",
+      "rate_source": "ecb",
+      "converted_at": "2024-11-01T09:00:00Z",
+      "is_stale": false
+    }
+  ]
+}

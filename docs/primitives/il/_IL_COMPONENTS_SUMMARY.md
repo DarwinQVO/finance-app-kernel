@@ -2,7 +2,7 @@
 
 **Status**: Specification complete
 **Last Updated**: 2025-10-24
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
 
 ---
 
@@ -1483,6 +1483,215 @@ All components accept `className` and respect CSS variables:
 - Real Estate: Overseas property transactions (local → home currency)
 - Energy: Commodity price conversions (oil barrels, natural gas)
 - Travel: Expense tracking across multiple currencies
+
+---
+
+### Vertical 3.6 (Unit - Currency & Date Normalization)
+
+#### 26. CurrencySelectorDialog ✅
+**Full spec**: [CurrencySelectorDialog.md](CurrencySelectorDialog.md)
+
+**Props**: `isOpen`, `onClose`, `onSelect`, `currentCurrency`, `includeCrypto`
+**States**: idle | loading | loaded | error
+**Reusable across**: Finance settings, Healthcare billing, E-commerce pricing, Travel expenses, Research grants
+
+**Purpose**: Modal dialog for selecting base currency from 150+ ISO 4217 currencies with search and popular currencies first (USD, EUR, MXN, GBP, JPY).
+
+**Visual (Default View)**:
+```
+┌─────────────────────────────────────────────────┐
+│  Select Base Currency                        × │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│  🔍 [Search currencies...                   ]  │
+│                                                 │
+│  ✨ Popular Currencies                          │
+│  ┌─────────────────────────────────────────┐   │
+│  │ 🇺🇸 USD - US Dollar              [✓]   │   │
+│  │ 🇪🇺 EUR - Euro                          │   │
+│  │ 🇲🇽 MXN - Mexican Peso                  │   │
+│  │ 🇬🇧 GBP - British Pound                 │   │
+│  │ 🇯🇵 JPY - Japanese Yen                  │   │
+│  └─────────────────────────────────────────┘   │
+│                                                 │
+│  All Currencies (A-Z)                           │
+│  ┌─────────────────────────────────────────┐   │
+│  │ 🇦🇺 AUD - Australian Dollar             │   │
+│  │ 🇨🇦 CAD - Canadian Dollar               │   │
+│  │ 🇨🇭 CHF - Swiss Franc                   │   │
+│  │ ... (scrollable)                         │   │
+│  └─────────────────────────────────────────┘   │
+│                                                 │
+│                    [Cancel]  [Select]           │
+└─────────────────────────────────────────────────┘
+```
+
+**Visual (Search Active)**:
+```
+┌─────────────────────────────────────────────────┐
+│  Select Base Currency                        × │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│  🔍 [mex                                     ]  │
+│                                                 │
+│  Search Results (1):                            │
+│  ┌─────────────────────────────────────────┐   │
+│  │ 🇲🇽 MXN - Mexican Peso                  │   │
+│  └─────────────────────────────────────────┘   │
+│                                                 │
+│                    [Cancel]  [Select]           │
+└─────────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: User settings (change base currency), transaction override
+- Healthcare: International patient billing (select patient currency)
+- E-commerce: Product pricing (set display currency for customer)
+- Travel: Expense tracking (select local currency for trip)
+- Research: Grant management (select funding currency)
+- Manufacturing: Material costs (select supplier currency)
+- Real Estate: Property transactions (select local market currency)
+
+---
+
+#### 27. AmountDisplayCard ✅
+**Full spec**: [AmountDisplayCard.md](AmountDisplayCard.md)
+
+**Props**: `amount`, `originalCurrency`, `baseCurrency`, `exchangeRate`, `showOriginal`, `onToggle`
+**States**: normalized_only | dual_currency | loading | error | compact
+**Reusable across**: Finance transactions, Healthcare claims, E-commerce orders, Travel expenses, Research budgets
+
+**Purpose**: Display transaction amount in both original currency and user's base currency with side-by-side comparison and toggle to show/hide original.
+
+**Visual (Dual Currency)**:
+```
+┌────────────────────────────────────────────┐
+│  Amount                                    │
+├────────────────────────────────────────────┤
+│                                            │
+│  Original:       $1,000.00 USD             │
+│  ↓ 18.5000 MXN/USD                         │
+│  Your Currency:  $18,500.00 MXN            │
+│                                            │
+│  [Hide Original]                           │
+└────────────────────────────────────────────┘
+```
+
+**Visual (Normalized Only)**:
+```
+┌────────────────────────────────────────────┐
+│  Amount                                    │
+├────────────────────────────────────────────┤
+│                                            │
+│  $18,500.00 MXN                            │
+│                                            │
+│  [Show Original]                           │
+└────────────────────────────────────────────┘
+```
+
+**Visual (Compact - Mobile)**:
+```
+┌─────────────────────────┐
+│  Amount                 │
+├─────────────────────────┤
+│  $1,000 USD             │
+│  ↓ 18.5000              │
+│  $18,500 MXN            │
+│                         │
+│  [Hide Original]        │
+└─────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Transaction detail view, account balances (multi-currency accounts)
+- Healthcare: International insurance claims (claim currency → patient currency)
+- E-commerce: Order totals (customer currency → merchant base currency)
+- Travel: Expense reports (local currency → home currency)
+- Research: Grant budgets (grant currency → institutional currency)
+- Manufacturing: Material costs (supplier currency → company currency)
+- Payroll: International contractor payments (contractor currency → company currency)
+
+---
+
+#### 28. ExchangeRateWidget ✅
+**Full spec**: [ExchangeRateWidget.md](ExchangeRateWidget.md)
+
+**Props**: `fromCurrency`, `toCurrency`, `rate`, `rateDate`, `rateSource`, `onRefresh`, `isStale`
+**States**: current | stale | refreshing | error | compact
+**Reusable across**: Finance dashboards, Healthcare billing, E-commerce admin, Travel planning, Research budgets
+
+**Purpose**: Display current exchange rate with last update time, rate source badge (ECB, Federal Reserve, manual), staleness indicator, and refresh button.
+
+**Visual (Current Rate)**:
+```
+┌────────────────────────────────────────────┐
+│  💱 Exchange Rate                          │
+├────────────────────────────────────────────┤
+│                                            │
+│  USD → MXN                                 │
+│  18.5000 MXN/USD                           │
+│                                            │
+│  Source: ECB                               │
+│  Last updated: 2025-10-24 10:30 AM         │
+│                                            │
+│  [🔄 Refresh]                              │
+└────────────────────────────────────────────┘
+```
+
+**Visual (Stale Rate Warning)**:
+```
+┌────────────────────────────────────────────┐
+│  💱 Exchange Rate                     ⚠️   │
+├────────────────────────────────────────────┤
+│                                            │
+│  USD → EUR                                 │
+│  0.9200 EUR/USD                            │
+│                                            │
+│  Source: Federal Reserve                   │
+│  Last updated: 2025-10-22 (2 days ago)     │
+│                                            │
+│  ⚠️ Rate is stale (>24h old)               │
+│  [🔄 Refresh Now]                          │
+└────────────────────────────────────────────┘
+```
+
+**Visual (Manual Override)**:
+```
+┌────────────────────────────────────────────┐
+│  💱 Exchange Rate                     ✏️   │
+├────────────────────────────────────────────┤
+│                                            │
+│  GBP → USD                                 │
+│  1.2500 USD/GBP                            │
+│                                            │
+│  Source: Manual Override                   │
+│  Set by: user_darwin                       │
+│  Set on: 2025-10-24 09:00 AM               │
+│                                            │
+│  [Edit Rate] [Use Market Rate]             │
+└────────────────────────────────────────────┘
+```
+
+**Visual (Compact - Dashboard Widget)**:
+```
+┌─────────────────────────┐
+│  💱 USD → MXN           │
+├─────────────────────────┤
+│  18.5000                │
+│  ECB · 10:30 AM         │
+│  [🔄]                   │
+└─────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Multi-currency dashboard, FX trading view, account summary
+- Healthcare: International billing dashboard (claims in multiple currencies)
+- E-commerce: Admin panel (product pricing across regions)
+- Travel: Expense tracker dashboard (real-time rate display)
+- Research: Grant management (budget tracking across currencies)
+- Manufacturing: Material cost dashboard (supplier currencies → base currency)
+- Treasury: Corporate treasury dashboard (FX exposure monitoring)
+- Banking: Customer-facing rate display (transfers, wire services)
 
 ---
 

@@ -24,6 +24,7 @@
 - **[3.3 Series Registry](verticals/3.3-series-registry.md)** ✅ Complete - Recurring payments, template + instance tracking, auto-link, variance detection
 - **[3.4 Tax Categorization](verticals/3.4-tax-categorization.md)** ✅ Complete - Multi-jurisdiction (USA+Mexico), hierarchical taxonomy, auto-classification, Factura tracking
 - **[3.5 Relationships](verticals/3.5-relationships.md)** ✅ Complete - Auto-detect transfers, FX conversion tracking, manual linking, analytics exclusion
+- **[3.6 Unit](verticals/3.6-unit.md)** ✅ Complete - Multi-currency normalization, exchange rate caching, date/timezone handling, locale-aware formatting
 
 ---
 
@@ -97,6 +98,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[FXConverter](primitives/ol/FXConverter.md)** - Calculate exchange rates and FX gain/loss
 - **[RelationshipMatcher](primitives/ol/RelationshipMatcher.md)** - Fuzzy matching with configurable thresholds
 
+**Vertical 3.6 (Unit):**
+- **[CurrencyConverter](primitives/ol/CurrencyConverter.md)** - Multi-currency normalization with batch conversion (150+ currencies)
+- **[DateNormalizer](primitives/ol/DateNormalizer.md)** - Timezone conversion (UTC storage, user display) with DST handling and ISO 8601 compliance
+- **[AmountFormatter](primitives/ol/AmountFormatter.md)** - Locale-aware formatting (en-US, es-MX, de-DE) with currency symbols and precision rules
+- **[ExchangeRateProvider](primitives/ol/ExchangeRateProvider.md)** - Multi-source rate fetching (ECB, Federal Reserve, manual) with caching and staleness detection
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -121,6 +128,9 @@ Reusable UI components:
 - **[RelationshipPanel](primitives/il/RelationshipPanel.md)** - Display linked transactions in detail view
 - **[TransferLinkDialog](primitives/il/TransferLinkDialog.md)** - Manual link creation UI with transaction search
 - **[FXConversionCard](primitives/il/FXConversionCard.md)** - FX conversion details display with market rate comparison
+- **[CurrencySelectorDialog](primitives/il/CurrencySelectorDialog.md)** - Modal dialog for selecting base currency with search and popular currencies
+- **[AmountDisplayCard](primitives/il/AmountDisplayCard.md)** - Display original + normalized amounts side-by-side with toggle
+- **[ExchangeRateWidget](primitives/il/ExchangeRateWidget.md)** - Display rate with refresh button, staleness indicator, and source badge
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -173,6 +183,11 @@ Executable contracts extracted from vertical specifications:
 - **[relationship-candidate.schema.json](schemas/relationship-candidate.schema.json)** - Auto-detection result with confidence score and match details
 - **[fx-details.schema.json](schemas/fx-details.schema.json)** - FX conversion details (exchange rate, market rate, gain/loss)
 
+**Vertical 3.6 (Unit):**
+- **[normalized-amount.schema.json](schemas/normalized-amount.schema.json)** - Amount with original + normalized values and exchange rate metadata
+- **[exchange-rate-record.schema.json](schemas/exchange-rate-record.schema.json)** - Cached exchange rate record with staleness detection
+- **[currency-config.schema.json](schemas/currency-config.schema.json)** - User currency configuration (base currency, timezone, display locale, precision)
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -202,6 +217,7 @@ User experience specifications with wireframes and journeys:
 - **[3.3 Series Registry Experience](ux-flows/3.3-series-registry-experience.md)** - Create recurring series, view status badges, manual link, variance alerts, archive series
 - **[3.4 Tax Categorization Experience](ux-flows/3.4-tax-categorization-experience.md)** - Classify transactions, upload Factura, create custom categories, auto-suggestions, bulk operations
 - **[3.5 Relationships Experience](ux-flows/3.5-relationships-experience.md)** - Accept transfer suggestion, manual link creation, FX conversion viewing, unlink flow, multiple candidates
+- **[3.6 Unit Experience](ux-flows/3.6-unit-experience.md)** - Set base currency, view dual currencies, refresh stale rates, manual rate override, timezone change
 
 ---
 
@@ -220,10 +236,8 @@ User experience specifications with wireframes and journeys:
 | | 3.3 Series Registry | ✅ Complete |
 | | 3.4 Tax Categorization | ✅ Complete |
 | | 3.5 Relationships | ✅ Complete |
-| | 3.2 Counterparty Registry | ✅ Complete |
-| | 3.3 Series Registry | ✅ Complete |
-| | 3.4 Tax Categorization | ✅ Complete |
-| | 3.4-3.9 | 📝 Pending |
+| | 3.6 Unit | ✅ Complete |
+| | 3.7-3.9 | 📝 Pending |
 | **4. Derivatives** | 4.1-4.3 | 📝 Pending |
 | **5. Governance** | 5.1-5.5 | 📝 Pending |
 

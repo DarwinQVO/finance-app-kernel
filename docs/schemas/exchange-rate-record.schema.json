@@ -1,0 +1,171 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/exchange-rate-record.schema.json",
+  "title": "ExchangeRateRecord",
+  "description": "Cached exchange rate record with metadata for provenance and staleness detection",
+  "type": "object",
+  "required": [
+    "rate_id",
+    "from_currency",
+    "to_currency",
+    "rate",
+    "rate_date",
+    "source",
+    "fetched_at"
+  ],
+  "properties": {
+    "rate_id": {
+      "type": "string",
+      "pattern": "^rate_[a-z0-9_]+$",
+      "description": "Unique identifier for rate record (format: rate_{from}_{to}_{date}[_manual_{user_id}])",
+      "examples": [
+        "rate_usd_mxn_20241101",
+        "rate_eur_usd_20241101",
+        "rate_usd_mxn_20241101_manual_user123"
+      ]
+    },
+    "from_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "Source currency (ISO 4217)",
+      "examples": ["USD", "EUR", "GBP"]
+    },
+    "to_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "Target currency (ISO 4217)",
+      "examples": ["MXN", "EUR", "JPY"]
+    },
+    "rate": {
+      "type": "number",
+      "minimum": 0.0001,
+      "multipleOf": 0.0001,
+      "description": "Exchange rate (to_currency / from_currency). 6 decimal precision.",
+      "examples": [18.5000, 0.9200, 150.0000]
+    },
+    "rate_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date for which this rate is valid (YYYY-MM-DD)",
+      "examples": ["2024-11-01"]
+    },
+    "source": {
+      "type": "string",
+      "enum": ["ecb", "federal_reserve", "manual"],
+      "description": "Source of exchange rate: ecb=European Central Bank, federal_reserve=US Federal Reserve, manual=user override"
+    },
+    "fetched_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when rate was fetched/created (ISO 8601 UTC)",
+      "examples": ["2024-11-01T08:00:00Z"]
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when rate becomes stale (fetched_at + staleness_threshold)",
+      "examples": ["2024-11-02T08:00:00Z"]
+    },
+    "is_stale": {
+      "type": "boolean",
+      "description": "True if NOW() > expires_at. Calculated field (not stored).",
+      "default": false
+    },
+    "user_id": {
+      "type": "string",
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "Optional: User ID if source='manual' (manual override)",
+      "examples": ["user_123"]
+    },
+    "override_reason": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Optional: Reason for manual rate override",
+      "examples": ["Bank charged higher rate", "Negotiated vendor rate"]
+    },
+    "variance_from_ecb": {
+      "type": "number",
+      "minimum": -100,
+      "maximum": 100,
+      "description": "Optional: Percentage variance from ECB rate (for manual overrides). Positive = higher than ECB, negative = lower.",
+      "examples": [2.7, -1.5]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional: Additional metadata (API response, debug info, etc.)",
+      "properties": {
+        "api_response_time_ms": {
+          "type": "number",
+          "description": "API response latency in milliseconds"
+        },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of retries before successful fetch"
+        },
+        "fallback_source": {
+          "type": "string",
+          "description": "If ECB failed, which fallback was used"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "rate_id": "rate_usd_mxn_20241101",
+      "from_currency": "USD",
+      "to_currency": "MXN",
+      "rate": 18.5000,
+      "rate_date": "2024-11-01",
+      "source": "ecb",
+      "fetched_at": "2024-11-01T08:00:00Z",
+      "expires_at": "2024-11-02T08:00:00Z",
+      "is_stale": false,
+      "metadata": {
+        "api_response_time_ms": 345,
+        "retry_count": 0
+      }
+    },
+    {
+      "rate_id": "rate_usd_eur_20241101",
+      "from_currency": "USD",
+      "to_currency": "EUR",
+      "rate": 0.9200,
+      "rate_date": "2024-11-01",
+      "source": "federal_reserve",
+      "fetched_at": "2024-11-01T08:05:00Z",
+      "expires_at": "2024-11-02T08:05:00Z",
+      "is_stale": false,
+      "metadata": {
+        "api_response_time_ms": 890,
+        "retry_count": 1,
+        "fallback_source": "federal_reserve"
+      }
+    },
+    {
+      "rate_id": "rate_usd_mxn_20241101_manual_user123",
+      "from_currency": "USD",
+      "to_currency": "MXN",
+      "rate": 19.0000,
+      "rate_date": "2024-11-01",
+      "source": "manual",
+      "fetched_at": "2024-11-01T10:30:00Z",
+      "expires_at": "2024-11-02T10:30:00Z",
+      "is_stale": false,
+      "user_id": "user_123",
+      "override_reason": "Bank charged higher rate due to foreign transaction fee",
+      "variance_from_ecb": 2.7
+    },
+    {
+      "rate_id": "rate_btc_usd_20241101",
+      "from_currency": "BTC",
+      "to_currency": "USD",
+      "rate": 65000.0000,
+      "rate_date": "2024-11-01",
+      "source": "ecb",
+      "fetched_at": "2024-11-01T09:00:00Z",
+      "expires_at": "2024-11-01T10:00:00Z",
+      "is_stale": false
+    }
+  ]
+}

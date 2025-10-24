@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/currency-config.schema.json",
+  "title": "CurrencyConfig",
+  "description": "User's currency configuration (base currency, timezone, display preferences)",
+  "type": "object",
+  "required": [
+    "user_id",
+    "base_currency",
+    "precision",
+    "display_locale",
+    "timezone"
+  ],
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "User identifier (foreign key to users table)",
+      "examples": ["user_123"]
+    },
+    "base_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "User's base currency for normalization (ISO 4217). All transactions normalized to this currency.",
+      "examples": ["USD", "EUR", "MXN", "GBP"]
+    },
+    "precision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8,
+      "description": "Decimal places for amounts (2 for fiat, 4-8 for crypto)",
+      "default": 2,
+      "examples": [2, 4, 8]
+    },
+    "display_locale": {
+      "type": "string",
+      "pattern": "^[a-z]{2}-[A-Z]{2}$",
+      "description": "BCP 47 locale for number formatting (e.g., 'en-US', 'es-MX', 'de-DE')",
+      "examples": ["en-US", "es-MX", "de-DE", "fr-FR", "ja-JP"]
+    },
+    "timezone": {
+      "type": "string",
+      "description": "IANA timezone for date/time display (e.g., 'America/Mexico_City', 'Europe/London')",
+      "examples": [
+        "America/Mexico_City",
+        "America/New_York",
+        "Europe/London",
+        "Asia/Tokyo",
+        "UTC"
+      ]
+    },
+    "rate_sources": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["ecb", "federal_reserve", "manual"]
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Preferred exchange rate sources in priority order. First source is primary, subsequent sources are fallbacks.",
+      "default": ["ecb", "federal_reserve", "manual"],
+      "examples": [
+        ["ecb", "federal_reserve", "manual"],
+        ["federal_reserve", "ecb", "manual"]
+      ]
+    },
+    "staleness_threshold_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 168,
+      "description": "Hours before exchange rate marked stale (24h default for fiat, 1h for crypto)",
+      "default": 24,
+      "examples": [24, 1]
+    },
+    "auto_refresh_stale_rates": {
+      "type": "boolean",
+      "description": "Automatically refresh stale rates when viewing transactions",
+      "default": false
+    },
+    "show_original_amounts": {
+      "type": "boolean",
+      "description": "Show original currency amounts alongside normalized amounts",
+      "default": true
+    },
+    "compact_display": {
+      "type": "boolean",
+      "description": "Use compact notation for large amounts (e.g., $1.2K instead of $1,234.56)",
+      "default": false
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when config was created (ISO 8601 UTC)",
+      "examples": ["2024-11-01T10:00:00Z"]
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when config was last updated (ISO 8601 UTC)",
+      "examples": ["2024-11-01T10:00:00Z"]
+    }
+  },
+  "examples": [
+    {
+      "user_id": "user_123",
+      "base_currency": "MXN",
+      "precision": 2,
+      "display_locale": "es-MX",
+      "timezone": "America/Mexico_City",
+      "rate_sources": ["ecb", "federal_reserve", "manual"],
+      "staleness_threshold_hours": 24,
+      "auto_refresh_stale_rates": false,
+      "show_original_amounts": true,
+      "compact_display": false,
+      "created_at": "2024-11-01T10:00:00Z",
+      "updated_at": "2024-11-01T10:00:00Z"
+    },
+    {
+      "user_id": "user_456",
+      "base_currency": "USD",
+      "precision": 2,
+      "display_locale": "en-US",
+      "timezone": "America/New_York",
+      "rate_sources": ["ecb", "federal_reserve", "manual"],
+      "staleness_threshold_hours": 24,
+      "auto_refresh_stale_rates": true,
+      "show_original_amounts": true,
+      "compact_display": false,
+      "created_at": "2024-10-15T08:00:00Z",
+      "updated_at": "2024-11-01T12:00:00Z"
+    },
+    {
+      "user_id": "user_789",
+      "base_currency": "BTC",
+      "precision": 8,
+      "display_locale": "en-US",
+      "timezone": "UTC",
+      "rate_sources": ["ecb", "manual"],
+      "staleness_threshold_hours": 1,
+      "auto_refresh_stale_rates": true,
+      "show_original_amounts": true,
+      "compact_display": false,
+      "created_at": "2024-11-01T10:00:00Z",
+      "updated_at": "2024-11-01T10:00:00Z"
+    },
+    {
+      "user_id": "user_012",
+      "base_currency": "EUR",
+      "precision": 2,
+      "display_locale": "de-DE",
+      "timezone": "Europe/Berlin",
+      "rate_sources": ["ecb", "federal_reserve", "manual"],
+      "staleness_threshold_hours": 24,
+      "auto_refresh_stale_rates": false,
+      "show_original_amounts": false,
+      "compact_display": true,
+      "created_at": "2024-10-01T06:00:00Z",
+      "updated_at": "2024-11-01T14:00:00Z"
+    }
+  ]
+}
