@@ -1,8 +1,8 @@
 # IL Components Summary
 
 **Status**: Specification complete
-**Last Updated**: 2025-10-23
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1
+**Last Updated**: 2025-10-24
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2
 
 ---
 
@@ -745,3 +745,77 @@ All components accept `className` and respect CSS variables:
 ---
 
 **Next vertical**: 3.2 Counterparty Registry (expected: 2-3 new IL components for open registry management)
+
+### Vertical 3.2 (Counterparty Registry)
+
+#### 14. CounterpartyManager ✅
+**Full spec**: [CounterpartyManager.md](CounterpartyManager.md)
+
+**Purpose**: Full CRUD UI for counterparties with duplicate suggestions and bulk merge
+
+**Key Features**:
+- List view with search across canonical names AND aliases
+- Duplicate suggestions panel with similarity scores (Levenshtein algorithm)
+- Multi-select for bulk merge operations
+- Edit modal (canonical name, type, aliases, notes)
+- Transaction count display per counterparty
+- Filter by type (merchant, person, business, government)
+- Group by type with smart ordering
+
+**Reusability**:
+- Finance: Manage merchants and payees
+- Healthcare: Manage healthcare providers
+- Legal: Manage opposing parties and law firms
+- Research: Manage publishers and co-authors
+- Manufacturing: Manage suppliers and vendors
+- Media: Manage advertisers and sponsors
+
+---
+
+#### 15. CounterpartySelector ✅
+**Full spec**: [CounterpartySelector.md](CounterpartySelector.md)
+
+**Purpose**: Dropdown for selecting counterparty with alias search and grouping
+
+**Key Features**:
+- Search across canonical names + aliases with highlighting
+- Group by type (person, merchant, business, government)
+- Show transaction count (helps users pick the right one)
+- Create inline (add new counterparty mid-flow)
+- Auto-sort by transaction count (most used first)
+- Keyboard navigation
+- Size variants (small, medium, large)
+
+**Reusability**:
+- Finance: Select merchant in transaction edit, filter by counterparty
+- Healthcare: Select provider in claim edit
+- Legal: Select opposing party in case allocation
+- Research: Select publisher in citation management
+- Manufacturing: Select supplier in purchase order
+- Media: Select advertiser in campaign analytics
+
+---
+
+#### 16. MergeCounterpartiesDialog ✅
+**Full spec**: [MergeCounterpartiesDialog.md](MergeCounterpartiesDialog.md)
+
+**Purpose**: 5-step wizard for merging duplicate counterparties
+
+**Key Features**:
+- **Step 1**: Select primary counterparty (keeps its canonical name)
+- **Step 2**: Preview combined aliases + total transaction count
+- **Step 3**: Confirm with type-to-confirm ("MERGE") + irreversible warning
+- **Step 4**: Progress indicator during merge (batch processing)
+- **Step 5**: Success screen with stats
+- Visual progress indicator at top of dialog
+- Transaction migration shown in real-time
+
+**Reusability**:
+- Finance: Merge duplicate merchants ("OpenAI" + "OpenAI Inc")
+- Healthcare: Merge duplicate providers ("Blue Cross" + "BCBS")
+- Legal: Merge duplicate parties ("Smith Law" + "Smith & Associates")
+- Research: Merge duplicate publishers ("Nature" + "Nature Publishing")
+- Manufacturing: Merge duplicate suppliers ("Acme Corp" + "ACME")
+- Media: Merge duplicate advertisers ("YouTube" + "YouTube Inc")
+
+---

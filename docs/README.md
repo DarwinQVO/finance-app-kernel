@@ -18,6 +18,7 @@
 - **[2.2 OL Exploration](verticals/2.2-ol-exploration.md)** ✅ Complete - Drill-down, decisions, provenance, artifact viewing
 - **[2.3 Finance Dashboard](verticals/2.3-finance-dashboard.md)** ✅ Complete - Saved views, aggregate metrics, PDF exports
 - **[3.1 Account Registry](verticals/3.1-account-registry.md)** ✅ Complete - Closed registry pattern, CRUD operations, soft delete
+- **[3.2 Counterparty Registry](verticals/3.2-counterparty-registry.md)** ✅ Complete - Open registry, aliases, fuzzy matching, merge duplicates(verticals/3.1-account-registry.md)** ✅ Complete - Closed registry pattern, CRUD operations, soft delete
 
 ---
 
@@ -68,6 +69,14 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[AccountStore](primitives/ol/AccountStore.md)** - CRUD operations for user accounts with uniqueness validation and soft delete
 - **[AccountValidator](primitives/ol/AccountValidator.md)** - Validates account data (names, types, currencies) before persistence
 
+**Vertical 3.2 (Counterparty Registry):**
+- **[counterparty.schema.json](schemas/counterparty.schema.json)** - Counterparty entity with canonical name, aliases array, merge support
+
+**Vertical 3.2 (Counterparty Registry):**
+- **[CounterpartyStore](primitives/ol/CounterpartyStore.md)** - CRUD operations with find_or_create pattern, alias management, merge support
+- **[CounterpartyMatcher](primitives/ol/CounterpartyMatcher.md)** - Fuzzy matching engine (Levenshtein, Jaro-Winkler, token-based)
+- **[AliasMerger](primitives/ol/AliasMerger.md)** - Safe merge operations with transaction migration and rollback
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -80,6 +89,9 @@ Reusable UI components:
 - **[SavedViewSelector](primitives/il/SavedViewSelector.md)** - Dropdown component for selecting and managing saved views with MRU history
 - **[AccountManager](primitives/il/AccountManager.md)** - Full CRUD UI for managing user accounts (create, edit, archive, search, filter)
 - **[AccountSelector](primitives/il/AccountSelector.md)** - Reusable dropdown for selecting account (used in transaction editing, filtering, reports)
+- **[CounterpartyManager](primitives/il/CounterpartyManager.md)** - Full CRUD UI for counterparties with duplicate suggestions and bulk merge
+- **[CounterpartySelector](primitives/il/CounterpartySelector.md)** - Dropdown for selecting counterparty with alias search and grouping
+- **[MergeCounterpartiesDialog](primitives/il/MergeCounterpartiesDialog.md)** - 5-step wizard for merging duplicate counterparties
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -115,6 +127,14 @@ Executable contracts extracted from vertical specifications:
 **Vertical 3.1 (Account Registry):**
 - **[account.schema.json](schemas/account.schema.json)** - User account entity (name, type, currency, institution, active status)
 
+**Vertical 3.2 (Counterparty Registry):**
+- **[counterparty.schema.json](schemas/counterparty.schema.json)** - Counterparty entity with canonical name, aliases array, merge support
+
+**Vertical 3.2 (Counterparty Registry):**
+- **[CounterpartyStore](primitives/ol/CounterpartyStore.md)** - CRUD operations with find_or_create pattern, alias management, merge support
+- **[CounterpartyMatcher](primitives/ol/CounterpartyMatcher.md)** - Fuzzy matching engine (Levenshtein, Jaro-Winkler, token-based)
+- **[AliasMerger](primitives/ol/AliasMerger.md)** - Safe merge operations with transaction migration and rollback
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -140,6 +160,7 @@ User experience specifications with wireframes and journeys:
 - **[2.2 OL Exploration Experience](ux-flows/2.2-ol-exploration-experience.md)** - Drill-down, decision explanations, provenance timeline, artifact viewing
 - **[2.3 Finance Dashboard Experience](ux-flows/2.3-finance-dashboard-experience.md)** - Dashboard views, custom view creation, metric drill-down, PDF export
 - **[3.1 Account Registry Experience](ux-flows/3.1-account-registry-experience.md)** - Account creation, editing, archiving, selector dropdown, immutability patterns
+- **[3.2 Counterparty Registry Experience](ux-flows/3.2-counterparty-registry-experience.md)** - Auto-creation, fuzzy matching, merge duplicates, alias management
 
 ---
 
