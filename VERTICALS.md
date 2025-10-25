@@ -662,11 +662,10 @@
 
 **Expected:**
 - REST API for external integrations
-- Webhook support
-- API versioning
-- Rate limiting and authentication
-
-**NOTE:** User unsure if this evolved/is still needed
+- Webhook support for real-time notifications
+- API versioning (v1, v2) with deprecation policy
+- Rate limiting and authentication (API keys, OAuth2)
+- OpenAPI/Swagger documentation
 
 ---
 

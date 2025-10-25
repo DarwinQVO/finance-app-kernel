@@ -2538,6 +2538,8 @@ Dropdown open:
 
 ---
 
-**Component Count**: 58 components across 22 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.3, 5.1-5.4)
+**Component Count**: 54 fully documented components across 22 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.3, 5.1-5.4)
 
 **Last Updated**: 2025-10-25
+
+**Note on Numbering**: Components are numbered 1-58 for organizational purposes. Components #2-5 (RegistrySelect, UploadButton, UploadStatus, UploadList) are conceptual placeholders documented inline but do not have separate specification files, as their functionality was absorbed into other components (e.g., RegistrySelect → AccountSelector, CounterpartySelector, SeriesSelector). All other 54 components have complete standalone specification files.
