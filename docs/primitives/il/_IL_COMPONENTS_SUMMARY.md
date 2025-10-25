@@ -2,7 +2,7 @@
 
 **Status**: Specification complete
 **Last Updated**: 2025-10-25
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4
 
 ---
 
@@ -2491,6 +2491,53 @@ Dropdown open:
 
 ---
 
-**Component Count**: 55 components across 21 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.3, 5.1-5.3)
+### Vertical 5.4 (Security & Access)
+
+#### 56. SecurityDashboard ✅
+**Full spec**: [SecurityDashboard.md](SecurityDashboard.md)
+
+**Props**: `timeRange` (24h | 7d | 30d), `refreshInterval` (60s), `filters` (user_id, event_type, result)
+**States**: loading | idle | refreshing | alert_triggered | error
+**Reusable across**: Finance account security dashboard, Healthcare PHI access dashboard, Legal client privilege dashboard, HR employee data access dashboard, E-commerce customer PII dashboard, Government citizen data dashboard, SaaS user access dashboard
+
+**Purpose**: Real-time security overview with 4 panels (access denials chart, PII activity table, security events timeline, user activity heatmap), auto-refresh 60s, alert creation.
+
+**Visual**: 4-panel grid layout (2x2 on desktop, stacked on mobile), line chart (access denials over time), table (recent PII unmask requests with reasons), timeline (security events), heatmap (user activity by hour/day).
+
+**Reusability**: ANY domain requiring security monitoring and PII tracking (HIPAA PHI access in healthcare, attorney-client privilege in legal, GDPR personal data access in e-commerce, classified data access in government).
+
+---
+
+#### 57. RoleManager ✅
+**Full spec**: [RoleManager.md](RoleManager.md)
+
+**Props**: `tenant_id`, `editable` (boolean), `onRoleChange` (callback)
+**States**: loading | idle | assigning | revoking | previewing_permissions | error
+**Reusable across**: Finance account permissions, Healthcare staff access control, Legal case access control, HR employee data permissions, E-commerce admin access, Government clearance management, SaaS team permissions
+
+**Purpose**: User role assignment UI with role hierarchy visualization, permission preview, bulk assignment, temporary roles with expiration.
+
+**Visual**: User list table with role dropdowns, role hierarchy tree diagram, permission preview modal, bulk assignment dialog, expiration date picker.
+
+**Reusability**: ANY domain with role-based access control (clinical role assignments in healthcare, case team assignments in legal, clearance levels in government, team role management in SaaS).
+
+---
+
+#### 58. AuditViewer ✅
+**Full spec**: [AuditViewer.md](AuditViewer.md)
+
+**Props**: `tenant_id`, `defaultFilters` (user, event_type, date_range), `exportEnabled` (boolean)
+**States**: loading | idle | filtering | exporting | error
+**Reusable across**: Finance SOX audit logs, Healthcare HIPAA audit logs, Legal case audit logs, HR personnel action logs, E-commerce PCI-DSS audit logs, Government FISMA audit logs, SaaS SOC2 audit logs
+
+**Purpose**: Paginated audit log browser with filters (date range, user, event type, result), CSV/PDF export, TanStack Table virtualization (handles 1M+ events).
+
+**Visual**: Paginated table with virtualization, date range picker, multi-select filter dropdowns, export dialog (CSV/PDF/JSON), event detail expansion panel.
+
+**Reusability**: ANY domain requiring compliance audit trails (SOX audit logs in finance, HIPAA access logs in healthcare, attorney-client privilege logs in legal, GDPR data access logs in e-commerce, FISMA security logs in government, SOC2 audit logs in SaaS).
+
+---
+
+**Component Count**: 58 components across 22 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.3, 5.1-5.4)
 
 **Last Updated**: 2025-10-25

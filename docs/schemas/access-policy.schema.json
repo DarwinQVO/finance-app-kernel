@@ -1,0 +1,319 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://truthconstructionprimitives.org/schemas/access-policy.schema.json",
+  "title": "AccessPolicy",
+  "description": "Role-based access control policy defining user permissions for resources (tenant-level, upload-level, or resource-level)",
+  "type": "object",
+  "required": [
+    "policy_id",
+    "user_id",
+    "tenant_id",
+    "role",
+    "resource_type",
+    "granted_by",
+    "granted_at",
+    "created_at"
+  ],
+  "properties": {
+    "policy_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this access policy",
+      "examples": ["pol_123e4567-e89b-12d3-a456-426614174000"]
+    },
+    "user_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "User ID this policy applies to",
+      "examples": ["usr_jane", "usr_john_accountant", "usr_external_auditor"]
+    },
+    "tenant_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Tenant ID this policy belongs to",
+      "examples": ["tenant_acme", "tenant_globex"]
+    },
+    "role": {
+      "type": "string",
+      "enum": ["owner", "editor", "viewer", "accountant_readonly", "auditor"],
+      "description": "Role assigned to user (determines permissions)",
+      "examples": ["owner", "viewer", "accountant_readonly"]
+    },
+    "resource_type": {
+      "type": "string",
+      "enum": ["tenant", "upload", "observation", "audit_log", "user", "parser", "rule"],
+      "description": "Type of resource this policy grants access to",
+      "examples": ["observation", "upload", "tenant"]
+    },
+    "resource_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Specific resource ID (null for tenant-wide access, '*' for all resources of type)",
+      "examples": ["upl_abc123", "obs_xyz789", null, "*"]
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["read", "write", "delete", "export", "manage_users", "manage_security", "unmask_pii", "view_audit_logs"]
+      },
+      "description": "Specific actions allowed (if null, use default role permissions)",
+      "examples": [["read", "write"], ["read", "view_audit_logs"]]
+    },
+    "conditions": {
+      "type": "object",
+      "description": "Optional conditions that must be met for policy to apply",
+      "properties": {
+        "ip_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "ipv4"
+          },
+          "description": "Policy only applies from these IP addresses",
+          "examples": [["192.168.1.0/24", "10.0.0.5"]]
+        },
+        "time_window": {
+          "type": "object",
+          "description": "Policy only applies during these hours (UTC)",
+          "properties": {
+            "start_hour": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23,
+              "description": "Start hour (UTC, 0-23)",
+              "examples": [9]
+            },
+            "end_hour": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23,
+              "description": "End hour (UTC, 0-23)",
+              "examples": [17]
+            },
+            "days_of_week": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+              },
+              "description": "Days of week policy applies (empty = all days)",
+              "examples": [["monday", "tuesday", "wednesday", "thursday", "friday"]]
+            }
+          },
+          "additionalProperties": false
+        },
+        "mfa_required": {
+          "type": "boolean",
+          "description": "Whether multi-factor authentication is required to use this policy",
+          "default": false,
+          "examples": [true, false]
+        },
+        "device_trust_required": {
+          "type": "boolean",
+          "description": "Whether device must be trusted (e.g., company laptop) to use this policy",
+          "default": false,
+          "examples": [true]
+        }
+      },
+      "additionalProperties": true
+    },
+    "granted_by": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "User ID who granted this policy (for audit trail)",
+      "examples": ["usr_admin", "usr_owner", "system"]
+    },
+    "granted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this policy was granted (UTC)",
+      "examples": ["2025-10-25T10:00:00Z"]
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional expiration timestamp (null = never expires). Used for temporary access grants.",
+      "examples": ["2025-12-31T23:59:59Z", null]
+    },
+    "revoked": {
+      "type": "boolean",
+      "description": "Whether this policy has been revoked (soft delete for audit trail)",
+      "default": false,
+      "examples": [false, true]
+    },
+    "revoked_by": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "User ID who revoked this policy (null if not revoked)",
+      "examples": ["usr_admin", null]
+    },
+    "revoked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this policy was revoked (null if not revoked)",
+      "examples": ["2025-11-15T14:30:00Z", null]
+    },
+    "revocation_reason": {
+      "type": "string",
+      "description": "Reason for revoking policy (for audit trail)",
+      "examples": ["User left company", "Role no longer needed", "Security incident"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional policy-specific metadata (optional)",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of policy purpose",
+          "examples": ["Grant accountant read-only access to financial observations"]
+        },
+        "approval_ticket": {
+          "type": "string",
+          "description": "Reference to approval ticket/workflow (if required)",
+          "examples": ["JIRA-1234", "SNOW-INC0056789"]
+        },
+        "notification_sent": {
+          "type": "boolean",
+          "description": "Whether user was notified of this policy grant",
+          "examples": [true, false]
+        },
+        "auto_renewed": {
+          "type": "boolean",
+          "description": "Whether this policy auto-renews on expiration",
+          "default": false,
+          "examples": [false]
+        }
+      },
+      "additionalProperties": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this policy record was created (UTC)",
+      "examples": ["2025-10-25T10:00:01Z"]
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this policy was last updated (UTC)",
+      "examples": ["2025-10-25T15:30:00Z"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "policy_id": "pol_123e4567-e89b-12d3-a456-426614174000",
+      "user_id": "usr_jane",
+      "tenant_id": "tenant_acme",
+      "role": "owner",
+      "resource_type": "tenant",
+      "resource_id": null,
+      "actions": null,
+      "conditions": null,
+      "granted_by": "system",
+      "granted_at": "2025-10-25T10:00:00Z",
+      "expires_at": null,
+      "revoked": false,
+      "revoked_by": null,
+      "revoked_at": null,
+      "revocation_reason": null,
+      "metadata": {
+        "description": "Tenant owner - full access to all resources",
+        "notification_sent": true
+      },
+      "created_at": "2025-10-25T10:00:01Z"
+    },
+    {
+      "policy_id": "pol_987f6543-e21b-34d5-b654-321098765432",
+      "user_id": "usr_john_accountant",
+      "tenant_id": "tenant_acme",
+      "role": "accountant_readonly",
+      "resource_type": "observation",
+      "resource_id": "*",
+      "actions": ["read"],
+      "conditions": {
+        "ip_allowlist": ["192.168.1.0/24"],
+        "mfa_required": true
+      },
+      "granted_by": "usr_admin",
+      "granted_at": "2025-10-25T11:00:00Z",
+      "expires_at": "2025-12-31T23:59:59Z",
+      "revoked": false,
+      "metadata": {
+        "description": "Accountant read-only access with MFA required",
+        "approval_ticket": "JIRA-1234"
+      },
+      "created_at": "2025-10-25T11:00:01Z"
+    },
+    {
+      "policy_id": "pol_456a7890-b12c-45d6-e789-012345678901",
+      "user_id": "usr_external_auditor",
+      "tenant_id": "tenant_acme",
+      "role": "auditor",
+      "resource_type": "audit_log",
+      "resource_id": "*",
+      "actions": ["read", "view_audit_logs"],
+      "conditions": {
+        "time_window": {
+          "start_hour": 9,
+          "end_hour": 17,
+          "days_of_week": ["monday", "tuesday", "wednesday", "thursday", "friday"]
+        },
+        "mfa_required": true,
+        "device_trust_required": true
+      },
+      "granted_by": "usr_compliance_officer",
+      "granted_at": "2025-10-25T12:00:00Z",
+      "expires_at": "2025-11-30T23:59:59Z",
+      "revoked": false,
+      "metadata": {
+        "description": "External auditor - audit log access only during business hours",
+        "approval_ticket": "SNOW-INC0056789",
+        "auto_renewed": false
+      },
+      "created_at": "2025-10-25T12:00:01Z"
+    },
+    {
+      "policy_id": "pol_789b0123-c45d-67e8-f901-234567890abc",
+      "user_id": "usr_temp_contractor",
+      "tenant_id": "tenant_acme",
+      "role": "editor",
+      "resource_type": "upload",
+      "resource_id": "upl_project_alpha",
+      "actions": ["read", "write"],
+      "conditions": null,
+      "granted_by": "usr_admin",
+      "granted_at": "2025-10-25T13:00:00Z",
+      "expires_at": "2025-11-15T23:59:59Z",
+      "revoked": false,
+      "metadata": {
+        "description": "Temporary contractor access to Project Alpha uploads only"
+      },
+      "created_at": "2025-10-25T13:00:01Z"
+    },
+    {
+      "policy_id": "pol_012c3456-d78e-90f1-g234-567890123def",
+      "user_id": "usr_former_employee",
+      "tenant_id": "tenant_acme",
+      "role": "editor",
+      "resource_type": "tenant",
+      "resource_id": null,
+      "actions": null,
+      "conditions": null,
+      "granted_by": "usr_admin",
+      "granted_at": "2025-08-01T10:00:00Z",
+      "expires_at": null,
+      "revoked": true,
+      "revoked_by": "usr_hr_admin",
+      "revoked_at": "2025-10-25T14:00:00Z",
+      "revocation_reason": "User left company (last day: 2025-10-24)",
+      "metadata": {
+        "description": "Revoked after employee departure",
+        "notification_sent": true
+      },
+      "created_at": "2025-08-01T10:00:01Z",
+      "updated_at": "2025-10-25T14:00:00Z"
+    }
+  ]
+}

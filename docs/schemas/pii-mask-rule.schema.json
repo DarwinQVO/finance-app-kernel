@@ -1,0 +1,295 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://truthconstructionprimitives.org/schemas/pii-mask-rule.schema.json",
+  "title": "PIIMaskRule",
+  "description": "Configuration rule for PII masking behavior, defining which fields to mask, detection patterns, and masking strategy",
+  "type": "object",
+  "required": [
+    "rule_id",
+    "tenant_id",
+    "field_pattern",
+    "pii_type",
+    "strategy",
+    "enabled",
+    "created_at"
+  ],
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Unique identifier for this masking rule",
+      "examples": ["mask_account_number", "mask_ssn_partial", "mask_email_domain_preserve"]
+    },
+    "tenant_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Tenant this rule applies to (use '*' for global rules)",
+      "examples": ["tenant_acme", "tenant_globex", "*"]
+    },
+    "field_pattern": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Field name pattern to match (supports regex, e.g., 'account.*', '.*_ssn', 'email')",
+      "examples": ["account_number", "ssn", ".*email.*", "credit_card.*"]
+    },
+    "pii_type": {
+      "type": "string",
+      "enum": ["ssn", "credit_card", "account_number", "email", "phone", "ip_address", "passport", "driver_license", "custom"],
+      "description": "Type of PII this rule detects (determines detection regex pattern)",
+      "examples": ["ssn", "account_number", "email"]
+    },
+    "detection_pattern": {
+      "type": "string",
+      "description": "Custom regex pattern for PII detection (overrides default pattern for pii_type). Use named groups for extraction.",
+      "examples": ["\\b\\d{3}-\\d{2}-\\d{4}\\b", "\\b[A-Z]{2}\\d{6}[A-Z]\\b"]
+    },
+    "strategy": {
+      "type": "string",
+      "enum": ["partial", "full", "email_obfuscate", "tokenize", "hash", "redact"],
+      "description": "Masking strategy to apply when PII is detected",
+      "examples": ["partial"]
+    },
+    "show_last_digits": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8,
+      "description": "For 'partial' strategy: how many trailing digits to show (default 4)",
+      "default": 4,
+      "examples": [4, 6, 2]
+    },
+    "mask_character": {
+      "type": "string",
+      "maxLength": 1,
+      "description": "Character used for masking (default '*')",
+      "default": "*",
+      "examples": ["*", "X", "#"]
+    },
+    "preserve_format": {
+      "type": "boolean",
+      "description": "Whether to preserve original format (e.g., preserve dashes in SSN: ***-**-6789)",
+      "default": true,
+      "examples": [true, false]
+    },
+    "tokenization_key_id": {
+      "type": "string",
+      "description": "Key ID for tokenization strategy (used to encrypt/decrypt tokens)",
+      "examples": ["key_v2025.10.25"]
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Whether this rule is active (false = rule disabled, no masking applied)",
+      "examples": [true, false]
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Rule priority (0-100, higher executes first). Used when multiple rules match same field.",
+      "default": 50,
+      "examples": [90, 50, 10]
+    },
+    "exceptions": {
+      "type": "object",
+      "description": "Exceptions to this rule (conditions where masking is NOT applied)",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["owner", "editor", "viewer", "accountant_readonly", "auditor"]
+          },
+          "description": "Roles that see unmasked data (bypass this rule)",
+          "examples": [["owner", "auditor"]]
+        },
+        "user_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Specific user IDs that bypass this rule",
+          "examples": [["usr_admin", "usr_compliance_officer"]]
+        },
+        "ip_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "ipv4"
+          },
+          "description": "IP addresses allowed to see unmasked data",
+          "examples": [["192.168.1.100", "10.0.0.5"]]
+        },
+        "require_reason": {
+          "type": "boolean",
+          "description": "Whether exceptions require documented reason (for audit trail)",
+          "default": true,
+          "examples": [true, false]
+        }
+      },
+      "additionalProperties": false
+    },
+    "audit_unmask_requests": {
+      "type": "boolean",
+      "description": "Whether to log unmask requests to audit trail (recommended for compliance)",
+      "default": true,
+      "examples": [true]
+    },
+    "compliance_tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["GDPR", "HIPAA", "SOX", "PCI-DSS", "CCPA", "FISMA", "SOC2"]
+      },
+      "description": "Compliance frameworks this rule helps satisfy",
+      "examples": [["GDPR", "HIPAA"], ["PCI-DSS"]]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional rule-specific metadata (optional)",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of rule purpose",
+          "examples": ["Mask last 4 digits of account numbers for PCI-DSS compliance"]
+        },
+        "created_by": {
+          "type": "string",
+          "description": "User ID who created this rule",
+          "examples": ["usr_admin"]
+        },
+        "last_modified_by": {
+          "type": "string",
+          "description": "User ID who last modified this rule",
+          "examples": ["usr_compliance_officer"]
+        },
+        "review_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Next scheduled review date for this rule",
+          "examples": ["2026-01-15"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this rule was created (UTC)",
+      "examples": ["2025-10-25T10:00:00Z"]
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this rule was last updated (UTC)",
+      "examples": ["2025-10-25T15:30:00Z"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "rule_id": "mask_account_number",
+      "tenant_id": "tenant_acme",
+      "field_pattern": "account_number",
+      "pii_type": "account_number",
+      "strategy": "partial",
+      "show_last_digits": 4,
+      "mask_character": "*",
+      "preserve_format": false,
+      "enabled": true,
+      "priority": 90,
+      "exceptions": {
+        "roles": ["owner"],
+        "require_reason": true
+      },
+      "audit_unmask_requests": true,
+      "compliance_tags": ["PCI-DSS", "SOX"],
+      "metadata": {
+        "description": "Mask all but last 4 digits of account numbers",
+        "created_by": "usr_admin"
+      },
+      "created_at": "2025-10-25T10:00:00Z",
+      "updated_at": "2025-10-25T10:00:00Z"
+    },
+    {
+      "rule_id": "mask_ssn_partial",
+      "tenant_id": "*",
+      "field_pattern": "ssn",
+      "pii_type": "ssn",
+      "detection_pattern": "\\b\\d{3}-\\d{2}-\\d{4}\\b",
+      "strategy": "partial",
+      "show_last_digits": 4,
+      "mask_character": "*",
+      "preserve_format": true,
+      "enabled": true,
+      "priority": 95,
+      "exceptions": {
+        "roles": ["owner", "auditor"],
+        "require_reason": true
+      },
+      "audit_unmask_requests": true,
+      "compliance_tags": ["GDPR", "HIPAA", "SOX"],
+      "metadata": {
+        "description": "Mask SSN showing last 4 digits (format: ***-**-6789)"
+      },
+      "created_at": "2025-10-25T10:00:00Z"
+    },
+    {
+      "rule_id": "mask_email_preserve_domain",
+      "tenant_id": "tenant_globex",
+      "field_pattern": ".*email.*",
+      "pii_type": "email",
+      "strategy": "email_obfuscate",
+      "enabled": true,
+      "priority": 50,
+      "exceptions": {
+        "roles": ["owner", "editor"]
+      },
+      "audit_unmask_requests": false,
+      "compliance_tags": ["GDPR"],
+      "metadata": {
+        "description": "Obfuscate email preserving domain (j***@example.com)"
+      },
+      "created_at": "2025-10-25T11:00:00Z"
+    },
+    {
+      "rule_id": "tokenize_credit_card",
+      "tenant_id": "tenant_ecommerce",
+      "field_pattern": "credit_card",
+      "pii_type": "credit_card",
+      "strategy": "tokenize",
+      "tokenization_key_id": "key_v2025.10.25",
+      "enabled": true,
+      "priority": 100,
+      "exceptions": {
+        "roles": ["owner"],
+        "require_reason": true
+      },
+      "audit_unmask_requests": true,
+      "compliance_tags": ["PCI-DSS"],
+      "metadata": {
+        "description": "Tokenize credit card numbers for secure storage"
+      },
+      "created_at": "2025-10-25T12:00:00Z"
+    },
+    {
+      "rule_id": "redact_classified_data",
+      "tenant_id": "tenant_government",
+      "field_pattern": "classified_.*",
+      "pii_type": "custom",
+      "detection_pattern": "\\[CLASSIFIED\\].*",
+      "strategy": "redact",
+      "enabled": true,
+      "priority": 100,
+      "exceptions": {
+        "user_ids": ["usr_security_clearance_admin"],
+        "require_reason": true
+      },
+      "audit_unmask_requests": true,
+      "compliance_tags": ["FISMA"],
+      "metadata": {
+        "description": "Redact classified information (replace with [REDACTED])",
+        "created_by": "usr_security_officer"
+      },
+      "created_at": "2025-10-25T13:00:00Z"
+    }
+  ]
+}

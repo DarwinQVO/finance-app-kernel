@@ -169,6 +169,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[QueueMonitor](primitives/ol/QueueMonitor.md)** - Monitor queue depths and detect backlog/stuck documents, <20ms p95 current depth query, snapshot every 60 seconds
 - **[TrendAnalyzer](primitives/ol/TrendAnalyzer.md)** - Analyze historical trends and detect performance degradation, anomaly detection (z-score >2.5), capacity forecasting, <150ms p95 trend queries
 
+**Vertical 5.4 (Security & Access):**
+- **[PIIMasker](primitives/ol/PIIMasker.md)** - Detect and mask PII (SSN, credit card, email, phone, IP) using pattern-based + semantic rules, <5ms p95 per observation, 3 strategies (partial/full/tokenize)
+- **[AccessControl](primitives/ol/AccessControl.md)** - RBAC permission checks with 5 roles (owner/editor/viewer/accountant/auditor), PostgreSQL RLS integration, <2ms p95 cached checks
+- **[EncryptionEngine](primitives/ol/EncryptionEngine.md)** - AES-256-GCM encryption with envelope encryption (Master Key → DEK → Data), AWS KMS integration, 90-day key rotation, <10ms p95 for 5MB docs
+- **[AuditLogger](primitives/ol/AuditLogger.md)** - Immutable audit trail with SHA-256 integrity chain, 7-year retention, compliance exports (JSON/CSV/PDF), <8ms p95 async writes
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -223,6 +229,9 @@ Reusable UI components:
 - **[PerformanceDashboard](primitives/il/PerformanceDashboard.md)** - Real-time monitoring dashboard (4 panels: parser stats, rule stats, queue health, error breakdown), auto-refresh 60s, drill-down navigation
 - **[RuleOptimizer](primitives/il/RuleOptimizer.md)** - Diagnostic tool for identifying slow normalization rules, AI-powered optimization recommendations, A/B testing sandbox, impact prediction
 - **[QueueMonitorPanel](primitives/il/QueueMonitorPanel.md)** - Real-time queue depth monitoring (pending/in-progress/stuck), health badges (healthy/warning/critical), manual controls (pause/resume/retry)
+- **[SecurityDashboard](primitives/il/SecurityDashboard.md)** - Real-time security overview (4 panels: access denials chart, PII activity table, security events timeline, user activity heatmap), auto-refresh 60s, time range 24h/7d/30d
+- **[RoleManager](primitives/il/RoleManager.md)** - User role assignment UI with role hierarchy visualization, permission preview, bulk assignment, temporary roles with expiration
+- **[AuditViewer](primitives/il/AuditViewer.md)** - Paginated audit log browser with filters (date range, user, event type, result), CSV/PDF export, TanStack Table virtualization (1M+ events)
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -325,6 +334,11 @@ Executable contracts extracted from vertical specifications:
 - **[rule-execution-metric.schema.json](schemas/rule-execution-metric.schema.json)** - Rule execution metric record (rule_id, rule_type, execution_time_ms, matched, transformation_applied, confidence_score)
 - **[queue-depth-snapshot.schema.json](schemas/queue-depth-snapshot.schema.json)** - Queue depth snapshot (queue_name, pending, in_progress, stuck, health_status, worker_stats, alerts)
 
+**Vertical 5.4 (Security & Access):**
+- **[pii-mask-rule.schema.json](schemas/pii-mask-rule.schema.json)** - PII masking rule configuration (field_pattern, pii_type, strategy, show_last_digits, exceptions, compliance_tags)
+- **[access-policy.schema.json](schemas/access-policy.schema.json)** - RBAC access policy (user_id, role, resource_type, resource_id, actions, conditions, expiration, revocation)
+- **[audit-event.schema.json](schemas/audit-event.schema.json)** - Audit trail event (event_type, user_id, action, resource_type, result, integrity_hash, compliance_tags, 7-year retention)
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -375,6 +389,9 @@ Key architectural decisions with rationale:
 - **[ADR-0033: Metrics Storage Strategy](adr/0033-metrics-storage-strategy.md)** - PostgreSQL with TimescaleDB extension for time-series optimization, 10K metrics/sec batch insert, monthly partitions, <50ms p95 aggregate queries, 90-day hot retention + S3 archive
 - **[ADR-0034: Aggregation Performance Strategy](adr/0034-aggregation-performance.md)** - Two-tier caching (TimescaleDB continuous aggregates + Redis cache), 22x faster queries (8ms vs 180ms), 96% cache hit rate, 5-minute refresh, 60-second TTL
 - **[ADR-0035: Alerting Architecture](adr/0035-alerting-architecture.md)** - Poll-based alerting with 60-second evaluation interval, <30s average alert latency, stateful tracking, fingerprint-based deduplication, no write path impact
+- **[ADR-0036: PII Masking Strategy](adr/0036-pii-masking-strategy.md)** - Rule-based + semantic detection with partial masking and PostgreSQL token vault, 98% accuracy, <5ms p95, 200 obs/sec throughput, alternatives rejected: ML-based (45ms), AWS Macie ($51K/month)
+- **[ADR-0037: RBAC Implementation](adr/0037-rbac-implementation.md)** - Hierarchical RBAC (5 roles) + PostgreSQL RLS + Redis cache, <2ms p95 checks (98% hit rate), defense-in-depth, alternatives rejected: ABAC/OPA (8.5ms), OAuth2 JWT (no revocation)
+- **[ADR-0038: Encryption Approach](adr/0038-encryption-approach.md)** - Envelope encryption (AES-256-GCM) + AWS KMS, <10ms p95 encrypt/decrypt 5MB docs, quarterly key rotation <30s cutover, $130/month, alternatives rejected: Direct KMS ($30K/month), dedicated HSM ($10K/month)
 
 ---
 
@@ -403,6 +420,7 @@ User experience specifications with wireframes and journeys:
 - **[5.1 Provenance Experience](ux-flows/5.1-provenance-experience.md)** - Run "as of" query, make retroactive correction, view bitemporal timeline, export audit report, handle validation errors, compare snapshots, schedule future-dated change
 - **[5.2 Schema Registry Experience](ux-flows/5.2-schema-registry-experience.md)** - Publish schema version, detect breaking changes, execute migration with rollback, compare versions, approve breaking change request, handle migration failure
 - **[5.3 Rule Performance & Logs Experience](ux-flows/5.3-rule-performance-logs-experience.md)** - Identify slow parser, optimize normalization rules, investigate queue backlog, detect performance degradation, handle error spikes, capacity planning
+- **[5.4 Security & Access Experience](ux-flows/5.4-security-access-experience.md)** - Security admin reviews dashboard, owner unmasks PII (with audit), admin assigns roles (temporary), auditor reviews logs (compliance report), accountant views masked data, security event triggered
 
 ---
 

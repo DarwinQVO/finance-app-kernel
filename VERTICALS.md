@@ -639,14 +639,19 @@
 
 ### **5.4 Security & Access**
 **Status:** ✅ Complete
-**Full Name:** Security & Access (PII, roles)
-**Spec:** TBD
+**Full Name:** Security & Access (PII, Roles, Encryption, Audit)
+**Spec:** [docs/verticals/5.4-security-access.md](docs/verticals/5.4-security-access.md)
 
-**Expected:**
-- PII handling (mask account numbers, SSN)
-- Role-based access control (owner, accountant read-only)
-- Data encryption at rest and in transit
-- Audit logs for access
+**Key Primitives:**
+- PIIMasker (pattern-based detection + masking, <5ms p95)
+- AccessControl (RBAC, 5 roles, PostgreSQL RLS, <2ms p95)
+- EncryptionEngine (AES-256-GCM, envelope encryption, 90-day key rotation, <10ms p95)
+- AuditLogger (immutable audit trail, 7-year retention, <8ms p95)
+
+**IL Components:** SecurityDashboard, RoleManager, AuditViewer
+**Schemas:** pii-mask-rule, access-policy, audit-event
+**ADRs:** 0036 (PII masking strategy), 0037 (RBAC implementation), 0038 (encryption approach)
+**UX Flow:** [docs/ux-flows/5.4-security-access-experience.md](docs/ux-flows/5.4-security-access-experience.md)
 
 ---
 
@@ -669,13 +674,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 21 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3 |
-| 📝 Pending | 2 | 5.4-5.5 |
+| ✅ Complete | 22 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4 |
+| 📝 Pending | 1 | 5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 91% (21/23)
+**Completion:** 96% (22/23)
 
-**Next up:** 5.4 Security & Access (PII handling, RBAC, encryption)
+**Next up:** 5.5 Public API Contracts (REST API, webhooks, rate limiting)
 
 ---
 

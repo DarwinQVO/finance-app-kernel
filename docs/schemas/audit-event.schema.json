@@ -1,0 +1,382 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://truthconstructionprimitives.org/schemas/audit-event.schema.json",
+  "title": "AuditEvent",
+  "description": "Immutable audit trail event recording user actions, data access, security events, and system events with cryptographic integrity",
+  "type": "object",
+  "required": [
+    "id",
+    "event_type",
+    "user_id",
+    "action",
+    "resource_type",
+    "resource_id",
+    "timestamp",
+    "ip_address",
+    "result",
+    "tenant_id",
+    "integrity_hash",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this audit event (UUID v4)",
+      "examples": ["ae_123e4567-e89b-12d3-a456-426614174000"]
+    },
+    "event_type": {
+      "type": "string",
+      "enum": ["data_access", "data_modification", "user_action", "security_event", "system_event"],
+      "description": "Category of audit event",
+      "examples": ["data_access", "security_event"]
+    },
+    "user_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "User ID who performed the action ('system' for automated actions)",
+      "examples": ["usr_jane", "usr_john", "system"]
+    },
+    "action": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Specific action performed (read, write, delete, login, unmask_pii, key_rotation, etc.)",
+      "examples": ["read", "write", "delete", "unmask_pii", "login", "role_change", "key_rotation"]
+    },
+    "resource_type": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Type of resource affected (observation, upload, user, encryption_key, etc.)",
+      "examples": ["observation", "upload", "user", "audit_log", "encryption_key"]
+    },
+    "resource_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Identifier of specific resource affected",
+      "examples": ["obs_abc123", "upl_xyz789", "usr_jane", "key_v2025.10.25"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when action occurred (UTC, high precision)",
+      "examples": ["2025-10-25T10:00:00.123Z"]
+    },
+    "ip_address": {
+      "type": "string",
+      "description": "Client IP address (IPv4 or IPv6, null for system events)",
+      "examples": ["192.168.1.100", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", null]
+    },
+    "user_agent": {
+      "type": "string",
+      "description": "Client user agent string (browser, API client, etc.)",
+      "examples": ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...", "curl/7.64.1", "PostmanRuntime/7.26.8"]
+    },
+    "session_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "User session ID (links events from same session, null for system events)",
+      "examples": ["sess_xyz789abc123", null]
+    },
+    "result": {
+      "type": "string",
+      "enum": ["success", "failure", "denied"],
+      "description": "Outcome of the action",
+      "examples": ["success", "denied"]
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Detailed error message if result=failure or result=denied (null if success)",
+      "examples": ["User 'usr_john' does not have permission to delete observation 'obs_abc123'", null]
+    },
+    "error_code": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Machine-readable error code (null if success)",
+      "examples": ["PERMISSION_DENIED", "RESOURCE_NOT_FOUND", "INVALID_INPUT", null]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional event-specific metadata (varies by event_type)",
+      "properties": {
+        "masked_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Fields that were masked for this user (data_access events)",
+          "examples": [["ssn", "account_number"]]
+        },
+        "reason": {
+          "type": "string",
+          "description": "User-provided reason for action (required for unmask_pii, role changes)",
+          "examples": ["Investigating fraud case #12345", "User role change per approval JIRA-1234"]
+        },
+        "changes": {
+          "type": "object",
+          "description": "Before/after values for data_modification events",
+          "properties": {
+            "before": {
+              "type": "object",
+              "description": "State before modification",
+              "examples": [{"role": "viewer"}]
+            },
+            "after": {
+              "type": "object",
+              "description": "State after modification",
+              "examples": [{"role": "editor"}]
+            }
+          }
+        },
+        "alert_triggered": {
+          "type": "boolean",
+          "description": "Whether this event triggered a security alert",
+          "examples": [true, false]
+        },
+        "alert_id": {
+          "type": "string",
+          "description": "ID of triggered security alert (if alert_triggered=true)",
+          "examples": ["alert_456def"]
+        },
+        "duration_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Duration of action in milliseconds (system_event performance tracking)",
+          "examples": [28750.5, 142.3]
+        },
+        "documents_affected": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of documents affected by action (bulk operations)",
+          "examples": [1, 47, 12847]
+        },
+        "old_key_version": {
+          "type": "string",
+          "description": "Previous key version (key_rotation events)",
+          "examples": ["v2025.08.25"]
+        },
+        "new_key_version": {
+          "type": "string",
+          "description": "New key version (key_rotation events)",
+          "examples": ["v2025.11.25"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "tenant_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Tenant ID this event belongs to",
+      "examples": ["tenant_acme", "tenant_globex"]
+    },
+    "correlation_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Correlation ID linking related events (e.g., multi-step workflow)",
+      "examples": ["corr_789b0123-c45d-67e8-f901-234567890abc"]
+    },
+    "parent_event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Parent event ID (for nested/cascading events)",
+      "examples": ["ae_456a7890-b12c-45d6-e789-012345678901"]
+    },
+    "integrity_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hash of event content + previous event hash (tamper detection chain)",
+      "examples": ["a3c5f8e9d4b2c1a0987654321fedcba0123456789abcdef0fedcba9876543210"]
+    },
+    "previous_event_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Integrity hash of previous event in chain (creates tamper-proof audit trail)",
+      "examples": ["b4d6g9f0e5c3d2b1098765432fedcba1234567890abcdef1fedcba9876543211"]
+    },
+    "compliance_tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["GDPR", "HIPAA", "SOX", "PCI-DSS", "CCPA", "FISMA", "SOC2"]
+      },
+      "description": "Compliance frameworks this event satisfies",
+      "examples": [["GDPR", "SOX"], ["HIPAA"]]
+    },
+    "retention_period_days": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "How many days to retain this event (default 2555 = 7 years for SOX/HIPAA)",
+      "default": 2555,
+      "examples": [2555, 365, 90]
+    },
+    "archived": {
+      "type": "boolean",
+      "description": "Whether this event has been archived to cold storage (after retention period)",
+      "default": false,
+      "examples": [false, true]
+    },
+    "archived_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when event was archived (null if not archived)",
+      "examples": ["2032-10-25T10:00:00Z", null]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this audit record was written to storage (UTC)",
+      "examples": ["2025-10-25T10:00:00.150Z"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": "ae_123e4567-e89b-12d3-a456-426614174000",
+      "event_type": "data_access",
+      "user_id": "usr_jane",
+      "action": "read",
+      "resource_type": "observation",
+      "resource_id": "obs_abc123",
+      "timestamp": "2025-10-25T10:00:00.123Z",
+      "ip_address": "192.168.1.100",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...",
+      "session_id": "sess_xyz789",
+      "result": "success",
+      "error_message": null,
+      "error_code": null,
+      "metadata": {
+        "masked_fields": ["ssn", "account_number"],
+        "reason": "Financial report generation"
+      },
+      "tenant_id": "tenant_acme",
+      "correlation_id": null,
+      "parent_event_id": null,
+      "integrity_hash": "a3c5f8e9d4b2c1a0987654321fedcba0123456789abcdef0fedcba9876543210",
+      "previous_event_hash": "b4d6g9f0e5c3d2b1098765432fedcba1234567890abcdef1fedcba9876543211",
+      "compliance_tags": ["GDPR", "SOX"],
+      "retention_period_days": 2555,
+      "archived": false,
+      "archived_at": null,
+      "created_at": "2025-10-25T10:00:00.150Z"
+    },
+    {
+      "id": "ae_987f6543-e21b-34d5-b654-321098765432",
+      "event_type": "security_event",
+      "user_id": "usr_john",
+      "action": "read",
+      "resource_type": "observation",
+      "resource_id": "obs_def456",
+      "timestamp": "2025-10-25T11:30:00.456Z",
+      "ip_address": "203.0.113.42",
+      "user_agent": "curl/7.64.1",
+      "session_id": "sess_abc456",
+      "result": "denied",
+      "error_message": "User 'usr_john' does not have permission to read observation 'obs_def456' (role: viewer, required: editor)",
+      "error_code": "PERMISSION_DENIED",
+      "metadata": {
+        "attempted_action": "unmask_pii",
+        "alert_triggered": true,
+        "alert_id": "alert_789ghi"
+      },
+      "tenant_id": "tenant_acme",
+      "correlation_id": null,
+      "parent_event_id": null,
+      "integrity_hash": "c5e7h0g1f6d4e3c2109876543fedcba2345678901abcdef2fedcba9876543212",
+      "previous_event_hash": "a3c5f8e9d4b2c1a0987654321fedcba0123456789abcdef0fedcba9876543210",
+      "compliance_tags": ["GDPR", "SOC2"],
+      "retention_period_days": 2555,
+      "archived": false,
+      "created_at": "2025-10-25T11:30:00.480Z"
+    },
+    {
+      "id": "ae_456a7890-b12c-45d6-e789-012345678901",
+      "event_type": "system_event",
+      "user_id": "system",
+      "action": "key_rotation",
+      "resource_type": "encryption_key",
+      "resource_id": "key_v2025.11.25",
+      "timestamp": "2025-10-25T14:00:00.000Z",
+      "ip_address": null,
+      "user_agent": "background-worker/1.0",
+      "session_id": null,
+      "result": "success",
+      "error_message": null,
+      "error_code": null,
+      "metadata": {
+        "old_key_version": "v2025.08.25",
+        "new_key_version": "v2025.11.25",
+        "documents_affected": 12847,
+        "duration_ms": 28750.5
+      },
+      "tenant_id": "tenant_acme",
+      "correlation_id": "corr_789b0123-c45d-67e8-f901-234567890abc",
+      "parent_event_id": null,
+      "integrity_hash": "d6f8i1h2g7e5f4d3210987654fedcba3456789012abcdef3fedcba9876543213",
+      "previous_event_hash": "c5e7h0g1f6d4e3c2109876543fedcba2345678901abcdef2fedcba9876543212",
+      "compliance_tags": ["SOX", "PCI-DSS"],
+      "retention_period_days": 2555,
+      "archived": false,
+      "created_at": "2025-10-25T14:00:28.751Z"
+    },
+    {
+      "id": "ae_789b0123-c45d-67e8-f901-234567890abc",
+      "event_type": "user_action",
+      "user_id": "usr_admin",
+      "action": "role_change",
+      "resource_type": "user",
+      "resource_id": "usr_contractor",
+      "timestamp": "2025-10-25T15:00:00.789Z",
+      "ip_address": "192.168.1.101",
+      "user_agent": "Mozilla/5.0...",
+      "session_id": "sess_admin_789",
+      "result": "success",
+      "error_message": null,
+      "error_code": null,
+      "metadata": {
+        "reason": "Contractor project completed, downgrade access per approval JIRA-5678",
+        "changes": {
+          "before": {"role": "editor", "resource_id": "*"},
+          "after": {"role": "viewer", "resource_id": "upl_project_alpha"}
+        }
+      },
+      "tenant_id": "tenant_acme",
+      "correlation_id": null,
+      "parent_event_id": null,
+      "integrity_hash": "e7g9j2i3h8f6g5e4321098765fedcba4567890123abcdef4fedcba9876543214",
+      "previous_event_hash": "d6f8i1h2g7e5f4d3210987654fedcba3456789012abcdef3fedcba9876543213",
+      "compliance_tags": ["SOX", "SOC2"],
+      "retention_period_days": 2555,
+      "archived": false,
+      "created_at": "2025-10-25T15:00:00.810Z"
+    },
+    {
+      "id": "ae_012c3456-d78e-90f1-g234-567890123def",
+      "event_type": "security_event",
+      "user_id": "usr_owner",
+      "action": "unmask_pii",
+      "resource_type": "observation",
+      "resource_id": "obs_sensitive_789",
+      "timestamp": "2025-10-25T16:00:00.234Z",
+      "ip_address": "192.168.1.100",
+      "user_agent": "Mozilla/5.0...",
+      "session_id": "sess_owner_123",
+      "result": "success",
+      "error_message": null,
+      "error_code": null,
+      "metadata": {
+        "reason": "Investigating fraud case #12345 - suspicious transaction pattern detected",
+        "masked_fields": ["ssn", "account_number"],
+        "alert_triggered": true,
+        "alert_id": "alert_pii_unmask_012"
+      },
+      "tenant_id": "tenant_acme",
+      "correlation_id": "corr_fraud_investigation_12345",
+      "parent_event_id": null,
+      "integrity_hash": "f8h0k3j4i9g7h6f5432109876fedcba5678901234abcdef5fedcba9876543215",
+      "previous_event_hash": "e7g9j2i3h8f6g5e4321098765fedcba4567890123abcdef4fedcba9876543214",
+      "compliance_tags": ["GDPR", "HIPAA", "SOX"],
+      "retention_period_days": 2555,
+      "archived": false,
+      "created_at": "2025-10-25T16:00:00.250Z"
+    }
+  ]
+}
