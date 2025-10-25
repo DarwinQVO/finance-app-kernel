@@ -495,14 +495,26 @@
 ### **4.3 Corrections Flow**
 **Status:** ✅ Complete
 **Full Name:** Corrections Flow
-**Additions:** + override precedence & audit por campo
-**Spec:** TBD
+**Additions:** + field-level overrides & complete audit trail
+**Spec:** [docs/verticals/4.3-corrections-flow.md](docs/verticals/4.3-corrections-flow.md)
+**Primitives Delivered:** 7 (4 OL + 3 IL)
+**Schemas:** 3
+**ADRs:** 3 (0024-0026)
 
-**Expected:**
-- Manual corrections to categorization
-- Override normalization decisions
-- Audit trail per field (who changed, when, why)
-- Precedence rules (manual override > rule > default)
+**Delivered:**
+- Field-level manual corrections (granular overrides per field)
+- Complete audit trail per field (who, when, why, before/after values)
+- Precedence resolution (manual > rule > extraction > default)
+- Validation engine (type, range, format, business logic validation)
+- Bulk correction support (correct 1,000 items in <10s)
+- Revert capability (undo specific field corrections)
+- UI components (CorrectionDialog, AuditTrailViewer, FieldOverrideIndicator)
+
+**Primitives:**
+- OL: OverrideStore, AuditLog, PrecedenceEngine, ValidationEngine
+- IL: CorrectionDialog, AuditTrailViewer, FieldOverrideIndicator
+
+**Multi-domain:** Finance (transactions), Healthcare (patient records), Legal (cases), Research (citations), E-commerce (products), SaaS (subscriptions)
 
 ---
 
@@ -584,13 +596,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 17 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2 |
-| 📝 Pending | 6 | 4.3, 5.1-5.5 |
+| ✅ Complete | 18 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3 |
+| 📝 Pending | 5 | 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 74% (17/23)
+**Completion:** 78% (18/23)
 
-**Next up:** 4.3 Corrections Flow (manual overrides, audit trail)
+**Next up:** 5.1 Provenance Ledger (bitemporal tracking, "as of" queries)
 
 ---
 

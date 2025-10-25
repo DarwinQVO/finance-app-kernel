@@ -1,0 +1,352 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://personal-os.dev/schemas/precedence-resolution.schema.json",
+  "title": "Precedence Resolution",
+  "description": "Schema for the result of precedence resolution. Shows final field value after applying precedence rules (manual override > automated rule > extraction > default), with full transparency into all available sources.",
+  "type": "object",
+  "required": [
+    "field_name",
+    "final_value",
+    "source",
+    "sources",
+    "metadata"
+  ],
+  "properties": {
+    "field_name": {
+      "type": "string",
+      "description": "Name of the field being resolved",
+      "minLength": 1,
+      "pattern": "^[a-z_][a-z0-9_]*$",
+      "examples": ["merchant", "category", "amount", "diagnosis_code", "case_number"]
+    },
+    "final_value": {
+      "description": "Final value to use after applying precedence rules. Type depends on field schema (string, number, date, etc.).",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" },
+        { "type": "object" },
+        { "type": "array" }
+      ],
+      "examples": [
+        "Amazon Marketplace",
+        "E11.65",
+        1234.56,
+        "Business Expenses",
+        null
+      ]
+    },
+    "source": {
+      "type": "string",
+      "description": "Which source won precedence resolution",
+      "enum": [
+        "manual",
+        "rule",
+        "extraction",
+        "default"
+      ],
+      "examples": ["manual", "extraction", "rule"]
+    },
+    "sources": {
+      "type": "object",
+      "description": "All available value sources for this field (null if source didn't produce a value)",
+      "properties": {
+        "manual_override": {
+          "description": "User manually corrected value (highest priority)",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "null" },
+            { "type": "object" },
+            { "type": "array" }
+          ],
+          "examples": ["Amazon Marketplace", 1234.56, null]
+        },
+        "rule_value": {
+          "description": "Value from automated normalization rule",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "null" },
+            { "type": "object" },
+            { "type": "array" }
+          ],
+          "examples": ["Amazon", "Business", null]
+        },
+        "extraction_value": {
+          "description": "Value from parser/OCR/extraction",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "null" },
+            { "type": "object" },
+            { "type": "array" }
+          ],
+          "examples": ["AMZN MKTP US*AB123", 123.45, "Shopping"]
+        },
+        "default_value": {
+          "description": "Fallback default value (lowest priority)",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "null" },
+            { "type": "object" },
+            { "type": "array" }
+          ],
+          "examples": ["Unknown Merchant", "Uncategorized", 0.0]
+        }
+      },
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about the resolution",
+      "required": ["is_overridden"],
+      "properties": {
+        "is_overridden": {
+          "type": "boolean",
+          "description": "True if a manual override exists for this field"
+        },
+        "overridden_by": {
+          "type": "string",
+          "description": "User ID who made the override (if is_overridden=true)",
+          "examples": ["user_123", "nurse_789"]
+        },
+        "overridden_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the override was made (if is_overridden=true)",
+          "examples": ["2025-10-24T10:30:00Z"]
+        },
+        "override_reason": {
+          "type": "string",
+          "description": "Why the override was made (if is_overridden=true)",
+          "examples": ["Normalize merchant name for reporting"]
+        },
+        "rule_id": {
+          "type": "string",
+          "description": "ID of the normalization rule that produced rule_value (if source='rule')",
+          "examples": ["rule_merchant_amazon", "rule_category_business"]
+        },
+        "extraction_confidence": {
+          "type": "number",
+          "description": "Confidence score from parser/OCR (0.0-1.0, if source='extraction')",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "examples": [0.95, 0.85]
+        },
+        "all_sources_null": {
+          "type": "boolean",
+          "description": "True if no sources produced a value (final_value is default or null)"
+        },
+        "conflicts": {
+          "type": "array",
+          "description": "Optional: List of conflicts detected during resolution (e.g., multiple rules producing different values)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": { "type": "string" },
+              "value": {},
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "precedence_order": {
+      "type": "array",
+      "description": "Optional: The precedence rules used (for debugging/documentation)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "priority": {
+            "type": "integer",
+            "description": "Priority level (1 = highest)"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["manual", "rule", "extraction", "default"]
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "examples": [
+        [
+          { "priority": 1, "source": "manual", "description": "User manual override" },
+          { "priority": 2, "source": "rule", "description": "Automated normalization rule" },
+          { "priority": 3, "source": "extraction", "description": "Parser/OCR extraction" },
+          { "priority": 4, "source": "default", "description": "System default value" }
+        ]
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "$comment": "Example 1: Finance - Manual override wins",
+      "field_name": "merchant",
+      "final_value": "Amazon Marketplace",
+      "source": "manual",
+      "sources": {
+        "manual_override": "Amazon Marketplace",
+        "rule_value": "Amazon",
+        "extraction_value": "AMZN MKTP US*AB123",
+        "default_value": "Unknown Merchant"
+      },
+      "metadata": {
+        "is_overridden": true,
+        "overridden_by": "user_123",
+        "overridden_at": "2025-10-24T10:30:00Z",
+        "override_reason": "Normalize merchant name for reporting",
+        "rule_id": "rule_merchant_amazon",
+        "extraction_confidence": 0.95,
+        "all_sources_null": false
+      }
+    },
+    {
+      "$comment": "Example 2: Healthcare - Extraction wins (no override, no rule)",
+      "field_name": "diagnosis_code",
+      "final_value": "E11.9",
+      "source": "extraction",
+      "sources": {
+        "manual_override": null,
+        "rule_value": null,
+        "extraction_value": "E11.9",
+        "default_value": "UNKNOWN"
+      },
+      "metadata": {
+        "is_overridden": false,
+        "extraction_confidence": 0.92,
+        "all_sources_null": false
+      }
+    },
+    {
+      "$comment": "Example 3: Legal - Rule wins (no override, but rule exists)",
+      "field_name": "attorney",
+      "final_value": "Jane Smith, Esq.",
+      "source": "rule",
+      "sources": {
+        "manual_override": null,
+        "rule_value": "Jane Smith, Esq.",
+        "extraction_value": "J. Smith",
+        "default_value": null
+      },
+      "metadata": {
+        "is_overridden": false,
+        "rule_id": "rule_attorney_normalization",
+        "extraction_confidence": 0.75,
+        "all_sources_null": false
+      }
+    },
+    {
+      "$comment": "Example 4: Research - Default wins (all sources null)",
+      "field_name": "publication_year",
+      "final_value": 2025,
+      "source": "default",
+      "sources": {
+        "manual_override": null,
+        "rule_value": null,
+        "extraction_value": null,
+        "default_value": 2025
+      },
+      "metadata": {
+        "is_overridden": false,
+        "all_sources_null": true
+      }
+    },
+    {
+      "$comment": "Example 5: E-commerce - Manual override same as extraction (still marked as override)",
+      "field_name": "category",
+      "final_value": "Home Appliances",
+      "source": "manual",
+      "sources": {
+        "manual_override": "Home Appliances",
+        "rule_value": "Electronics",
+        "extraction_value": "Home Appliances",
+        "default_value": "Uncategorized"
+      },
+      "metadata": {
+        "is_overridden": true,
+        "overridden_by": "catalog_manager_789",
+        "overridden_at": "2025-10-24T16:45:00Z",
+        "override_reason": "Confirm extraction is correct despite rule suggesting otherwise",
+        "rule_id": "rule_category_electronics",
+        "extraction_confidence": 0.88,
+        "all_sources_null": false,
+        "conflicts": [
+          {
+            "source": "rule",
+            "value": "Electronics",
+            "reason": "Rule suggested different category than extraction"
+          }
+        ]
+      }
+    },
+    {
+      "$comment": "Example 6: SaaS - Complete resolution with all sources",
+      "field_name": "mrr",
+      "final_value": 500.0,
+      "source": "manual",
+      "sources": {
+        "manual_override": 500.0,
+        "rule_value": 50.0,
+        "extraction_value": 50.0,
+        "default_value": 0.0
+      },
+      "metadata": {
+        "is_overridden": true,
+        "overridden_by": "operations_analyst_456",
+        "overridden_at": "2025-10-24T18:00:00Z",
+        "override_reason": "Corrected MRR from accounting system reconciliation",
+        "rule_id": "rule_mrr_calculation",
+        "extraction_confidence": 0.99,
+        "all_sources_null": false
+      },
+      "precedence_order": [
+        { "priority": 1, "source": "manual", "description": "User manual override" },
+        { "priority": 2, "source": "rule", "description": "Automated MRR calculation rule" },
+        { "priority": 3, "source": "extraction", "description": "Extracted from billing system" },
+        { "priority": 4, "source": "default", "description": "Default MRR of 0" }
+      ]
+    }
+  ],
+  "definitions": {
+    "PrecedenceRule": {
+      "type": "object",
+      "description": "A single precedence rule",
+      "properties": {
+        "priority": {
+          "type": "integer",
+          "description": "Priority level (1 = highest)",
+          "minimum": 1
+        },
+        "source": {
+          "type": "string",
+          "enum": ["manual", "rule", "extraction", "default"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of this source"
+        }
+      },
+      "required": ["priority", "source"]
+    }
+  },
+  "notes": [
+    "Precedence order is FIXED and DETERMINISTIC: manual > rule > extraction > default.",
+    "If a source produces null/undefined, precedence falls through to next source.",
+    "is_overridden=true means a manual override exists, even if it matches the extraction value.",
+    "For debugging, include precedence_order array to show which rules were evaluated.",
+    "Performance: Batch resolution should fetch all overrides upfront, then resolve in-memory (<100ms for 100 entities).",
+    "Security: Redact PII in sources if needed (same logic as audit log).",
+    "This schema is the OUTPUT of PrecedenceEngine.resolveField() method."
+  ]
+}

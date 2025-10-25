@@ -32,6 +32,7 @@
 ### Group 4: Derivatives & Insights
 - **[4.1 Reminders](verticals/4.1-reminders.md)** ✅ Complete - Alert rules, notification delivery, snooze/dismiss, persistence, multi-channel dispatch
 - **[4.2 Forecast](verticals/4.2-forecast.md)** ✅ Complete - Income/expense projections, goal tracking, burn rate, cash runway, scenario analysis
+- **[4.3 Corrections Flow](verticals/4.3-corrections-flow.md)** ✅ Complete - Field-level overrides, audit trail, precedence resolution, validation engine, bulk corrections, revert capability
 
 ---
 
@@ -141,6 +142,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[BurnRateCalculator](primitives/ol/BurnRateCalculator.md)** - Calculate burn rate (simple, weighted, EMA), cash runway, zero date prediction
 - **[ForecastCache](primitives/ol/ForecastCache.md)** - Cache projections with 24h TTL, smart invalidation on data changes
 
+**Vertical 4.3 (Corrections Flow):**
+- **[OverrideStore](primitives/ol/OverrideStore.md)** - CRUD for field-level overrides with bulk operations support (1,000 items in <5s)
+- **[AuditLog](primitives/ol/AuditLog.md)** - Immutable audit trail logging for all field changes (extraction, override, revert, delete)
+- **[PrecedenceEngine](primitives/ol/PrecedenceEngine.md)** - Resolve field values using precedence rules (manual > rule > extraction > default)
+- **[ValidationEngine](primitives/ol/ValidationEngine.md)** - Validate field overrides before accepting (type, range, format, business logic validation)
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -183,6 +190,9 @@ Reusable UI components:
 - **[ForecastChart](primitives/il/ForecastChart.md)** - Interactive line/area/bar chart for historical data + projections with confidence intervals, algorithm comparison
 - **[GoalProgressCard](primitives/il/GoalProgressCard.md)** - Goal display with progress bar, on-track status, time/amount remaining, milestone tracking
 - **[GoalConfigDialog](primitives/il/GoalConfigDialog.md)** - Modal for creating/editing goals with templates, tabbed interface (Basic/Advanced/Preview), live preview
+- **[CorrectionDialog](primitives/il/CorrectionDialog.md)** - Modal/drawer for editing field values with inline validation, single-item and bulk modes, field history viewer
+- **[AuditTrailViewer](primitives/il/AuditTrailViewer.md)** - Timeline visualization showing complete history of field changes with filters, export capability
+- **[FieldOverrideIndicator](primitives/il/FieldOverrideIndicator.md)** - Badge/icon showing field was manually corrected with tooltip (who, when), clickable to open audit trail
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -265,6 +275,11 @@ Executable contracts extracted from vertical specifications:
 - **[goal-config.schema.json](schemas/goal-config.schema.json)** - Goal configuration (target amount, deadline, category, recurring contributions, milestones)
 - **[burn-rate-analysis.schema.json](schemas/burn-rate-analysis.schema.json)** - Burn rate calculation result (daily/weekly/monthly rates, runway months, zero date prediction)
 
+**Vertical 4.3 (Corrections Flow):**
+- **[field-override.schema.json](schemas/field-override.schema.json)** - Field-level override with original value, corrected value, user metadata, reason, approval workflow
+- **[audit-entry.schema.json](schemas/audit-entry.schema.json)** - Immutable audit log entry (action type, before/after values, user, timestamp, source, signature for tamper detection)
+- **[precedence-resolution.schema.json](schemas/precedence-resolution.schema.json)** - Final field value after precedence resolution (manual > rule > extraction > default) with all sources visible
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -301,6 +316,9 @@ Key architectural decisions with rationale:
 - **[ADR-0021: Projection Algorithm Strategy](adr/0021-projection-algorithm-strategy.md)** - Multi-algorithm ensemble with accuracy tracking, algorithm selection based on data characteristics
 - **[ADR-0022: Goal Tracking Persistence Strategy](adr/0022-goal-tracking-persistence.md)** - Milestone-based tracking with auto-progression, recurring contribution handling, achievement notifications
 - **[ADR-0023: Forecast Caching Strategy](adr/0023-forecast-caching-strategy.md)** - 24-hour projection cache with smart invalidation on transaction changes, pre-warming for common queries
+- **[ADR-0024: Field-Level Overrides](adr/0024-field-level-overrides.md)** - Field-level granularity (vs record-level) for corrections with independent override capability per field
+- **[ADR-0025: Audit Storage Strategy](adr/0025-audit-storage-strategy.md)** - PostgreSQL append-only table with JSONB metadata, database-enforced immutability, cryptographic signatures
+- **[ADR-0026: Precedence Resolution](adr/0026-precedence-resolution.md)** - Static precedence rules (manual > rule > extraction > default), predictable and deterministic value resolution
 
 ---
 
@@ -325,6 +343,7 @@ User experience specifications with wireframes and journeys:
 - **[3.9 Reconciliation Strategies Experience](ux-flows/3.9-reconciliation-strategies-experience.md)** - Auto-matched items, review suggested matches, manual match creation, reject false positives, split transaction matching, adjust thresholds
 - **[4.1 Reminders Experience](ux-flows/4.1-reminders-experience.md)** - Create alert rules, receive notifications, snooze/dismiss, configure channels, view notification history, test conditions
 - **[4.2 Forecast Experience](ux-flows/4.2-forecast-experience.md)** - View projections, compare algorithms, create goals, track progress, analyze burn rate, run scenarios
+- **[4.3 Corrections Experience](ux-flows/4.3-corrections-experience.md)** - Correct single field, view audit trail, revert override, bulk corrections, handle validation errors, concurrent edit warnings
 
 ---
 
@@ -349,7 +368,7 @@ User experience specifications with wireframes and journeys:
 | | 3.9 Reconciliation Strategies | ✅ Complete |
 | **4. Derivatives** | 4.1 Reminders | ✅ Complete |
 | | 4.2 Forecast | ✅ Complete |
-| | 4.3 Corrections Flow | 📝 Pending |
+| | 4.3 Corrections Flow | ✅ Complete |
 | **5. Governance** | 5.1-5.5 | 📝 Pending |
 
 ---

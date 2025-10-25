@@ -1,0 +1,328 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://personal-os.dev/schemas/field-override.schema.json",
+  "title": "Field Override",
+  "description": "Schema for manual field-level corrections. Stores user overrides to extracted/normalized values with audit metadata.",
+  "type": "object",
+  "required": [
+    "override_id",
+    "entity_id",
+    "entity_type",
+    "field_name",
+    "override_value",
+    "overridden_by",
+    "overridden_at"
+  ],
+  "properties": {
+    "override_id": {
+      "type": "string",
+      "description": "Unique identifier for this override (UUID or prefixed ID like 'ovr_abc123')",
+      "pattern": "^(ovr_[a-z0-9]{6,}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$",
+      "examples": ["ovr_abc123", "550e8400-e29b-41d4-a716-446655440000"]
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "ID of the entity being corrected (e.g., transaction_id, patient_id, case_id)",
+      "minLength": 1,
+      "examples": ["txn_xyz789", "patient_456", "case_2025cv1234"]
+    },
+    "entity_type": {
+      "type": "string",
+      "description": "Type of entity being corrected (used for multi-tenancy and validation routing)",
+      "enum": [
+        "transaction",
+        "patient_record",
+        "case",
+        "publication",
+        "product",
+        "subscription",
+        "policy",
+        "claim"
+      ],
+      "examples": ["transaction", "patient_record", "case"]
+    },
+    "field_name": {
+      "type": "string",
+      "description": "Name of the field being overridden (must match entity schema field)",
+      "minLength": 1,
+      "pattern": "^[a-z_][a-z0-9_]*$",
+      "examples": ["merchant", "category", "amount", "diagnosis_code", "case_number"]
+    },
+    "original_value": {
+      "description": "Value before the override (from extraction, rule, or default). Can be any type (string, number, date, etc.). Null if no prior value existed.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" },
+        { "type": "object" },
+        { "type": "array" }
+      ],
+      "examples": [
+        "AMZN MKTP US*AB123",
+        "E11.9",
+        "2025-CV-1234",
+        123.45,
+        null
+      ]
+    },
+    "override_value": {
+      "description": "User-corrected value (replaces original_value in precedence resolution). Type must match field schema.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "object" },
+        { "type": "array" }
+      ],
+      "examples": [
+        "Amazon Marketplace",
+        "E11.65",
+        "2025-CV-12345",
+        1234.56
+      ]
+    },
+    "overridden_by": {
+      "type": "string",
+      "description": "User ID of the person who made the correction",
+      "minLength": 1,
+      "examples": ["user_123", "nurse_789", "analyst_456"]
+    },
+    "overridden_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the correction was made (transaction time)",
+      "examples": ["2025-10-24T10:30:00Z", "2025-10-24T14:30:15.123Z"]
+    },
+    "reason": {
+      "type": "string",
+      "description": "Optional explanation for why the correction was made (best practice: always provide)",
+      "maxLength": 1000,
+      "examples": [
+        "Normalize merchant name for reporting",
+        "Patient has chronic kidney disease, E11.9 too generic",
+        "Court clerk entered wrong case number"
+      ]
+    },
+    "effective_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Optional: For retroactive corrections, the date when the correct value should have been used (valid time). Supports bitemporal queries.",
+      "examples": ["2025-01-15", "2024-12-01"]
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Optional: User's confidence in the correction (0.0 = unsure, 1.0 = certain). Used for audit/quality scoring.",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "examples": [0.95, 0.75, 1.0]
+    },
+    "source": {
+      "type": "string",
+      "description": "Optional: Where the corrected value came from (manual entry, external system, suggested correction, etc.)",
+      "examples": [
+        "manual_entry",
+        "accounting_system_api",
+        "suggested_correction",
+        "normalization_rule_override"
+      ]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional: Extensible metadata for domain-specific attributes (PII redaction flags, approval status, etc.)",
+      "properties": {
+        "approved": {
+          "type": "boolean",
+          "description": "For approval workflows: Has this correction been approved by a senior user?"
+        },
+        "approved_by": {
+          "type": "string",
+          "description": "User ID of approver"
+        },
+        "approved_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When correction was approved"
+        },
+        "impact": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "description": "Severity/impact of this correction"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Custom tags for filtering/grouping"
+        }
+      },
+      "additionalProperties": true,
+      "examples": [
+        {
+          "approved": true,
+          "approved_by": "doctor_123",
+          "approved_at": "2025-10-25T09:00:00Z",
+          "impact": "high"
+        },
+        {
+          "tags": ["bulk_correction", "supplier_x_error"],
+          "batch_id": "batch_20251024_001"
+        }
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Database record creation timestamp (usually same as overridden_at)",
+      "examples": ["2025-10-24T10:30:00Z"]
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Database record last update timestamp (for tracking changes to metadata)",
+      "examples": ["2025-10-24T10:30:00Z"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "$comment": "Example 1: Finance - Transaction merchant correction",
+      "override_id": "ovr_abc123",
+      "entity_id": "txn_xyz789",
+      "entity_type": "transaction",
+      "field_name": "merchant",
+      "original_value": "AMZN MKTP US*AB123",
+      "override_value": "Amazon Marketplace",
+      "overridden_by": "user_123",
+      "overridden_at": "2025-10-24T10:30:00Z",
+      "reason": "Normalize merchant name for reporting",
+      "confidence": 1.0,
+      "source": "manual_entry",
+      "metadata": {
+        "tags": ["merchant_normalization"]
+      }
+    },
+    {
+      "$comment": "Example 2: Healthcare - Diagnosis code correction",
+      "override_id": "ovr_def456",
+      "entity_id": "patient_456",
+      "entity_type": "patient_record",
+      "field_name": "diagnosis_code",
+      "original_value": "E11.9",
+      "override_value": "E11.65",
+      "overridden_by": "nurse_789",
+      "overridden_at": "2025-10-24T11:00:00Z",
+      "reason": "Patient has chronic kidney disease, E11.9 too generic",
+      "confidence": 0.95,
+      "source": "manual_entry",
+      "metadata": {
+        "approved": true,
+        "approved_by": "doctor_123",
+        "approved_at": "2025-10-24T15:30:00Z",
+        "impact": "high"
+      }
+    },
+    {
+      "$comment": "Example 3: Legal - Retroactive case number correction",
+      "override_id": "ovr_ghi789",
+      "entity_id": "case_2025cv1234",
+      "entity_type": "case",
+      "field_name": "filing_date",
+      "original_value": "2025-01-20",
+      "override_value": "2025-01-15",
+      "overridden_by": "legal_assistant_456",
+      "overridden_at": "2025-10-24T14:00:00Z",
+      "effective_date": "2025-01-15",
+      "reason": "Court clerk entered wrong date, correcting to actual filing date",
+      "confidence": 1.0,
+      "source": "manual_entry",
+      "metadata": {
+        "tags": ["court_filing", "date_correction"],
+        "impact": "critical"
+      }
+    },
+    {
+      "$comment": "Example 4: E-commerce - Bulk product category correction",
+      "override_id": "ovr_jkl012",
+      "entity_id": "prod_42",
+      "entity_type": "product",
+      "field_name": "category",
+      "original_value": "Electronics",
+      "override_value": "Home Appliances",
+      "overridden_by": "catalog_manager_789",
+      "overridden_at": "2025-10-24T16:45:00Z",
+      "reason": "Supplier X catalog error - these are appliances not electronics",
+      "confidence": 1.0,
+      "source": "manual_entry",
+      "metadata": {
+        "tags": ["bulk_correction", "supplier_x_error"],
+        "batch_id": "batch_20251024_001",
+        "batch_size": 50
+      }
+    },
+    {
+      "$comment": "Example 5: SaaS - MRR correction with external system source",
+      "override_id": "ovr_mno345",
+      "entity_id": "sub_789",
+      "entity_type": "subscription",
+      "field_name": "mrr",
+      "original_value": 50.0,
+      "override_value": 500.0,
+      "overridden_by": "accounting_system",
+      "overridden_at": "2025-10-24T18:00:00Z",
+      "reason": "Corrected MRR from accounting system reconciliation",
+      "confidence": 1.0,
+      "source": "accounting_system_api",
+      "metadata": {
+        "tags": ["revenue_reconciliation"],
+        "external_system": "QuickBooks",
+        "reconciliation_id": "recon_20251024"
+      }
+    }
+  ],
+  "definitions": {
+    "OverrideQueryFilters": {
+      "type": "object",
+      "description": "Filters for querying overrides",
+      "properties": {
+        "entity_type": {
+          "type": "string",
+          "description": "Filter by entity type"
+        },
+        "field_name": {
+          "type": "string",
+          "description": "Filter by field name"
+        },
+        "overridden_by": {
+          "type": "string",
+          "description": "Filter by user who made correction"
+        },
+        "date_range": {
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "end": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Filter by metadata tags"
+        }
+      }
+    }
+  },
+  "notes": [
+    "This schema supports field-level granularity (one override per field per entity).",
+    "Database should enforce UNIQUE constraint on (entity_id, field_name) to prevent duplicate overrides.",
+    "For retroactive corrections, use 'effective_date' (valid time) vs 'overridden_at' (transaction time) for bitemporal queries.",
+    "The 'metadata' field is intentionally flexible to support domain-specific attributes without schema changes.",
+    "Validation should occur BEFORE creating override (see ValidationEngine primitive).",
+    "Audit trail for override creation/deletion is logged separately (see AuditLog primitive)."
+  ]
+}

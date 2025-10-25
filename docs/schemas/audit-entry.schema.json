@@ -1,0 +1,385 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://personal-os.dev/schemas/audit-entry.schema.json",
+  "title": "Audit Entry",
+  "description": "Schema for immutable audit log entries tracking all field-level changes (extraction, override, revert, delete). Supports HIPAA, SOX, and GDPR compliance requirements.",
+  "type": "object",
+  "required": [
+    "audit_id",
+    "entity_id",
+    "entity_type",
+    "field_name",
+    "action",
+    "new_value",
+    "changed_by",
+    "timestamp",
+    "source"
+  ],
+  "properties": {
+    "audit_id": {
+      "type": "string",
+      "description": "Unique identifier for this audit entry (UUID or prefixed ID like 'audit_abc123')",
+      "pattern": "^(audit_[a-z0-9]{6,}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$",
+      "examples": ["audit_abc123", "650e8400-e29b-41d4-a716-446655440000"]
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "ID of the entity whose field changed",
+      "minLength": 1,
+      "examples": ["txn_xyz789", "patient_456", "case_2025cv1234"]
+    },
+    "entity_type": {
+      "type": "string",
+      "description": "Type of entity (used for compliance filtering and multi-tenancy)",
+      "enum": [
+        "transaction",
+        "patient_record",
+        "case",
+        "publication",
+        "product",
+        "subscription",
+        "policy",
+        "claim"
+      ],
+      "examples": ["transaction", "patient_record", "case"]
+    },
+    "field_name": {
+      "type": "string",
+      "description": "Name of the field that changed",
+      "minLength": 1,
+      "pattern": "^[a-z_][a-z0-9_]*$",
+      "examples": ["merchant", "diagnosis_code", "case_number", "amount"]
+    },
+    "action": {
+      "type": "string",
+      "description": "Type of change that occurred",
+      "enum": [
+        "extracted",
+        "override",
+        "revert",
+        "delete",
+        "rule_applied",
+        "ai_suggested",
+        "bulk_update"
+      ],
+      "examples": ["extracted", "override", "revert"]
+    },
+    "previous_value": {
+      "description": "Value before this action (null for 'extracted' action). Can be any type. May be redacted for PII fields.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" },
+        { "type": "object" },
+        { "type": "array" }
+      ],
+      "examples": [
+        "AMZN MKTP US*AB123",
+        "E11.9",
+        null,
+        "[REDACTED]"
+      ]
+    },
+    "new_value": {
+      "description": "Value after this action. Can be any type. May be redacted for PII fields.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" },
+        { "type": "object" },
+        { "type": "array" }
+      ],
+      "examples": [
+        "Amazon Marketplace",
+        "E11.65",
+        1234.56,
+        "[REDACTED]"
+      ]
+    },
+    "changed_by": {
+      "type": "string",
+      "description": "User ID or system identifier that performed the action",
+      "minLength": 1,
+      "examples": [
+        "user_123",
+        "nurse_789",
+        "parser_pdf_v2",
+        "normalization_rule_merchant",
+        "accounting_system_api"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the action occurred (transaction time)",
+      "examples": ["2025-10-24T10:30:00Z", "2025-10-24T14:30:15.123Z"]
+    },
+    "reason": {
+      "type": "string",
+      "description": "Optional explanation for the change (required for manual overrides, optional for automated actions)",
+      "maxLength": 1000,
+      "examples": [
+        "Normalize merchant name for reporting",
+        "Patient has chronic kidney disease",
+        "Extracted from PDF page 3",
+        "Applied normalization rule: merchant_amazon"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "description": "System or process that performed the action",
+      "examples": [
+        "manual_correction",
+        "parser_pdf_v2",
+        "normalization_rule",
+        "accounting_system_api",
+        "ai_suggestion_engine"
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Optional: Confidence score for this value (0.0-1.0). Used for extraction and AI suggestions.",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "examples": [0.95, 0.85, 1.0]
+    },
+    "ip_address": {
+      "type": "string",
+      "description": "Optional: IP address of user who performed action (for security audits)",
+      "format": "ipv4",
+      "examples": ["192.168.1.100", "10.0.0.5"]
+    },
+    "user_agent": {
+      "type": "string",
+      "description": "Optional: Browser user agent (for UI actions)",
+      "examples": [
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        "curl/7.68.0"
+      ]
+    },
+    "signature": {
+      "type": "string",
+      "description": "Optional: SHA-256 hash of entry for tamper detection (cryptographic integrity verification)",
+      "pattern": "^[a-f0-9]{64}$",
+      "examples": ["5d41402abc4b2a76b9719d911017c592ae9f8e7a9a0f3e4c6b5d8f2a1e9c3d7b"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional: Extensible metadata for domain-specific attributes",
+      "properties": {
+        "effective_date": {
+          "type": "string",
+          "format": "date",
+          "description": "For retroactive corrections: when the correct value should have been used (valid time)"
+        },
+        "batch_id": {
+          "type": "string",
+          "description": "For bulk operations: ID of the batch this change belongs to"
+        },
+        "pii_redacted": {
+          "type": "boolean",
+          "description": "Flag indicating if previous_value or new_value was redacted for PII protection"
+        },
+        "compliance_tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Compliance requirements this entry satisfies (HIPAA, SOX, GDPR, etc.)"
+        },
+        "related_audit_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Related audit entries (e.g., revert points to original override)"
+        }
+      },
+      "additionalProperties": true,
+      "examples": [
+        {
+          "effective_date": "2025-01-15",
+          "compliance_tags": ["HIPAA", "patient_data"]
+        },
+        {
+          "batch_id": "batch_20251024_001",
+          "batch_size": 50
+        }
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Database record creation timestamp (usually same as timestamp)",
+      "examples": ["2025-10-24T10:30:00Z"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "$comment": "Example 1: Finance - Extraction from PDF",
+      "audit_id": "audit_001",
+      "entity_id": "txn_xyz789",
+      "entity_type": "transaction",
+      "field_name": "merchant",
+      "action": "extracted",
+      "previous_value": null,
+      "new_value": "AMZN MKTP US*AB123",
+      "changed_by": "parser_pdf_v2",
+      "timestamp": "2025-10-20T08:00:00Z",
+      "source": "parser_pdf_v2",
+      "confidence": 0.95,
+      "metadata": {
+        "pdf_page": 3,
+        "ocr_engine": "tesseract_v5"
+      }
+    },
+    {
+      "$comment": "Example 2: Finance - Manual override",
+      "audit_id": "audit_002",
+      "entity_id": "txn_xyz789",
+      "entity_type": "transaction",
+      "field_name": "merchant",
+      "action": "override",
+      "previous_value": "AMZN MKTP US*AB123",
+      "new_value": "Amazon Marketplace",
+      "changed_by": "user_123",
+      "timestamp": "2025-10-24T10:30:00Z",
+      "reason": "Normalize merchant name for reporting",
+      "source": "manual_correction",
+      "confidence": 1.0,
+      "ip_address": "192.168.1.100",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+      "signature": "5d41402abc4b2a76b9719d911017c592ae9f8e7a9a0f3e4c6b5d8f2a1e9c3d7b"
+    },
+    {
+      "$comment": "Example 3: Healthcare - Diagnosis code correction (PII redacted)",
+      "audit_id": "audit_003",
+      "entity_id": "patient_456",
+      "entity_type": "patient_record",
+      "field_name": "diagnosis_code",
+      "action": "override",
+      "previous_value": "E11.9",
+      "new_value": "E11.65",
+      "changed_by": "nurse_789",
+      "timestamp": "2025-10-24T11:00:00Z",
+      "reason": "Patient has chronic kidney disease, E11.9 too generic",
+      "source": "manual_correction",
+      "confidence": 0.95,
+      "metadata": {
+        "pii_redacted": false,
+        "compliance_tags": ["HIPAA", "patient_data"],
+        "approved_by": "doctor_123",
+        "approved_at": "2025-10-24T15:30:00Z"
+      }
+    },
+    {
+      "$comment": "Example 4: Legal - Revert correction",
+      "audit_id": "audit_004",
+      "entity_id": "case_2025cv1234",
+      "entity_type": "case",
+      "field_name": "attorney",
+      "action": "revert",
+      "previous_value": "John Smith",
+      "new_value": "J. Smith",
+      "changed_by": "legal_assistant_456",
+      "timestamp": "2025-10-25T09:00:00Z",
+      "reason": "Wrong attorney - reverting to original extraction",
+      "source": "manual_correction",
+      "metadata": {
+        "related_audit_ids": ["audit_003_prev_override"]
+      }
+    },
+    {
+      "$comment": "Example 5: E-commerce - Bulk category correction",
+      "audit_id": "audit_005",
+      "entity_id": "prod_42",
+      "entity_type": "product",
+      "field_name": "category",
+      "action": "bulk_update",
+      "previous_value": "Electronics",
+      "new_value": "Home Appliances",
+      "changed_by": "catalog_manager_789",
+      "timestamp": "2025-10-24T16:45:00Z",
+      "reason": "Supplier X catalog error - these are appliances not electronics",
+      "source": "manual_correction",
+      "metadata": {
+        "batch_id": "batch_20251024_001",
+        "batch_size": 50,
+        "batch_index": 0
+      }
+    },
+    {
+      "$comment": "Example 6: Healthcare - PII field (redacted values)",
+      "audit_id": "audit_006",
+      "entity_id": "patient_789",
+      "entity_type": "patient_record",
+      "field_name": "ssn",
+      "action": "override",
+      "previous_value": "[REDACTED]",
+      "new_value": "[REDACTED]",
+      "changed_by": "nurse_456",
+      "timestamp": "2025-10-24T12:00:00Z",
+      "reason": "Corrected SSN from intake form",
+      "source": "manual_correction",
+      "metadata": {
+        "pii_redacted": true,
+        "compliance_tags": ["HIPAA", "PII", "patient_data"],
+        "field_changed": true
+      }
+    }
+  ],
+  "definitions": {
+    "AuditQueryFilters": {
+      "type": "object",
+      "description": "Filters for querying audit entries",
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "description": "Filter by entity ID"
+        },
+        "entity_type": {
+          "type": "string",
+          "description": "Filter by entity type"
+        },
+        "field_name": {
+          "type": "string",
+          "description": "Filter by field name"
+        },
+        "action": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Filter by action types"
+        },
+        "changed_by": {
+          "type": "string",
+          "description": "Filter by user/system that made change"
+        },
+        "date_range": {
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "end": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "search_text": {
+          "type": "string",
+          "description": "Full-text search in reason field"
+        }
+      }
+    }
+  },
+  "notes": [
+    "This schema enforces immutability at the application level. Database should revoke UPDATE/DELETE permissions on audit_log table.",
+    "For HIPAA/GDPR compliance, configure PII field redaction (store '[REDACTED]' instead of actual values).",
+    "The 'signature' field enables tamper detection: hash(audit_id + entity_id + field_name + action + timestamp + new_value).",
+    "For retroactive corrections, use 'metadata.effective_date' (valid time) vs 'timestamp' (transaction time) for bitemporal queries.",
+    "Audit entries are append-only. To 'delete' a field, create a new entry with action='delete'.",
+    "For performance on large datasets, partition audit_log table by month or entity_type.",
+    "Index recommendations: (entity_id, field_name, timestamp DESC), (changed_by, timestamp DESC), (entity_type, timestamp DESC)."
+  ]
+}

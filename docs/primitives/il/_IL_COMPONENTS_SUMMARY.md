@@ -2327,6 +2327,41 @@ Dropdown open:
 
 ---
 
-**Component Count**: 43 components across 17 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.2)
+### Vertical 4.3: Corrections Flow
+
+#### 44. CorrectionDialog ✅
+**Full spec**: [CorrectionDialog.md](CorrectionDialog.md)
+
+**Props**: `mode` (single/bulk), `entity`, `entities`, `entityType`, `editableFields`, `onSave`, `onCancel`
+**States**: editing | validating | saving | error
+**Reusable across**: Finance transactions, Healthcare patient records, Legal cases, Research citations, E-commerce products
+
+**Purpose**: Modal/drawer for editing field values with inline validation, single-item and bulk modes, field history, reason tracking.
+
+---
+
+#### 45. AuditTrailViewer ✅
+**Full spec**: [AuditTrailViewer.md](AuditTrailViewer.md)
+
+**Props**: `entityId`, `entityType`, `fieldName`, `variant` (timeline/table/compact), `filterByUser`, `onExport`
+**States**: loading | loaded | empty | error
+**Reusable across**: Finance audits, Healthcare HIPAA trails, Legal compliance, Research data quality, E-commerce tracking
+
+**Purpose**: Timeline visualization of field changes with color-coded actions, filters, export (CSV/JSON).
+
+---
+
+#### 46. FieldOverrideIndicator ✅
+**Full spec**: [FieldOverrideIndicator.md](FieldOverrideIndicator.md)
+
+**Props**: `isOverridden`, `overriddenBy`, `overriddenAt`, `variant` (badge/icon/dot), `onClick`
+**States**: visible | hidden
+**Reusable across**: All correctable fields across all domains
+
+**Purpose**: Badge/icon showing manual correction with tooltip (who, when), clickable for audit trail.
+
+---
+
+**Component Count**: 46 components across 18 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.3)
 
 **Last Updated**: 2025-10-24
