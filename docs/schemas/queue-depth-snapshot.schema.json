@@ -1,0 +1,319 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://truthconstructionprimitives.org/schemas/queue-depth-snapshot.schema.json",
+  "title": "QueueDepthSnapshot",
+  "description": "Snapshot of queue depth metrics at a specific point in time, tracking pending/in-progress/stuck documents and health status",
+  "type": "object",
+  "required": [
+    "id",
+    "queue_name",
+    "snapshot_at",
+    "pending",
+    "in_progress",
+    "stuck",
+    "health_status",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this snapshot record",
+      "examples": ["qds_123e4567-e89b-12d3-a456-426614174000"]
+    },
+    "queue_name": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Name of the queue being monitored (e.g., 'parse_queue', 'normalize_queue', 'reconcile_queue')",
+      "examples": ["parse_queue", "normalize_queue", "reconcile_queue"]
+    },
+    "snapshot_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this snapshot was taken (UTC)",
+      "examples": ["2025-10-25T10:00:00Z"]
+    },
+    "pending": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of documents waiting to be processed (not yet picked up by workers)",
+      "examples": [145, 0, 847]
+    },
+    "in_progress": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of documents currently being processed by workers",
+      "examples": [12, 8, 15]
+    },
+    "stuck": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of documents stuck in retry loop (>5 failed attempts, requires manual intervention)",
+      "examples": [3, 0, 45]
+    },
+    "oldest_pending_age_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Age of oldest pending document in seconds (null if pending=0). Used to detect stale queue.",
+      "examples": [42, 300, 1800]
+    },
+    "avg_wait_time_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Average wait time for documents in this queue (time from added to picked up), in seconds",
+      "examples": [18.5, 5.2, 120.8]
+    },
+    "processing_rate_per_minute": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Processing rate over last 5 minutes (documents completed per minute)",
+      "examples": [45.2, 30.5, 18.3]
+    },
+    "health_status": {
+      "type": "string",
+      "enum": ["healthy", "warning", "critical"],
+      "description": "Overall health status of queue based on thresholds (pending, stuck, oldest_pending_age)",
+      "examples": ["healthy", "warning", "critical"]
+    },
+    "alerts": {
+      "type": "array",
+      "description": "List of active alerts for this queue snapshot (empty if healthy)",
+      "items": {
+        "type": "object",
+        "required": ["alert_type", "severity", "message"],
+        "properties": {
+          "alert_type": {
+            "type": "string",
+            "enum": ["high_pending", "stuck_documents", "stale_queue", "low_processing_rate", "worker_down"],
+            "description": "Type of alert triggered",
+            "examples": ["high_pending", "stuck_documents"]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["warning", "critical"],
+            "description": "Severity level of alert",
+            "examples": ["warning", "critical"]
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable alert message",
+            "examples": ["Queue depth exceeds warning threshold (200 pending documents)"]
+          },
+          "threshold_value": {
+            "type": "number",
+            "description": "Threshold value that was breached (e.g., 200 for high_pending warning)",
+            "examples": [200, 500, 300]
+          },
+          "actual_value": {
+            "type": "number",
+            "description": "Actual value that triggered alert (e.g., 245 pending documents)",
+            "examples": [245, 847, 28]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "worker_stats": {
+      "type": "object",
+      "description": "Statistics about workers processing this queue (optional)",
+      "properties": {
+        "active_workers": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of workers actively processing documents from this queue",
+          "examples": [5, 10, 2]
+        },
+        "idle_workers": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of workers idle (waiting for documents)",
+          "examples": [2, 0, 5]
+        },
+        "total_workers": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of workers configured for this queue",
+          "examples": [7, 10, 7]
+        },
+        "worker_utilization": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Worker utilization percentage (active_workers / total_workers)",
+          "examples": [0.71, 1.0, 0.29]
+        }
+      },
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional queue-specific metadata (optional)",
+      "properties": {
+        "snapshot_source": {
+          "type": "string",
+          "description": "Source of snapshot data (e.g., 'redis', 'postgres', 'kafka')",
+          "examples": ["redis", "postgres"]
+        },
+        "queue_priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Queue priority level (0-10, higher is more urgent)",
+          "examples": [5, 8, 2]
+        },
+        "maintenance_mode": {
+          "type": "boolean",
+          "description": "Whether queue is in maintenance mode (paused processing)",
+          "examples": [false, true]
+        }
+      },
+      "additionalProperties": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this snapshot record was created (UTC)",
+      "examples": ["2025-10-25T10:00:01Z"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": "qds_123e4567-e89b-12d3-a456-426614174000",
+      "queue_name": "parse_queue",
+      "snapshot_at": "2025-10-25T10:00:00Z",
+      "pending": 145,
+      "in_progress": 12,
+      "stuck": 3,
+      "oldest_pending_age_seconds": 42,
+      "avg_wait_time_seconds": 18.5,
+      "processing_rate_per_minute": 45.2,
+      "health_status": "healthy",
+      "alerts": [],
+      "worker_stats": {
+        "active_workers": 5,
+        "idle_workers": 2,
+        "total_workers": 7,
+        "worker_utilization": 0.71
+      },
+      "metadata": {
+        "snapshot_source": "redis",
+        "queue_priority": 8,
+        "maintenance_mode": false
+      },
+      "created_at": "2025-10-25T10:00:01Z"
+    },
+    {
+      "id": "qds_987f6543-e21b-34d5-b654-321098765432",
+      "queue_name": "normalize_queue",
+      "snapshot_at": "2025-10-25T10:00:00Z",
+      "pending": 245,
+      "in_progress": 8,
+      "stuck": 0,
+      "oldest_pending_age_seconds": 85,
+      "avg_wait_time_seconds": 32.4,
+      "processing_rate_per_minute": 38.7,
+      "health_status": "warning",
+      "alerts": [
+        {
+          "alert_type": "high_pending",
+          "severity": "warning",
+          "message": "Queue depth exceeds warning threshold (200 pending documents)",
+          "threshold_value": 200,
+          "actual_value": 245
+        }
+      ],
+      "worker_stats": {
+        "active_workers": 8,
+        "idle_workers": 0,
+        "total_workers": 10,
+        "worker_utilization": 0.8
+      },
+      "metadata": {
+        "snapshot_source": "redis",
+        "queue_priority": 5,
+        "maintenance_mode": false
+      },
+      "created_at": "2025-10-25T10:00:01Z"
+    },
+    {
+      "id": "qds_456a7890-b12c-45d6-e789-012345678901",
+      "queue_name": "reconcile_queue",
+      "snapshot_at": "2025-10-25T10:00:00Z",
+      "pending": 847,
+      "in_progress": 15,
+      "stuck": 45,
+      "oldest_pending_age_seconds": 1800,
+      "avg_wait_time_seconds": 420.5,
+      "processing_rate_per_minute": 18.3,
+      "health_status": "critical",
+      "alerts": [
+        {
+          "alert_type": "high_pending",
+          "severity": "critical",
+          "message": "Queue depth exceeds critical threshold (500 pending documents)",
+          "threshold_value": 500,
+          "actual_value": 847
+        },
+        {
+          "alert_type": "stuck_documents",
+          "severity": "critical",
+          "message": "High number of stuck documents requiring manual intervention (45 stuck)",
+          "threshold_value": 20,
+          "actual_value": 45
+        },
+        {
+          "alert_type": "stale_queue",
+          "severity": "warning",
+          "message": "Oldest pending document exceeds staleness threshold (30 minutes old)",
+          "threshold_value": 300,
+          "actual_value": 1800
+        },
+        {
+          "alert_type": "low_processing_rate",
+          "severity": "warning",
+          "message": "Processing rate below target (18.3 docs/min, target 30 docs/min)",
+          "threshold_value": 30,
+          "actual_value": 18.3
+        }
+      ],
+      "worker_stats": {
+        "active_workers": 10,
+        "idle_workers": 0,
+        "total_workers": 10,
+        "worker_utilization": 1.0
+      },
+      "metadata": {
+        "snapshot_source": "postgres",
+        "queue_priority": 2,
+        "maintenance_mode": false
+      },
+      "created_at": "2025-10-25T10:00:01Z"
+    },
+    {
+      "id": "qds_789b0123-c45d-67e8-f901-234567890abc",
+      "queue_name": "parse_queue",
+      "snapshot_at": "2025-10-25T11:00:00Z",
+      "pending": 0,
+      "in_progress": 0,
+      "stuck": 0,
+      "oldest_pending_age_seconds": null,
+      "avg_wait_time_seconds": 0,
+      "processing_rate_per_minute": 0,
+      "health_status": "healthy",
+      "alerts": [],
+      "worker_stats": {
+        "active_workers": 0,
+        "idle_workers": 7,
+        "total_workers": 7,
+        "worker_utilization": 0
+      },
+      "metadata": {
+        "snapshot_source": "redis",
+        "queue_priority": 8,
+        "maintenance_mode": false
+      },
+      "created_at": "2025-10-25T11:00:01Z"
+    }
+  ]
+}

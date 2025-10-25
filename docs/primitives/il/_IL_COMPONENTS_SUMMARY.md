@@ -2,7 +2,7 @@
 
 **Status**: Specification complete
 **Last Updated**: 2025-10-25
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3, 5.1, 5.2
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3
 
 ---
 
@@ -2444,6 +2444,53 @@ Dropdown open:
 
 ---
 
-**Component Count**: 52 components across 20 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.3, 5.1-5.2)
+### Vertical 5.3 (Rule Performance & Logs)
+
+#### 53. PerformanceDashboard ✅
+**Full spec**: [PerformanceDashboard.md](PerformanceDashboard.md)
+
+**Props**: `timeRange` (24h | 7d | 30d), `refreshInterval` (60s), `filters` (parser_id, rule_id)
+**States**: loading | idle | refreshing | error
+**Reusable across**: Finance transaction processing dashboard, Healthcare claim processing dashboard, Legal document processing dashboard, Research data pipeline dashboard, E-commerce order processing dashboard, SaaS API performance dashboard, Insurance claims processing dashboard
+
+**Purpose**: Real-time monitoring dashboard with 4 panels (parser stats, rule stats, queue health, error breakdown), auto-refresh 60s, drill-down navigation.
+
+**Visual**: 4-panel grid layout (2x2 on desktop, stacked on mobile), charts (latency histogram, error pie chart, queue area chart), sortable tables, export to CSV/JSON.
+
+**Reusability**: ANY domain with document/data processing pipelines (HL7 messages in healthcare, contract OCR in legal, paper extraction in research, product imports in e-commerce).
+
+---
+
+#### 54. RuleOptimizer ✅
+**Full spec**: [RuleOptimizer.md](RuleOptimizer.md)
+
+**Props**: `timeRange` (7d | 30d), `ruleType` (exact | regex | fuzzy), `sortBy` (execution_time | match_rate)
+**States**: loading | analyzing | optimizing | testing | error
+**Reusable across**: Finance merchant normalization, Healthcare diagnosis code mapping, Legal document classification, Research data validation, E-commerce SKU validation, SaaS API validation, Insurance claims validation
+
+**Purpose**: Diagnostic tool for identifying slow normalization rules, AI-powered optimization recommendations, A/B testing sandbox, impact prediction.
+
+**Visual**: Split view (performance table 60%, details panel 40%), execution time histogram, optimization recommendations, test sandbox with before/after comparison.
+
+**Reusability**: ANY domain with rule-based data transformation (medical code validation in healthcare, document classification in legal, data cleansing in research).
+
+---
+
+#### 55. QueueMonitorPanel ✅
+**Full spec**: [QueueMonitorPanel.md](QueueMonitorPanel.md)
+
+**Props**: `queues` (array of queue names), `refreshInterval` (30s), `alertThresholds` (pending, stuck)
+**States**: healthy | warning | critical | maintenance_mode
+**Reusable across**: Finance payment queues, Healthcare claims processing queues, Legal document review queues, Research data ingestion queues, E-commerce order queues, SaaS webhook queues, Insurance underwriting queues
+
+**Purpose**: Real-time queue depth monitoring (pending/in-progress/stuck), health badges (healthy/warning/critical), manual controls (pause/resume/retry).
+
+**Visual**: Area chart (queue depth over time), queue status cards with health badges, processing rate line chart, stuck documents drill-down table.
+
+**Reusability**: ANY domain with asynchronous processing queues (lab result queues in healthcare, e-discovery queues in legal, background job queues in SaaS).
+
+---
+
+**Component Count**: 55 components across 21 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.3, 5.1-5.3)
 
 **Last Updated**: 2025-10-25

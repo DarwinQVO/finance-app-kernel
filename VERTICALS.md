@@ -600,15 +600,40 @@
 
 ### **5.3 Rule Performance / Logs**
 **Status:** ✅ Complete
-**Full Name:** Rule Performance / Logs
-**Additions:** + parser/queue metrics
-**Spec:** TBD
+**Full Name:** Rule Performance & Logs (Parser/Rule/Queue Observability)
+**Additions:** + comprehensive observability dashboards
+**Spec:** [docs/verticals/5.3-rule-performance-logs.md](docs/verticals/5.3-rule-performance-logs.md)
 
-**Expected:**
-- Parser execution metrics (latency, success rate)
-- Normalization rule performance
-- Queue depth and processing times
-- Error rates and retry statistics
+**Primitives Delivered:**
+- **OL:** MetricsCollector, PerformanceAnalyzer, QueueMonitor, TrendAnalyzer
+- **IL:** PerformanceDashboard, RuleOptimizer, QueueMonitorPanel
+
+**Schemas:** parser-execution-metric.schema.json, rule-execution-metric.schema.json, queue-depth-snapshot.schema.json
+
+**ADRs:** 0033 (Metrics Storage - PostgreSQL+TimescaleDB), 0034 (Aggregation Performance - Materialized Views+Redis), 0035 (Alerting Architecture - Poll-based 60s)
+
+**UX Flow:** [docs/ux-flows/5.3-rule-performance-logs-experience.md](docs/ux-flows/5.3-rule-performance-logs-experience.md)
+
+**Delivered:**
+- Parser execution metrics (latency p50/p95/p99, success rate, throughput, error breakdown)
+- Normalization rule performance tracking (execution time, match rate, transformation success rate)
+- Queue depth monitoring (pending/in-progress/stuck documents, health indicators, processing rate)
+- Error rate dashboards (grouped by parser/rule/error type, trend analysis, spike detection)
+- Historical trend analysis (performance degradation detection, anomaly detection with z-score >2.5)
+- Automated alerting (SLA breaches, error spikes, queue backlog, capacity thresholds)
+- Performance drill-down (slowest executions, inefficient rules, stuck documents)
+- Capacity forecasting (predict when capacity breached, linear regression, 90-day projection)
+- Real-time dashboards (4-panel layout, auto-refresh 60s, export to CSV/JSON)
+- Rule optimization recommendations (AI-powered suggestions, A/B comparison, impact prediction)
+
+**Multi-Domain Applicability:**
+- Finance: Transaction processing metrics (bank statement parsing, merchant normalization, reconciliation queues)
+- Healthcare: Claim processing metrics (HL7 parsing, diagnosis code mapping, claims queues)
+- Legal: Document processing metrics (contract OCR, document classification, e-discovery queues)
+- Research: Data pipeline metrics (paper extraction, citation normalization, ingestion queues)
+- E-commerce: Product import metrics (catalog parsing, SKU validation, import queues)
+- SaaS: API performance metrics (webhook parsing, data transformation, background job queues)
+- Insurance: Claims processing metrics (claims form OCR, policy validation, underwriting queues)
 
 ---
 
@@ -644,13 +669,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 20 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3, 5.1, 5.2 |
-| 📝 Pending | 3 | 5.3-5.5 |
+| ✅ Complete | 21 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3 |
+| 📝 Pending | 2 | 5.4-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 87% (20/23)
+**Completion:** 91% (21/23)
 
-**Next up:** 5.3 Rule Performance / Logs (parser/queue metrics)
+**Next up:** 5.4 Security & Access (PII handling, RBAC, encryption)
 
 ---
 

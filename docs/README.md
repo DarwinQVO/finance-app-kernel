@@ -163,6 +163,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[MigrationEngine](primitives/ol/MigrationEngine.md)** - Zero-downtime migrations (shadow tables, batch processing 14K records/sec, automatic rollback on failure)
 - **[BackwardCompatibilityChecker](primitives/ol/BackwardCompatibilityChecker.md)** - Detect breaking changes with field-level JSON Schema diff, 15+ change types (field removed, type changed, etc.), <380ms p95 for 100-field schemas
 
+**Vertical 5.3 (Rule Performance & Logs):**
+- **[MetricsCollector](primitives/ol/MetricsCollector.md)** - Record execution metrics for parsers and rules with <10ms p95 ingestion, batch insert support (10K metrics/sec)
+- **[PerformanceAnalyzer](primitives/ol/PerformanceAnalyzer.md)** - Query and aggregate metrics (latency percentiles, success rates, throughput), <50ms p95 single parser stats, <200ms all parsers
+- **[QueueMonitor](primitives/ol/QueueMonitor.md)** - Monitor queue depths and detect backlog/stuck documents, <20ms p95 current depth query, snapshot every 60 seconds
+- **[TrendAnalyzer](primitives/ol/TrendAnalyzer.md)** - Analyze historical trends and detect performance degradation, anomaly detection (z-score >2.5), capacity forecasting, <150ms p95 trend queries
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -214,6 +220,9 @@ Reusable UI components:
 - **[SchemaEditor](primitives/il/SchemaEditor.md)** - Monaco-based JSON Schema editor with autocomplete, syntax highlighting, real-time validation, version comparison
 - **[MigrationWizard](primitives/il/MigrationWizard.md)** - 5-step wizard for schema migrations (pre-checks, backup, shadow setup, transformation, cutover) with real-time progress
 - **[CompatibilityViewer](primitives/il/CompatibilityViewer.md)** - Side-by-side diff viewer for schema versions with breaking change detection, field-level comparison, export
+- **[PerformanceDashboard](primitives/il/PerformanceDashboard.md)** - Real-time monitoring dashboard (4 panels: parser stats, rule stats, queue health, error breakdown), auto-refresh 60s, drill-down navigation
+- **[RuleOptimizer](primitives/il/RuleOptimizer.md)** - Diagnostic tool for identifying slow normalization rules, AI-powered optimization recommendations, A/B testing sandbox, impact prediction
+- **[QueueMonitorPanel](primitives/il/QueueMonitorPanel.md)** - Real-time queue depth monitoring (pending/in-progress/stuck), health badges (healthy/warning/critical), manual controls (pause/resume/retry)
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -311,6 +320,11 @@ Executable contracts extracted from vertical specifications:
 - **[migration-plan.schema.json](schemas/migration-plan.schema.json)** - Migration execution plan (from/to versions, steps, batch size, rollback strategy, estimated duration, pre-migration validation)
 - **[compatibility-report.schema.json](schemas/compatibility-report.schema.json)** - Compatibility analysis result (compatible flag, breaking changes with severity, impact analysis, recommended version bump)
 
+**Vertical 5.3 (Rule Performance & Logs):**
+- **[parser-execution-metric.schema.json](schemas/parser-execution-metric.schema.json)** - Parser execution metric record (parser_id, duration_ms, status, observations_extracted, error_type, document_size_bytes)
+- **[rule-execution-metric.schema.json](schemas/rule-execution-metric.schema.json)** - Rule execution metric record (rule_id, rule_type, execution_time_ms, matched, transformation_applied, confidence_score)
+- **[queue-depth-snapshot.schema.json](schemas/queue-depth-snapshot.schema.json)** - Queue depth snapshot (queue_name, pending, in_progress, stuck, health_status, worker_stats, alerts)
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -358,6 +372,9 @@ Key architectural decisions with rationale:
 - **[ADR-0030: Semantic Versioning Strategy](adr/0030-versioning-strategy.md)** - MAJOR.MINOR.PATCH versioning for schemas with strict compatibility rules, rejected alternatives (timestamp versioning, auto-increment, git SHA), <3ms p50 queries
 - **[ADR-0031: Migration Execution - Batch Processing](adr/0031-migration-execution.md)** - Shadow table strategy with batch processing (10K records/batch), zero-downtime cutover (2.5s), automatic rollback on failure, 14,183 records/sec throughput
 - **[ADR-0032: Breaking Change Detection Algorithm](adr/0032-breaking-change-detection.md)** - Field-level JSON Schema diff with semantic analysis, 15+ breaking change types detected (field removed, type changed, constraint tightened), <380ms p95 for 100-field schemas
+- **[ADR-0033: Metrics Storage Strategy](adr/0033-metrics-storage-strategy.md)** - PostgreSQL with TimescaleDB extension for time-series optimization, 10K metrics/sec batch insert, monthly partitions, <50ms p95 aggregate queries, 90-day hot retention + S3 archive
+- **[ADR-0034: Aggregation Performance Strategy](adr/0034-aggregation-performance.md)** - Two-tier caching (TimescaleDB continuous aggregates + Redis cache), 22x faster queries (8ms vs 180ms), 96% cache hit rate, 5-minute refresh, 60-second TTL
+- **[ADR-0035: Alerting Architecture](adr/0035-alerting-architecture.md)** - Poll-based alerting with 60-second evaluation interval, <30s average alert latency, stateful tracking, fingerprint-based deduplication, no write path impact
 
 ---
 
@@ -385,6 +402,7 @@ User experience specifications with wireframes and journeys:
 - **[4.3 Corrections Experience](ux-flows/4.3-corrections-experience.md)** - Correct single field, view audit trail, revert override, bulk corrections, handle validation errors, concurrent edit warnings
 - **[5.1 Provenance Experience](ux-flows/5.1-provenance-experience.md)** - Run "as of" query, make retroactive correction, view bitemporal timeline, export audit report, handle validation errors, compare snapshots, schedule future-dated change
 - **[5.2 Schema Registry Experience](ux-flows/5.2-schema-registry-experience.md)** - Publish schema version, detect breaking changes, execute migration with rollback, compare versions, approve breaking change request, handle migration failure
+- **[5.3 Rule Performance & Logs Experience](ux-flows/5.3-rule-performance-logs-experience.md)** - Identify slow parser, optimize normalization rules, investigate queue backlog, detect performance degradation, handle error spikes, capacity planning
 
 ---
 

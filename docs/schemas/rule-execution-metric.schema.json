@@ -1,0 +1,244 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://truthconstructionprimitives.org/schemas/rule-execution-metric.schema.json",
+  "title": "RuleExecutionMetric",
+  "description": "Metric record for a single normalization rule execution, tracking performance, match status, and transformation success",
+  "type": "object",
+  "required": [
+    "id",
+    "rule_id",
+    "rule_type",
+    "observation_id",
+    "started_at",
+    "completed_at",
+    "execution_time_ms",
+    "matched",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this metric record",
+      "examples": ["rem_123e4567-e89b-12d3-a456-426614174000"]
+    },
+    "rule_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Identifier for the normalization rule that executed (e.g., 'merchant_normalize_starbucks')",
+      "examples": ["merchant_normalize_starbucks", "amount_currency_conversion", "date_format_iso8601"]
+    },
+    "rule_type": {
+      "type": "string",
+      "enum": ["exact", "regex", "fuzzy", "soundex", "ml_classifier"],
+      "description": "Type of rule matching algorithm used",
+      "examples": ["exact", "regex", "fuzzy"]
+    },
+    "observation_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Identifier for the observation this rule was applied to",
+      "examples": ["obs_xyz789"]
+    },
+    "normalization_run_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Identifier for the normalization run (used to distinguish re-normalizations of same observation)",
+      "examples": ["nrun_456a7890-b12c-45d6-e789-012345678901"]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when rule execution started (UTC, high precision)",
+      "examples": ["2025-10-25T10:00:15.200Z"]
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when rule execution completed (UTC, high precision)",
+      "examples": ["2025-10-25T10:00:15.235Z"]
+    },
+    "execution_time_ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Execution duration in milliseconds (sub-millisecond precision, e.g., 0.235ms)",
+      "examples": [35.2, 0.8, 142.7]
+    },
+    "matched": {
+      "type": "boolean",
+      "description": "Whether the rule matched the observation (true = rule condition was satisfied)"
+    },
+    "transformation_applied": {
+      "type": "boolean",
+      "description": "Whether a transformation was successfully applied (only relevant if matched=true, null if matched=false)"
+    },
+    "field_name": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Name of field this rule operates on (e.g., 'merchant', 'amount', 'date')",
+      "examples": ["merchant", "amount", "date", "category"]
+    },
+    "original_value": {
+      "type": "string",
+      "description": "Original value before transformation (null if matched=false)",
+      "examples": ["STARBUCKS #12345 NEW YORK NY", "1500.00 USD", "2025/10/25"]
+    },
+    "transformed_value": {
+      "type": "string",
+      "description": "Transformed value after applying rule (null if matched=false or transformation_applied=false)",
+      "examples": ["Starbucks", "1500.00", "2025-10-25"]
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Confidence score for the transformation (0-1, higher is more confident)",
+      "examples": [0.98, 0.75, 1.0]
+    },
+    "error_type": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Type of error if rule execution failed (null if success). Common values: 'regex_timeout', 'invalid_input', 'transformation_error'.",
+      "examples": ["regex_timeout", "transformation_error"]
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Detailed error message if execution failed (null if success)",
+      "examples": ["Regex execution exceeded 100ms timeout (catastrophic backtracking)"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional rule-specific metadata (optional)",
+      "properties": {
+        "rule_priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Priority of rule (0-100, higher executes first)",
+          "examples": [90, 50, 10]
+        },
+        "rule_version": {
+          "type": "string",
+          "description": "Version of rule definition used",
+          "examples": ["v1.2.0", "v2.0.3"]
+        },
+        "match_method": {
+          "type": "string",
+          "description": "Specific matching method used (e.g., 'levenshtein', 'jaro_winkler')",
+          "examples": ["levenshtein", "jaro_winkler", "soundex"]
+        },
+        "similarity_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Similarity score for fuzzy matching (0-1)",
+          "examples": [0.87, 0.92]
+        }
+      },
+      "additionalProperties": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this metric record was created (UTC)",
+      "examples": ["2025-10-25T10:00:15Z"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": "rem_123e4567-e89b-12d3-a456-426614174000",
+      "rule_id": "merchant_normalize_starbucks",
+      "rule_type": "regex",
+      "observation_id": "obs_xyz789",
+      "normalization_run_id": "nrun_456a7890-b12c-45d6-e789-012345678901",
+      "started_at": "2025-10-25T10:00:15.200Z",
+      "completed_at": "2025-10-25T10:00:15.235Z",
+      "execution_time_ms": 35.2,
+      "matched": true,
+      "transformation_applied": true,
+      "field_name": "merchant",
+      "original_value": "STARBUCKS #12345 NEW YORK NY",
+      "transformed_value": "Starbucks",
+      "confidence_score": 0.98,
+      "error_type": null,
+      "error_message": null,
+      "metadata": {
+        "rule_priority": 90,
+        "rule_version": "v1.2.0"
+      },
+      "created_at": "2025-10-25T10:00:15Z"
+    },
+    {
+      "id": "rem_987f6543-e21b-34d5-b654-321098765432",
+      "rule_id": "merchant_fuzzy_match_all",
+      "rule_type": "fuzzy",
+      "observation_id": "obs_abc123",
+      "normalization_run_id": "nrun_789b0123-c45d-67e8-f901-234567890abc",
+      "started_at": "2025-10-25T11:30:10.500Z",
+      "completed_at": "2025-10-25T11:30:10.642Z",
+      "execution_time_ms": 142.7,
+      "matched": true,
+      "transformation_applied": true,
+      "field_name": "merchant",
+      "original_value": "AMAZN MKTP US*AB1CD2EF3",
+      "transformed_value": "Amazon",
+      "confidence_score": 0.87,
+      "error_type": null,
+      "error_message": null,
+      "metadata": {
+        "rule_priority": 50,
+        "rule_version": "v2.0.3",
+        "match_method": "levenshtein",
+        "similarity_score": 0.87
+      },
+      "created_at": "2025-10-25T11:30:10Z"
+    },
+    {
+      "id": "rem_456a7890-b12c-45d6-e789-012345678901",
+      "rule_id": "amount_currency_conversion",
+      "rule_type": "exact",
+      "observation_id": "obs_def456",
+      "normalization_run_id": "nrun_012c3456-d78e-90f1-g234-567890123def",
+      "started_at": "2025-10-25T14:15:05.100Z",
+      "completed_at": "2025-10-25T14:15:05.100Z",
+      "execution_time_ms": 0.8,
+      "matched": false,
+      "transformation_applied": null,
+      "field_name": "amount",
+      "original_value": null,
+      "transformed_value": null,
+      "confidence_score": null,
+      "error_type": null,
+      "error_message": null,
+      "metadata": {
+        "rule_priority": 10,
+        "rule_version": "v1.0.0"
+      },
+      "created_at": "2025-10-25T14:15:05Z"
+    },
+    {
+      "id": "rem_789b0123-c45d-67e8-f901-234567890abc",
+      "rule_id": "merchant_regex_complex",
+      "rule_type": "regex",
+      "observation_id": "obs_ghi789",
+      "normalization_run_id": "nrun_345d6789-e01f-23g4-h567-890123456ghi",
+      "started_at": "2025-10-25T16:45:20.000Z",
+      "completed_at": "2025-10-25T16:45:20.105Z",
+      "execution_time_ms": 105.0,
+      "matched": false,
+      "transformation_applied": null,
+      "field_name": "merchant",
+      "original_value": null,
+      "transformed_value": null,
+      "confidence_score": null,
+      "error_type": "regex_timeout",
+      "error_message": "Regex execution exceeded 100ms timeout (catastrophic backtracking detected on pattern '(a+)+')",
+      "metadata": {
+        "rule_priority": 75,
+        "rule_version": "v1.5.0"
+      },
+      "created_at": "2025-10-25T16:45:20Z"
+    }
+  ]
+}
