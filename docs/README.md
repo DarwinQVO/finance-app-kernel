@@ -157,6 +157,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[TimelineReconstructor](primitives/ol/TimelineReconstructor.md)** - Reconstruct complete entity history across both timelines for visualization
 - **[RetroactiveCorrector](primitives/ol/RetroactiveCorrector.md)** - Handle retroactive corrections with validation and impact analysis
 
+**Vertical 5.2 (Schema Registry):**
+- **[SchemaRegistry](primitives/ol/SchemaRegistry.md)** - Schema version storage and retrieval with UNIQUE(schema_id, version) constraint, <3ms p50 queries
+- **[SchemaVersionManager](primitives/ol/SchemaVersionManager.md)** - Semantic version management (MAJOR.MINOR.PATCH), lifecycle operations (publish, deprecate, list versions)
+- **[MigrationEngine](primitives/ol/MigrationEngine.md)** - Zero-downtime migrations (shadow tables, batch processing 14K records/sec, automatic rollback on failure)
+- **[BackwardCompatibilityChecker](primitives/ol/BackwardCompatibilityChecker.md)** - Detect breaking changes with field-level JSON Schema diff, 15+ change types (field removed, type changed, etc.), <380ms p95 for 100-field schemas
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -205,6 +211,9 @@ Reusable UI components:
 - **[TimelineViewer](primitives/il/TimelineViewer.md)** - Bitemporal timeline visualization (D3.js) with dual axes (transaction time, valid time), event color coding, zoom/pan, export
 - **[AsOfQueryBuilder](primitives/il/AsOfQueryBuilder.md)** - Date picker interface for building "as of" queries (transaction time, valid time, bitemporal modes)
 - **[RetroactiveCorrectionDialog](primitives/il/RetroactiveCorrectionDialog.md)** - Modal for making retroactive corrections with effective date selector (Today, Original Date, Custom)
+- **[SchemaEditor](primitives/il/SchemaEditor.md)** - Monaco-based JSON Schema editor with autocomplete, syntax highlighting, real-time validation, version comparison
+- **[MigrationWizard](primitives/il/MigrationWizard.md)** - 5-step wizard for schema migrations (pre-checks, backup, shadow setup, transformation, cutover) with real-time progress
+- **[CompatibilityViewer](primitives/il/CompatibilityViewer.md)** - Side-by-side diff viewer for schema versions with breaking change detection, field-level comparison, export
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -297,6 +306,11 @@ Executable contracts extracted from vertical specifications:
 - **[bitemporal-query.schema.json](schemas/bitemporal-query.schema.json)** - Query structure for "as of" queries (transaction time, valid time, bitemporal modes, filters, pagination)
 - **[timeline-event.schema.json](schemas/timeline-event.schema.json)** - Timeline event for visualization (transaction_time, valid_time, action, value, metadata for color/icon)
 
+**Vertical 5.2 (Schema Registry):**
+- **[schema-version.schema.json](schemas/schema-version.schema.json)** - Versioned schema definition (schema_id, version, JSON Schema, backward_compatible flag, breaking/additive changes, changelog, deprecation, migration metadata)
+- **[migration-plan.schema.json](schemas/migration-plan.schema.json)** - Migration execution plan (from/to versions, steps, batch size, rollback strategy, estimated duration, pre-migration validation)
+- **[compatibility-report.schema.json](schemas/compatibility-report.schema.json)** - Compatibility analysis result (compatible flag, breaking changes with severity, impact analysis, recommended version bump)
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -340,6 +354,11 @@ Key architectural decisions with rationale:
 - **[ADR-0028: Provenance Storage Strategy](adr/0028-provenance-storage-strategy.md)** - PostgreSQL append-only with monthly partitioning, S3 archival for >2 years, <100ms queries on 10M+ records
 - **[ADR-0029: Query Performance Optimization](adr/0029-query-performance-optimization.md)** - Layered optimization (indexes + materialized views + Redis cache + partitioning) for sub-100ms "as of" queries
 
+**Group 5: Governance & Meta**
+- **[ADR-0030: Semantic Versioning Strategy](adr/0030-versioning-strategy.md)** - MAJOR.MINOR.PATCH versioning for schemas with strict compatibility rules, rejected alternatives (timestamp versioning, auto-increment, git SHA), <3ms p50 queries
+- **[ADR-0031: Migration Execution - Batch Processing](adr/0031-migration-execution.md)** - Shadow table strategy with batch processing (10K records/batch), zero-downtime cutover (2.5s), automatic rollback on failure, 14,183 records/sec throughput
+- **[ADR-0032: Breaking Change Detection Algorithm](adr/0032-breaking-change-detection.md)** - Field-level JSON Schema diff with semantic analysis, 15+ breaking change types detected (field removed, type changed, constraint tightened), <380ms p95 for 100-field schemas
+
 ---
 
 ## 🎨 UX Flows
@@ -365,6 +384,7 @@ User experience specifications with wireframes and journeys:
 - **[4.2 Forecast Experience](ux-flows/4.2-forecast-experience.md)** - View projections, compare algorithms, create goals, track progress, analyze burn rate, run scenarios
 - **[4.3 Corrections Experience](ux-flows/4.3-corrections-experience.md)** - Correct single field, view audit trail, revert override, bulk corrections, handle validation errors, concurrent edit warnings
 - **[5.1 Provenance Experience](ux-flows/5.1-provenance-experience.md)** - Run "as of" query, make retroactive correction, view bitemporal timeline, export audit report, handle validation errors, compare snapshots, schedule future-dated change
+- **[5.2 Schema Registry Experience](ux-flows/5.2-schema-registry-experience.md)** - Publish schema version, detect breaking changes, execute migration with rollback, compare versions, approve breaking change request, handle migration failure
 
 ---
 

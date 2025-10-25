@@ -1,8 +1,8 @@
 # IL Components Summary
 
 **Status**: Specification complete
-**Last Updated**: 2025-10-24
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2
+**Last Updated**: 2025-10-25
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3, 5.1, 5.2
 
 ---
 
@@ -2397,6 +2397,53 @@ Dropdown open:
 
 ---
 
-**Component Count**: 49 components across 19 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.3, 5.1)
+### Vertical 5.2 (Schema Registry)
 
-**Last Updated**: 2025-10-24
+#### 50. SchemaEditor ✅
+**Full spec**: [SchemaEditor.md](SchemaEditor.md)
+
+**Props**: `schemaId`, `currentVersion`, `onChange`, `onPublish`, `readOnly`, `showDiff`
+**States**: idle | editing | validating | checking_compatibility | publishing | error
+**Reusable across**: Finance schema editing, Healthcare HL7 schema management, Legal contract template schemas, Research data model schemas, E-commerce product schemas, SaaS tenant config schemas, Insurance claims schemas
+
+**Purpose**: Monaco-based JSON Schema editor with autocomplete, syntax highlighting, real-time validation, compatibility checking, and version comparison.
+
+**Visual**: Code editor with toolbar (Save Draft, Check Compatibility, Publish), Monaco editor pane, compatibility panel (side-by-side or bottom), version history sidebar.
+
+**Reusability**: Used in ANY domain requiring schema management (HL7 messages in healthcare, contract templates in legal, data models in research, product catalogs in e-commerce).
+
+---
+
+#### 51. MigrationWizard ✅
+**Full spec**: [MigrationWizard.md](MigrationWizard.md)
+
+**Props**: `schemaId`, `fromVersion`, `toVersion`, `onComplete`, `onCancel`, `showAdvanced`
+**States**: pre_checks | backing_up | shadow_setup | transforming | cutover | completed | failed | rolling_back
+**Reusable across**: Finance transaction schema migrations, Healthcare patient record migrations, Legal contract migrations, Research dataset migrations, E-commerce product catalog migrations, SaaS user schema migrations, Insurance claims migrations
+
+**Purpose**: 5-step wizard for executing schema migrations with real-time progress, health monitoring, and automatic rollback on failure.
+
+**Visual**: Wizard with progress bar, step indicator (1/5, 2/5, etc.), current step content (pre-checks with validation results, transformation with batch progress, cutover with countdown), health metrics panel, pause/resume controls.
+
+**Reusability**: ANY large-scale data migration across domains (patient records in healthcare, legal documents, research datasets, product catalogs in e-commerce).
+
+---
+
+#### 52. CompatibilityViewer ✅
+**Full spec**: [CompatibilityViewer.md](CompatibilityViewer.md)
+
+**Props**: `leftVersion`, `rightVersion`, `schemaId`, `onExport`, `highlightBreaking`
+**States**: loading | comparing | idle | error
+**Reusable across**: Finance schema comparison, Healthcare HL7 version diffs, Legal contract template comparison, Research schema evolution tracking, E-commerce product schema diffs, SaaS API schema versioning, Insurance claims schema evolution
+
+**Purpose**: Side-by-side diff viewer for comparing two schema versions with breaking change detection, field-level comparison, and export capability.
+
+**Visual**: Split view (left version | right version), diff highlighting (green for added, red for removed, yellow for modified), change summary panel (Added: 3 fields, Removed: 1 field, Modified: 2 fields), breaking change badges, export button.
+
+**Reusability**: ANY domain requiring schema evolution tracking (API versioning in SaaS, HL7 message versions in healthcare, contract templates in legal).
+
+---
+
+**Component Count**: 52 components across 20 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.3, 5.1-5.2)
+
+**Last Updated**: 2025-10-25

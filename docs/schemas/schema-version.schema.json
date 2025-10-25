@@ -1,0 +1,289 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://personal-os.dev/schemas/schema-version.schema.json",
+  "title": "Schema Version",
+  "description": "Represents a versioned schema definition in the schema registry. Includes semantic versioning, backward compatibility metadata, and schema definition in JSON Schema format.",
+  "type": "object",
+  "required": [
+    "schema_id",
+    "version",
+    "schema",
+    "published_at",
+    "published_by"
+  ],
+  "properties": {
+    "schema_id": {
+      "type": "string",
+      "description": "Unique identifier for the schema (e.g., 'observation-transaction', 'canonical-payment')",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "examples": ["observation-transaction", "canonical-payment", "observation-patient-record"]
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version string (major.minor.patch format)",
+      "pattern": "^v?\\d+\\.\\d+\\.\\d+$",
+      "examples": ["v1.0.0", "v1.1.0", "v2.0.0", "1.2.3"]
+    },
+    "schema": {
+      "type": "object",
+      "description": "JSON Schema definition (draft-07 or later). Defines the structure and validation rules for data conforming to this schema version.",
+      "properties": {
+        "$schema": { "type": "string" },
+        "$id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string" },
+        "properties": { "type": "object" },
+        "required": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["type"]
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this schema version was published to the registry",
+      "examples": ["2025-10-24T10:00:00Z"]
+    },
+    "published_by": {
+      "type": "string",
+      "description": "User ID or system that published this schema version",
+      "examples": ["data_engineer_123", "schema_automation", "admin"]
+    },
+    "backward_compatible": {
+      "type": "boolean",
+      "description": "Whether this version is backward compatible with the previous version. True if consumers of previous version can safely read data in this version.",
+      "examples": [true, false]
+    },
+    "breaking_changes": {
+      "type": "array",
+      "description": "List of breaking changes introduced in this version",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string", "description": "Field name that changed" },
+          "change_type": {
+            "type": "string",
+            "enum": ["field_removed", "type_changed", "required_added", "constraint_tightened", "enum_value_removed"],
+            "description": "Type of breaking change"
+          },
+          "description": { "type": "string", "description": "Human-readable description of the change" }
+        },
+        "required": ["field", "change_type"]
+      },
+      "examples": [
+        [
+          {
+            "field": "amount",
+            "change_type": "type_changed",
+            "description": "Changed from 'string' to 'number'"
+          }
+        ]
+      ]
+    },
+    "additive_changes": {
+      "type": "array",
+      "description": "List of additive (non-breaking) changes introduced in this version",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "change_type": {
+            "type": "string",
+            "enum": ["field_added", "constraint_relaxed", "enum_value_added"],
+            "description": "Type of additive change"
+          },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "changelog": {
+      "type": "string",
+      "description": "Human-readable changelog entry describing all changes in this version",
+      "examples": [
+        "Add optional tax_category field for tax reporting",
+        "BREAKING: Change date format from YYYY-MM-DD to ISO 8601"
+      ]
+    },
+    "deprecated": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this schema version is deprecated. Deprecated versions should not be used for new data but existing data remains supported."
+    },
+    "deprecated_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when this version was marked as deprecated"
+    },
+    "replacement_version": {
+      "type": ["string", "null"],
+      "description": "Version that replaces this deprecated version",
+      "examples": ["v2.0.0"]
+    },
+    "migration_available": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether an automated migration is available to upgrade to this version from the previous version"
+    },
+    "migration_id": {
+      "type": ["string", "null"],
+      "description": "ID of the migration plan that upgrades to this version",
+      "examples": ["mig_abc123"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about this schema version",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tags for categorization and search",
+          "examples": [["finance", "transaction", "critical"]]
+        },
+        "documentation_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to full documentation for this schema version"
+        },
+        "examples": {
+          "type": "array",
+          "description": "Example data conforming to this schema version",
+          "items": { "type": "object" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "$comment": "Example 1: Finance - observation-transaction v1.0.0 (initial version)",
+      "schema_id": "observation-transaction",
+      "version": "v1.0.0",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "merchant": { "type": "string", "description": "Merchant name" },
+          "amount": { "type": "number", "minimum": 0 },
+          "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+        },
+        "required": ["merchant", "amount", "date"]
+      },
+      "published_at": "2025-01-15T08:00:00Z",
+      "published_by": "data_engineer_123",
+      "backward_compatible": true,
+      "breaking_changes": [],
+      "additive_changes": [],
+      "changelog": "Initial schema version",
+      "deprecated": false,
+      "migration_available": false,
+      "metadata": {
+        "tags": ["finance", "transaction", "observation"],
+        "documentation_url": "https://docs.example.com/schemas/observation-transaction/v1.0.0"
+      }
+    },
+    {
+      "$comment": "Example 2: Finance - observation-transaction v1.1.0 (backward compatible - added optional field)",
+      "schema_id": "observation-transaction",
+      "version": "v1.1.0",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "merchant": { "type": "string" },
+          "amount": { "type": "number", "minimum": 0 },
+          "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "category": { "type": "string", "description": "Transaction category" }
+        },
+        "required": ["merchant", "amount", "date"]
+      },
+      "published_at": "2025-03-10T10:00:00Z",
+      "published_by": "data_engineer_456",
+      "backward_compatible": true,
+      "breaking_changes": [],
+      "additive_changes": [
+        {
+          "field": "category",
+          "change_type": "field_added",
+          "description": "Added optional category field"
+        }
+      ],
+      "changelog": "Add optional category field for transaction categorization",
+      "deprecated": false,
+      "migration_available": false,
+      "metadata": {
+        "tags": ["finance", "transaction", "observation"]
+      }
+    },
+    {
+      "$comment": "Example 3: Finance - observation-transaction v2.0.0 (BREAKING - changed date format)",
+      "schema_id": "observation-transaction",
+      "version": "v2.0.0",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "merchant": { "type": "string" },
+          "amount": { "type": "number", "minimum": 0 },
+          "date": { "type": "string", "format": "date-time", "description": "ISO 8601 datetime" },
+          "category": { "type": "string" }
+        },
+        "required": ["merchant", "amount", "date"]
+      },
+      "published_at": "2025-06-20T14:00:00Z",
+      "published_by": "data_engineer_789",
+      "backward_compatible": false,
+      "breaking_changes": [
+        {
+          "field": "date",
+          "change_type": "type_changed",
+          "description": "Changed date format from YYYY-MM-DD to ISO 8601 datetime"
+        }
+      ],
+      "additive_changes": [],
+      "changelog": "BREAKING: Change date format to ISO 8601 for timezone support",
+      "deprecated": false,
+      "migration_available": true,
+      "migration_id": "mig_v1_to_v2",
+      "metadata": {
+        "tags": ["finance", "transaction", "observation"]
+      }
+    },
+    {
+      "$comment": "Example 4: Healthcare - observation-patient-record v1.0.0 (HIPAA compliant)",
+      "schema_id": "observation-patient-record",
+      "version": "v1.0.0",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "patient_id": { "type": "string" },
+          "diagnosis_code": { "type": "string", "pattern": "^[A-Z]\\d{2}\\.\\d+$" },
+          "provider": { "type": "string" }
+        },
+        "required": ["patient_id", "diagnosis_code", "provider"]
+      },
+      "published_at": "2025-02-01T09:00:00Z",
+      "published_by": "healthcare_engineer_101",
+      "backward_compatible": true,
+      "breaking_changes": [],
+      "additive_changes": [],
+      "changelog": "Initial HIPAA-compliant patient record schema",
+      "deprecated": false,
+      "metadata": {
+        "tags": ["healthcare", "patient", "hipaa", "observation"],
+        "documentation_url": "https://docs.example.com/schemas/patient-record/v1.0.0"
+      }
+    }
+  ],
+  "notes": [
+    "Semantic versioning rules: MAJOR.MINOR.PATCH",
+    "PATCH (v1.0.0 → v1.0.1): Bug fixes, description changes only",
+    "MINOR (v1.0.0 → v1.1.0): Backward compatible changes (add optional field, relax constraint)",
+    "MAJOR (v1.0.0 → v2.0.0): Breaking changes (remove field, change type, add required field)",
+    "backward_compatible=true: Consumers of previous version can read data in this version",
+    "UNIQUE constraint: (schema_id, version) must be unique in database",
+    "deprecated versions should not be deleted if data still references them",
+    "migration_available=true: Automated migration exists to upgrade to this version",
+    "This schema is OUTPUT of SchemaRegistry.publish() and INPUT to SchemaRegistry.getVersion()"
+  ]
+}
