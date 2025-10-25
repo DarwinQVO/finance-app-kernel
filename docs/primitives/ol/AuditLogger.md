@@ -395,7 +395,7 @@ await auditLogger.logEvent({
   action: "regenerate",
   tenant_id: "account_abc",
   changes: {
-    key_value: { old: "sk_live_old***", new: "sk_live_new***" }
+    key_value: { old: "tc_live_old***", new: "tc_live_new***" }
   },
   metadata: {
     ip_address: "203.0.113.50",

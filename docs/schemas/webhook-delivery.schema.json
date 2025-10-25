@@ -1,0 +1,270 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://truthconstructionprimitives.org/schemas/webhook-delivery.schema.json",
+  "title": "WebhookDelivery",
+  "description": "Record of a webhook delivery attempt (success/failed), including payload, signature, response status, and retry information",
+  "type": "object",
+  "required": [
+    "delivery_id",
+    "webhook_id",
+    "event_type",
+    "payload",
+    "signature",
+    "status",
+    "retry_count",
+    "created_at"
+  ],
+  "properties": {
+    "delivery_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this delivery attempt",
+      "examples": ["del_123e4567-e89b-12d3-a456-426614174000"]
+    },
+    "webhook_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Reference to webhook configuration",
+      "examples": ["wh_123e4567-e89b-12d3-a456-426614174000"]
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "upload.completed",
+        "upload.failed",
+        "observation.created",
+        "entity.resolved",
+        "entity.merged",
+        "reconciliation.completed",
+        "reconciliation.failed"
+      ],
+      "description": "Type of event being delivered",
+      "examples": ["upload.completed", "entity.resolved", "reconciliation.completed"]
+    },
+    "payload": {
+      "type": "object",
+      "description": "Event payload (JSON object), varies by event_type",
+      "properties": {
+        "upload_id": {
+          "type": "string",
+          "description": "Upload ID (for upload.* events)",
+          "examples": ["upl_abc123"]
+        },
+        "observation_id": {
+          "type": "string",
+          "description": "Observation ID (for observation.* events)",
+          "examples": ["obs_xyz789"]
+        },
+        "entity_id": {
+          "type": "string",
+          "description": "Entity ID (for entity.* events)",
+          "examples": ["ent_def456"]
+        },
+        "reconciliation_id": {
+          "type": "string",
+          "description": "Reconciliation ID (for reconciliation.* events)",
+          "examples": ["rec_ghi789"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the resource (parsed, failed, resolved, etc.)",
+          "examples": ["parsed", "failed", "resolved"]
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when event occurred (UTC)",
+          "examples": ["2025-10-25T10:15:23Z"]
+        }
+      },
+      "additionalProperties": true,
+      "examples": [
+        {
+          "upload_id": "upl_abc123",
+          "status": "parsed",
+          "parser_type": "bank_statement",
+          "observation_count": 45,
+          "timestamp": "2025-10-25T10:15:23Z"
+        },
+        {
+          "entity_id": "ent_xyz789",
+          "type": "transaction",
+          "canonical_id": "can_123",
+          "timestamp": "2025-10-25T10:15:23Z"
+        }
+      ]
+    },
+    "signature": {
+      "type": "string",
+      "description": "HMAC-SHA256 signature of payload (format: sha256=<hex_digest>). Consumer must verify before processing.",
+      "pattern": "^sha256=[a-f0-9]{64}$",
+      "examples": ["sha256=abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567ab"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "success", "failed"],
+      "description": "Delivery status (pending=queued/retrying, success=200-299, failed=4xx/5xx/timeout)",
+      "examples": ["pending", "success", "failed"]
+    },
+    "status_code": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 599,
+      "description": "HTTP status code from webhook endpoint (null if not yet delivered)",
+      "examples": [200, 201, 503, 504, null]
+    },
+    "response_time_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Response time in milliseconds (null if not yet delivered). 10000ms = timeout.",
+      "examples": [342, 1250, 10000, null]
+    },
+    "response_body": {
+      "type": "string",
+      "description": "Response body from webhook endpoint (truncated to 1KB, for debugging)",
+      "maxLength": 1024,
+      "examples": ["OK", "{\"status\": \"received\"}", "Service Unavailable"]
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "Number of retry attempts (0 = first attempt, 1-5 = retries). Max 5 retries with exponential backoff.",
+      "default": 0,
+      "examples": [0, 1, 2, 3, 4, 5]
+    },
+    "next_retry_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when next retry will be attempted (null if no retry scheduled). Exponential backoff: 5s, 25s, 125s, 625s, 3125s.",
+      "examples": ["2025-10-25T10:15:28Z", "2025-10-25T10:15:48Z", null]
+    },
+    "delivered_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when delivery succeeded (null if pending/failed)",
+      "examples": ["2025-10-25T10:15:24Z", null]
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error message if delivery failed (null if success/pending)",
+      "examples": ["Service Unavailable", "Connection timeout", "Connection refused", null]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this delivery record was created (UTC)",
+      "examples": ["2025-10-25T10:15:23Z"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "delivery_id": "del_123e4567-e89b-12d3-a456-426614174000",
+      "webhook_id": "wh_abc123xyz456",
+      "event_type": "upload.completed",
+      "payload": {
+        "upload_id": "upl_abc123",
+        "status": "parsed",
+        "parser_type": "bank_statement",
+        "observation_count": 45,
+        "timestamp": "2025-10-25T10:15:23Z"
+      },
+      "signature": "sha256=abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567ab",
+      "status": "success",
+      "status_code": 200,
+      "response_time_ms": 342,
+      "response_body": "OK",
+      "retry_count": 0,
+      "next_retry_at": null,
+      "delivered_at": "2025-10-25T10:15:24Z",
+      "error_message": null,
+      "created_at": "2025-10-25T10:15:23Z"
+    },
+    {
+      "delivery_id": "del_987f6543-e21b-34d5-b654-321098765432",
+      "webhook_id": "wh_xyz789abc012",
+      "event_type": "entity.resolved",
+      "payload": {
+        "entity_id": "ent_xyz789",
+        "type": "transaction",
+        "canonical_id": "can_123",
+        "timestamp": "2025-10-25T10:15:23Z"
+      },
+      "signature": "sha256=def456ghi789jkl012mno345pqr678stu901vwx234yz567abc123de",
+      "status": "success",
+      "status_code": 201,
+      "response_time_ms": 128,
+      "response_body": "{\"status\": \"received\"}",
+      "retry_count": 0,
+      "next_retry_at": null,
+      "delivered_at": "2025-10-25T10:15:24Z",
+      "error_message": null,
+      "created_at": "2025-10-25T10:15:23Z"
+    },
+    {
+      "delivery_id": "del_456a7890-b12c-45d6-e789-012345678901",
+      "webhook_id": "wh_def456ghi789",
+      "event_type": "reconciliation.completed",
+      "payload": {
+        "reconciliation_id": "rec_ghi789",
+        "status": "matched",
+        "match_count": 42,
+        "timestamp": "2025-10-25T10:15:23Z"
+      },
+      "signature": "sha256=ghi789jkl012mno345pqr678stu901vwx234yz567abc123def456gh",
+      "status": "pending",
+      "status_code": null,
+      "response_time_ms": null,
+      "response_body": null,
+      "retry_count": 2,
+      "next_retry_at": "2025-10-25T10:17:28Z",
+      "delivered_at": null,
+      "error_message": null,
+      "created_at": "2025-10-25T10:15:23Z"
+    },
+    {
+      "delivery_id": "del_789b0123-c45d-67e8-f901-234567890abc",
+      "webhook_id": "wh_ghi789jkl012",
+      "event_type": "upload.completed",
+      "payload": {
+        "upload_id": "upl_def456",
+        "status": "parsed",
+        "parser_type": "invoice",
+        "observation_count": 28,
+        "timestamp": "2025-10-25T09:30:00Z"
+      },
+      "signature": "sha256=jkl012mno345pqr678stu901vwx234yz567abc123def456ghi789jk",
+      "status": "failed",
+      "status_code": 503,
+      "response_time_ms": 10000,
+      "response_body": "Service Unavailable",
+      "retry_count": 5,
+      "next_retry_at": null,
+      "delivered_at": null,
+      "error_message": "Service Unavailable (max retries exhausted)",
+      "created_at": "2025-10-25T09:30:00Z"
+    },
+    {
+      "delivery_id": "del_012c3456-d78e-90f1-g234-567890123def",
+      "webhook_id": "wh_jkl012mno345",
+      "event_type": "observation.created",
+      "payload": {
+        "observation_id": "obs_mno345",
+        "upload_id": "upl_pqr678",
+        "type": "lab_result",
+        "timestamp": "2025-10-25T10:00:00Z"
+      },
+      "signature": "sha256=mno345pqr678stu901vwx234yz567abc123def456ghi789jkl012mn",
+      "status": "failed",
+      "status_code": 504,
+      "response_time_ms": 10000,
+      "response_body": null,
+      "retry_count": 1,
+      "next_retry_at": "2025-10-25T10:00:25Z",
+      "delivered_at": null,
+      "error_message": "Gateway Timeout",
+      "created_at": "2025-10-25T10:00:00Z"
+    }
+  ]
+}

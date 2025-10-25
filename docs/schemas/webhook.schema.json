@@ -1,0 +1,276 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://truthconstructionprimitives.org/schemas/webhook.schema.json",
+  "title": "Webhook",
+  "description": "Webhook configuration for receiving real-time event notifications (upload.completed, observation.created, entity.resolved, etc.)",
+  "type": "object",
+  "required": [
+    "webhook_id",
+    "tenant_id",
+    "url",
+    "secret",
+    "events",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "webhook_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this webhook",
+      "examples": ["wh_123e4567-e89b-12d3-a456-426614174000"]
+    },
+    "tenant_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Tenant ID this webhook belongs to",
+      "examples": ["tenant_acme", "tenant_globex"]
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "HTTPS endpoint to receive webhook deliveries (must be HTTPS, no localhost/private IPs)",
+      "examples": ["https://example.com/webhook", "https://api.partner.com/events"]
+    },
+    "secret": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Secret used to generate HMAC-SHA256 signature (X-Webhook-Signature header). User-provided or auto-generated.",
+      "examples": ["webhook_secret_abc123xyz"]
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "upload.completed",
+          "upload.failed",
+          "observation.created",
+          "entity.resolved",
+          "entity.merged",
+          "reconciliation.completed",
+          "reconciliation.failed"
+        ]
+      },
+      "minItems": 1,
+      "description": "List of event types to trigger this webhook",
+      "examples": [
+        ["upload.completed"],
+        ["upload.completed", "upload.failed"],
+        ["entity.resolved", "entity.merged"],
+        ["reconciliation.completed"]
+      ]
+    },
+    "filters": {
+      "type": "object",
+      "description": "Optional filters to narrow webhook triggers (JSON object). Only trigger when payload matches ALL filter keys.",
+      "properties": {
+        "parser_type": {
+          "type": "string",
+          "description": "Only trigger for specific parser type",
+          "examples": ["bank_statement", "invoice", "lab_report"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Only trigger for specific status",
+          "examples": ["parsed", "failed"]
+        },
+        "entity_type": {
+          "type": "string",
+          "description": "Only trigger for specific entity type",
+          "examples": ["transaction", "counterparty", "account"]
+        }
+      },
+      "additionalProperties": true,
+      "examples": [
+        {"parser_type": "bank_statement"},
+        {"status": "parsed"},
+        {"entity_type": "transaction"}
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "failed", "disabled"],
+      "description": "Webhook status (active=working, failed=5 retries exhausted, disabled=user paused)",
+      "examples": ["active", "failed", "disabled"]
+    },
+    "last_delivery_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last successful delivery (null if never delivered)",
+      "examples": ["2025-10-25T10:15:23Z", null]
+    },
+    "last_delivery_status": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 599,
+      "description": "HTTP status code of last delivery attempt (null if never delivered)",
+      "examples": [200, 503, null]
+    },
+    "last_delivery_response_time_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Response time of last delivery in milliseconds (null if never delivered)",
+      "examples": [342, 1250, null]
+    },
+    "failure_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of consecutive failed deliveries (resets to 0 on successful delivery)",
+      "default": 0,
+      "examples": [0, 3, 5]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional webhook-specific metadata (optional)",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable name for this webhook (for UI display)",
+          "examples": ["Upload Notifications", "Entity Updates", "Reconciliation Alerts"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of webhook purpose",
+          "examples": ["Notify ERP system when bank statements are parsed"]
+        },
+        "created_by": {
+          "type": "string",
+          "description": "User ID who created this webhook",
+          "examples": ["usr_admin", "usr_integration_engineer"]
+        },
+        "contact_email": {
+          "type": "string",
+          "format": "email",
+          "description": "Email to notify on webhook failures",
+          "examples": ["admin@example.com"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this webhook was created (UTC)",
+      "examples": ["2025-10-25T10:00:00Z"]
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this webhook was last updated (UTC)",
+      "examples": ["2025-10-25T15:30:00Z"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "webhook_id": "wh_123e4567-e89b-12d3-a456-426614174000",
+      "tenant_id": "tenant_acme",
+      "url": "https://example.com/webhook",
+      "secret": "webhook_secret_abc123xyz",
+      "events": ["upload.completed", "upload.failed"],
+      "filters": null,
+      "status": "active",
+      "last_delivery_at": "2025-10-25T10:15:23Z",
+      "last_delivery_status": 200,
+      "last_delivery_response_time_ms": 342,
+      "failure_count": 0,
+      "metadata": {
+        "name": "Upload Notifications",
+        "description": "Notify ERP system when bank statements are parsed",
+        "created_by": "usr_admin",
+        "contact_email": "admin@example.com"
+      },
+      "created_at": "2025-10-01T10:00:00Z",
+      "updated_at": "2025-10-25T10:15:23Z"
+    },
+    {
+      "webhook_id": "wh_987f6543-e21b-34d5-b654-321098765432",
+      "tenant_id": "tenant_globex",
+      "url": "https://api.partner.com/webhook",
+      "secret": "webhook_secret_xyz789abc",
+      "events": ["entity.resolved", "entity.merged"],
+      "filters": {
+        "entity_type": "transaction"
+      },
+      "status": "active",
+      "last_delivery_at": "2025-10-25T08:45:12Z",
+      "last_delivery_status": 200,
+      "last_delivery_response_time_ms": 128,
+      "failure_count": 0,
+      "metadata": {
+        "name": "Entity Updates",
+        "description": "Notify partner system when transactions are resolved",
+        "created_by": "usr_integration_engineer"
+      },
+      "created_at": "2025-09-15T10:00:00Z",
+      "updated_at": "2025-10-25T08:45:12Z"
+    },
+    {
+      "webhook_id": "wh_456a7890-b12c-45d6-e789-012345678901",
+      "tenant_id": "tenant_acme",
+      "url": "https://old-endpoint.com/webhook",
+      "secret": "webhook_secret_def456ghi",
+      "events": ["reconciliation.completed"],
+      "filters": null,
+      "status": "failed",
+      "last_delivery_at": "2025-10-24T10:15:23Z",
+      "last_delivery_status": 503,
+      "last_delivery_response_time_ms": 10000,
+      "failure_count": 5,
+      "metadata": {
+        "name": "Reconciliation Alerts",
+        "description": "Notify accounting system when reconciliations complete",
+        "created_by": "usr_admin",
+        "contact_email": "admin@example.com"
+      },
+      "created_at": "2025-08-01T10:00:00Z",
+      "updated_at": "2025-10-24T10:15:23Z"
+    },
+    {
+      "webhook_id": "wh_789b0123-c45d-67e8-f901-234567890abc",
+      "tenant_id": "tenant_ecommerce",
+      "url": "https://api.ecommerce.com/invoice-webhook",
+      "secret": "webhook_secret_ghi789jkl",
+      "events": ["upload.completed"],
+      "filters": {
+        "parser_type": "invoice"
+      },
+      "status": "active",
+      "last_delivery_at": "2025-10-25T09:30:00Z",
+      "last_delivery_status": 200,
+      "last_delivery_response_time_ms": 256,
+      "failure_count": 0,
+      "metadata": {
+        "name": "Invoice Processing",
+        "description": "Trigger invoice approval workflow when invoices are parsed",
+        "created_by": "usr_finance_admin"
+      },
+      "created_at": "2025-10-20T10:00:00Z",
+      "updated_at": "2025-10-25T09:30:00Z"
+    },
+    {
+      "webhook_id": "wh_012c3456-d78e-90f1-g234-567890123def",
+      "tenant_id": "tenant_healthcare",
+      "url": "https://ehr.hospital.com/lab-results-webhook",
+      "secret": "webhook_secret_jkl012mno",
+      "events": ["observation.created"],
+      "filters": {
+        "parser_type": "lab_report"
+      },
+      "status": "active",
+      "last_delivery_at": "2025-10-25T10:00:00Z",
+      "last_delivery_status": 200,
+      "last_delivery_response_time_ms": 189,
+      "failure_count": 0,
+      "metadata": {
+        "name": "Lab Results Integration",
+        "description": "Update EHR when lab results are parsed",
+        "created_by": "usr_it_admin",
+        "contact_email": "it@hospital.com"
+      },
+      "created_at": "2025-09-01T10:00:00Z",
+      "updated_at": "2025-10-25T10:00:00Z"
+    }
+  ]
+}

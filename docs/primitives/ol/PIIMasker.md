@@ -343,7 +343,7 @@ console.log(maskedEmail.value); // "j***@example.com"
 **Use Case**: Mask API keys, webhook secrets, authentication tokens.
 
 **PII Types**:
-- API Keys: sk_live_abc123def456
+- API Keys: tc_live_abc123def456
 - Webhook Secrets: whsec_abc123
 - OAuth Tokens: oauth_token_abc123
 - IP Addresses: 192.168.1.1
@@ -356,7 +356,7 @@ console.log(maskedEmail.value); // "j***@example.com"
 // Mask webhook observation
 const observation = {
   field: "api_key",
-  value: "sk_live_abc123def456ghi789",
+  value: "tc_live_abc123def456ghi789",
   upload_id: "webhook_890"
 };
 

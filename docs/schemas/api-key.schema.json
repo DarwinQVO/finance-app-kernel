@@ -1,0 +1,200 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://truthconstructionprimitives.org/schemas/api-key.schema.json",
+  "title": "APIKey",
+  "description": "API key for authenticating external API requests, scoped to tenant with configurable permissions and expiration",
+  "type": "object",
+  "required": [
+    "api_key_id",
+    "tenant_id",
+    "key_hash",
+    "key_prefix",
+    "scopes",
+    "created_at"
+  ],
+  "properties": {
+    "api_key_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this API key",
+      "examples": ["key_123e4567-e89b-12d3-a456-426614174000"]
+    },
+    "tenant_id": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Tenant ID this key is scoped to (cannot access other tenants' data)",
+      "examples": ["tenant_acme", "tenant_globex"]
+    },
+    "key_hash": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "bcrypt hash of actual API key (NEVER store plaintext key). Used for constant-time comparison.",
+      "examples": ["$2b$12$abc123..."]
+    },
+    "key_prefix": {
+      "type": "string",
+      "maxLength": 16,
+      "description": "First 16 characters of API key (for UI display only, e.g., 'sk_live_abc123')",
+      "examples": ["sk_live_abc123", "sk_test_xyz789", "sk_sandbox_def"]
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["read", "write", "admin"]
+      },
+      "minItems": 1,
+      "description": "Permission scopes granted to this API key (read, write, admin)",
+      "examples": [["read"], ["read", "write"], ["read", "write", "admin"]]
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional expiration timestamp (null = never expires). Used for temporary access grants (e.g., contractors).",
+      "examples": ["2026-01-15T23:59:59Z", null]
+    },
+    "last_used_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this key was last used (null = never used). Updated asynchronously on each request.",
+      "examples": ["2025-10-25T10:15:23Z", null]
+    },
+    "revoked": {
+      "type": "boolean",
+      "description": "Whether this key has been revoked (soft delete for audit trail)",
+      "default": false,
+      "examples": [false, true]
+    },
+    "revoked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this key was revoked (null if not revoked)",
+      "examples": ["2025-11-15T14:30:00Z", null]
+    },
+    "revoked_by": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "User ID who revoked this key (null if not revoked)",
+      "examples": ["usr_admin", null]
+    },
+    "revocation_reason": {
+      "type": "string",
+      "description": "Reason for revoking key (for audit trail and compliance)",
+      "examples": ["Key leaked on GitHub", "User left company", "Security incident"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional key-specific metadata (optional)",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable name for this key (for UI display)",
+          "examples": ["Production Key", "Integration Key", "Test Key (Development)"]
+        },
+        "created_by": {
+          "type": "string",
+          "description": "User ID who created this key",
+          "examples": ["usr_admin", "usr_developer"]
+        },
+        "ip_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "ipv4"
+          },
+          "description": "Optional IP allowlist (key only works from these IPs)",
+          "examples": [["192.168.1.0/24", "10.0.0.5"]]
+        },
+        "usage_notes": {
+          "type": "string",
+          "description": "Notes about intended usage (for documentation)",
+          "examples": ["Used by ERP system for daily statement uploads"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this key was created (UTC)",
+      "examples": ["2025-10-25T10:00:00Z"]
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this key was last updated (UTC)",
+      "examples": ["2025-10-25T15:30:00Z"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "api_key_id": "key_123e4567-e89b-12d3-a456-426614174000",
+      "tenant_id": "tenant_acme",
+      "key_hash": "$2b$12$abc123xyz456def789ghi012jkl345mno678pqr901stu234vwx567yz",
+      "key_prefix": "sk_live_3K7mP9x",
+      "scopes": ["read", "write"],
+      "expires_at": null,
+      "last_used_at": "2025-10-25T10:15:23Z",
+      "revoked": false,
+      "metadata": {
+        "name": "Production Key",
+        "created_by": "usr_admin",
+        "usage_notes": "Used by ERP system for daily statement uploads"
+      },
+      "created_at": "2025-10-01T10:00:00Z",
+      "updated_at": "2025-10-25T10:15:23Z"
+    },
+    {
+      "api_key_id": "key_987f6543-e21b-34d5-b654-321098765432",
+      "tenant_id": "tenant_globex",
+      "key_hash": "$2b$12$xyz789abc012def345ghi678jkl901mno234pqr567stu890vwx123yz",
+      "key_prefix": "sk_test_8uA6bC0",
+      "scopes": ["read"],
+      "expires_at": null,
+      "last_used_at": null,
+      "revoked": false,
+      "metadata": {
+        "name": "Test Key (Development)",
+        "created_by": "usr_developer"
+      },
+      "created_at": "2025-09-15T10:00:00Z"
+    },
+    {
+      "api_key_id": "key_456a7890-b12c-45d6-e789-012345678901",
+      "tenant_id": "tenant_acme",
+      "key_hash": "$2b$12$def456ghi789jkl012mno345pqr678stu901vwx234yz567abc890xy",
+      "key_prefix": "sk_live_1tY4uA6",
+      "scopes": ["read", "write"],
+      "expires_at": "2025-11-30T23:59:59Z",
+      "last_used_at": "2025-10-20T14:30:00Z",
+      "revoked": false,
+      "metadata": {
+        "name": "Contractor Key (Temporary)",
+        "created_by": "usr_admin",
+        "usage_notes": "Temporary access for external contractor (expires Nov 30)",
+        "ip_allowlist": ["203.0.113.0/24"]
+      },
+      "created_at": "2025-10-15T10:00:00Z"
+    },
+    {
+      "api_key_id": "key_789b0123-c45d-67e8-f901-234567890abc",
+      "tenant_id": "tenant_acme",
+      "key_hash": "$2b$12$ghi012jkl345mno678pqr901stu234vwx567yz890abc123def456gh",
+      "key_prefix": "sk_live_9xQ2jR8",
+      "scopes": ["read", "write", "admin"],
+      "expires_at": null,
+      "last_used_at": "2025-08-01T10:00:00Z",
+      "revoked": true,
+      "revoked_at": "2025-10-25T14:00:00Z",
+      "revoked_by": "usr_security_admin",
+      "revocation_reason": "Key leaked on public GitHub repository (detected by secret scanning)",
+      "metadata": {
+        "name": "Integration Key (REVOKED)",
+        "created_by": "usr_admin"
+      },
+      "created_at": "2025-08-01T10:00:00Z",
+      "updated_at": "2025-10-25T14:00:00Z"
+    }
+  ]
+}

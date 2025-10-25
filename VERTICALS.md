@@ -657,15 +657,29 @@
 
 ### **5.5 Public API Contracts**
 **Status:** ✅ Complete
-**Full Name:** Public API Contracts (si aplica)
-**Spec:** TBD
+**Full Name:** Public API Contracts
+**Spec:** [docs/verticals/5.5-public-api-contracts.md](docs/verticals/5.5-public-api-contracts.md)
 
-**Expected:**
-- REST API for external integrations
-- Webhook support for real-time notifications
-- API versioning (v1, v2) with deprecation policy
-- Rate limiting and authentication (API keys, OAuth2)
-- OpenAPI/Swagger documentation
+**Primitives Delivered:**
+- APIGateway (authentication, rate limiting, CORS, audit logging)
+- APIRouter (OpenAPI-driven routing, request validation, response serialization)
+- WebhookDispatcher (event delivery with exponential backoff retry)
+- APIKeyValidator (bcrypt-based key validation, tenant scoping)
+- OAuth2Provider (authorization code flow, JWT tokens)
+- APIKeyManagementPanel (IL - API key generation/revocation UI)
+- WebhookManagementPanel (IL - webhook registration/testing UI)
+
+**Schemas:** api-key.schema.json, webhook.schema.json, webhook-delivery.schema.json
+**ADRs:** 0039 (API versioning strategy), 0040 (webhook retry policy), 0041 (API key vs OAuth2)
+**UX Flow:** [5.5-api-consumer-experience.md](docs/ux-flows/5.5-api-consumer-experience.md)
+
+**Delivered:**
+- REST API with OpenAPI 3.0 specification (uploads, observations, entities, reconciliations)
+- Webhook system with retry logic (5 retries, exponential backoff)
+- API versioning (URL path /v1/, /v2/) with 12-month deprecation policy
+- Rate limiting (per-tenant: 1000-10000 req/hour by tier)
+- Dual authentication (API keys for server-to-server, OAuth2 for third-party apps)
+- Multi-domain applicability: Finance, Healthcare, Legal, Research, E-Commerce, SaaS, Insurance
 
 ---
 
@@ -673,13 +687,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 22 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4 |
-| 📝 Pending | 1 | 5.5 |
+| ✅ Complete | 23 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4, 5.5 |
+| 📝 Pending | 0 | - |
 | **TOTAL** | **23** | |
 
-**Completion:** 96% (22/23)
+**Completion:** 100% (23/23) ✅ **PROJECT COMPLETE**
 
-**Next up:** 5.5 Public API Contracts (REST API, webhooks, rate limiting)
+**Final Vertical:** 5.5 Public API Contracts (completed 2025-10-25)
 
 ---
 

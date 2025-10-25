@@ -330,7 +330,7 @@ const encrypted = await encryptionEngine.encryptDocument({
 // Encrypt API key
 const apiKey = {
   key_id: "key_123",
-  key_value: "sk_live_abc123def456",
+  key_value: "tc_live_abc123def456",
   tenant_id: "tenant_abc",
   scopes: ["read", "write"]
 };
