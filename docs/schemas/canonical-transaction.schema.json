@@ -6,6 +6,7 @@
   "type": "object",
   "required": [
     "canonical_id",
+    "insertion_sequence",
     "upload_id",
     "observation_id",
     "date",
@@ -24,6 +25,11 @@
       "format": "uuid",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
       "description": "Globally unique canonical transaction ID using UUIDv5 (RFC 4122). Generated deterministically: uuid5(NAMESPACE_CANONICAL, f'{upload_id}:{row_id}:{normalizer_version}'). Ensures idempotent re-normalization and global uniqueness. Example: '550e8400-e29b-51d4-a716-446655440000'"
+    },
+    "insertion_sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Database-generated auto-incrementing sequence for pagination. Used for cursor-based pagination to avoid race conditions with backdated transactions. See ADR-0006 for rationale. Example: 123456"
     },
     "upload_id": {
       "type": "string",
@@ -139,6 +145,7 @@
   "examples": [
     {
       "canonical_id": "550e8400-e29b-51d4-a716-446655440000",
+      "insertion_sequence": 123456,
       "upload_id": "UL_abc123",
       "observation_id": "UL_abc123:0",
       "date": "2025-01-15T00:00:00Z",
@@ -165,6 +172,7 @@
     },
     {
       "canonical_id": "6ba7b810-9dad-51d1-80b4-00c04fd430c8",
+      "insertion_sequence": 123457,
       "upload_id": "UL_def456",
       "observation_id": "UL_def456:15",
       "date": "2025-01-02T00:00:00Z",
@@ -194,6 +202,7 @@
     },
     {
       "canonical_id": "7c9e6679-7425-5a94-85d2-e56b7c3e5e14",
+      "insertion_sequence": 123458,
       "upload_id": "UL_ghi789",
       "observation_id": "UL_ghi789:42",
       "date": "2025-02-28T00:00:00Z",

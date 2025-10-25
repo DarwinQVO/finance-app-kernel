@@ -554,6 +554,87 @@ Total downtime                     | 2,510ms ≈ 2.5 seconds
 
 **Production impact**: Writes blocked for ~2.5 seconds (acceptable for most workloads).
 
+### Deployment Requirements for Production
+
+**Problem**: 2.5-second write block during cutover can cause issues in high-traffic systems:
+
+**Potential Issues:**
+- Request timeouts (if client timeout < 2.5s)
+- Connection pool exhaustion (clients waiting for lock)
+- Cascading failures in dependent services
+- Queue backlog buildup
+
+**Required Mitigations:**
+
+**1. Deploy during low-traffic windows**
+```
+Recommended windows (UTC):
+- Americas: 2:00-6:00 AM PST (10:00-14:00 UTC)
+- Europe: 2:00-6:00 AM CET (01:00-05:00 UTC)
+- Asia: 2:00-6:00 AM JST (17:00-21:00 UTC previous day)
+```
+
+**2. Pre-deployment checklist**
+- ✅ Alert monitoring systems to suppress alarms during migration
+- ✅ Notify on-call engineers of scheduled migration
+- ✅ Verify rollback procedure tested in staging
+- ✅ Confirm database backup completed <1 hour ago
+- ✅ Check connection pool has spare capacity (>30% free)
+
+**3. During migration**
+- ✅ Monitor database connection pool usage (alert if >80%)
+- ✅ Watch for request timeout spikes (alert if >1% error rate)
+- ✅ Track queue depth (alert if >2x normal)
+- ✅ Have rollback command ready (1-click execution)
+
+**4. Post-migration**
+- ✅ Pre-warm connection pools (send warmup queries)
+- ✅ Verify no lingering locks (`SELECT * FROM pg_locks WHERE granted = false`)
+- ✅ Check slow query log for migration-related queries
+- ✅ Monitor error rates for 15 minutes post-cutover
+
+**5. Application-level safeguards**
+```javascript
+// Client retry logic for lock timeouts
+async function withRetry(fn, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error.code === 'LOCK_TIMEOUT' && attempt < maxRetries) {
+        await sleep(100 * attempt);  // Exponential backoff
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+```
+
+**6. Circuit breaker pattern**
+```javascript
+// Fail fast during migration instead of piling up requests
+if (database.connectionPoolUtilization() > 90%) {
+  throw new ServiceUnavailableError('Database under load, retry later');
+}
+```
+
+**7. Concurrent migration limits**
+- **NEVER run more than 2 migrations concurrently** on same database
+- Schedule migrations 1 hour apart minimum
+- Coordinate with other teams (shared database clusters)
+
+**Example deployment timeline:**
+```
+T-10 min: Suppress monitoring alerts
+T-5 min:  Verify backup exists
+T-2 min:  Notify #oncall channel
+T0:       Start migration
+T+2.5s:   Cutover lock released
+T+5 min:  Verify no errors, re-enable alerts
+T+15 min: Final validation, declare success
+```
+
 ### 3. Automatic Rollback Prevents Data Loss
 
 **Rollback triggers:**

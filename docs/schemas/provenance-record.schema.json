@@ -12,7 +12,9 @@
     "transaction_time",
     "valid_time_start",
     "value",
-    "changed_by"
+    "changed_by",
+    "retention_class",
+    "archival_status"
   ],
   "properties": {
     "provenance_id": {
@@ -164,6 +166,25 @@
       "pattern": "^[a-f0-9]{64}$",
       "examples": ["5d41402abc4b2a76b9719d911017c592ae9f8e7a9a0f3e4c6b5d8f2a1e9c3d7b"]
     },
+    "previous_signature": {
+      "type": ["string", "null"],
+      "description": "SHA-256 hash of previous provenance record in the chain for this entity_id + field_name. Null for first record. Enables cryptographic chain validation to detect tampering.",
+      "pattern": "^[a-f0-9]{64}$",
+      "examples": ["4c30391bb3c1a75ba8b2d85f9e6c4d2a8f7e3b1c5d9a2f6e8b4c3a1e7d9f2b5c", null]
+    },
+    "retention_class": {
+      "type": "string",
+      "description": "Retention policy class determining how long this record must be kept. Drives archival and deletion workflows.",
+      "enum": ["regulatory_7yr", "operational_2yr", "temporary_90d"],
+      "examples": ["regulatory_7yr", "operational_2yr", "temporary_90d"]
+    },
+    "archival_status": {
+      "type": "string",
+      "description": "Current archival status of this record. Used to manage hot/cold storage lifecycle.",
+      "enum": ["active", "archived_s3", "deleted"],
+      "default": "active",
+      "examples": ["active", "archived_s3", "deleted"]
+    },
     "metadata": {
       "type": "object",
       "description": "Optional: Extensible metadata for domain-specific attributes",
@@ -249,6 +270,9 @@
       "source": "manual_correction",
       "confidence": 1.0,
       "signature": "5d41402abc4b2a76b9719d911017c592ae9f8e7a9a0f3e4c6b5d8f2a1e9c3d7b",
+      "previous_signature": null,
+      "retention_class": "regulatory_7yr",
+      "archival_status": "active",
       "metadata": {
         "compliance_tags": ["SOX", "financial_audit"]
       }
@@ -270,6 +294,9 @@
       "source": "manual_correction",
       "confidence": 0.95,
       "signature": "6e52d02bdc4a2c76c8819e922027d593bf9f9e8b1b1f4e5d7c6e9f3b2f0d4e8c",
+      "previous_signature": "5d41402abc4b2a76b9719d911017c592ae9f8e7a9a0f3e4c6b5d8f2a1e9c3d7b",
+      "retention_class": "regulatory_7yr",
+      "archival_status": "active",
       "metadata": {
         "compliance_tags": ["HIPAA", "patient_data"],
         "pii_redacted": false,
@@ -294,6 +321,9 @@
       "source": "manual_correction",
       "confidence": 1.0,
       "signature": "7f63e03cde5b3d87d9920f033138e694c0g0f9d2c2g5f6e8d7f0g4c3g1e5f9d",
+      "previous_signature": "6e52d02bdc4a2c76c8819e922027d593bf9f9e8b1b1f4e5d7c6e9f3b2f0d4e8c",
+      "retention_class": "regulatory_7yr",
+      "archival_status": "active",
       "metadata": {
         "compliance_tags": ["court_filing"],
         "impact_analysis": {
@@ -319,6 +349,9 @@
       "source": "manual_correction",
       "confidence": 1.0,
       "signature": "8g74f04def6c4e98e0a31g144249f7a5d1h1g0e3d3h6g7f9e8g1h5d4h2f6g0e",
+      "previous_signature": "7f63e03cde5b3d87d9920f033138e694c0g0f9d2c2g5f6e8d7f0g4c3g1e5f9d",
+      "retention_class": "operational_2yr",
+      "archival_status": "active",
       "metadata": {
         "approval_required": true,
         "approved_by": "pricing_director_456",
@@ -342,6 +375,9 @@
       "source": "customer_portal",
       "confidence": 1.0,
       "signature": "9h85g05efg7d5f09f1b42h255350g8b6e2i2h1f4e4i7h8g0f9h2i6e5i3g7h1f",
+      "previous_signature": "8g74f04def6c4e98e0a31g144249f7a5d1h1g0e3d3h6g7f9e8g1h5d4h2f6g0e",
+      "retention_class": "regulatory_7yr",
+      "archival_status": "active",
       "metadata": {
         "compliance_tags": ["SOX", "revenue_recognition"],
         "impact_analysis": {
@@ -366,6 +402,9 @@
       "source": "manual_correction",
       "confidence": 1.0,
       "signature": "0i96h06fgh8e6g10g2c53i366461h9c7f3j3i2g5f5j8i9h1g0i3j7f6j4h8i2g",
+      "previous_signature": "9h85g05efg7d5f09f1b42h255350g8b6e2i2h1f4e4i7h8g0f9h2i6e5i3g7h1f",
+      "retention_class": "temporary_90d",
+      "archival_status": "active",
       "metadata": {
         "compliance_tags": ["NIH_reporting"],
         "impact_analysis": {
@@ -400,6 +439,10 @@
     "For scheduled changes, valid_time_start > transaction_time (we know about it now, effective later).",
     "Index recommendations: (entity_id, field_name, transaction_time DESC), (transaction_time), (valid_time_start, valid_time_end).",
     "Partition recommendations: Partition table by transaction_time (monthly partitions) for query performance.",
-    "This schema is OUTPUT of ProvenanceLedger.append() and INPUT to BitemporalQuery methods."
+    "This schema is OUTPUT of ProvenanceLedger.append() and INPUT to BitemporalQuery methods.",
+    "Retention policy enforcement: Use retention_class to drive archival workflows. regulatory_7yr = 7 years hot storage (SOX, HIPAA), operational_2yr = 2 years hot + archive, temporary_90d = 90 days then delete.",
+    "Archival workflow: active → archived_s3 (move to cold storage after retention_class period) → deleted (after legal retention met).",
+    "Hash chain validation: previous_signature links to prior record for same entity_id + field_name. Verify chain integrity: hash(record_N-1) == record_N.previous_signature. Detects tampering or missing records.",
+    "Storage growth mitigation: Without retention, 1M transactions × 5 fields × 3 edits = 15M records × 2KB = 30GB/year. With archival_status, move old records to S3 (74% compression) after retention period."
   ]
 }

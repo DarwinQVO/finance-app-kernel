@@ -180,6 +180,122 @@ If queried on 2025-12-31:
 
 ---
 
+## Cache Stampede Mitigation
+
+**Problem**: All exchange rate cache keys expire simultaneously at 16:00 CET:
+
+```
+16:00 CET: All EUR/USD, GBP/USD, JPY/USD, etc. keys expire
+16:01: 1000 concurrent requests for same rates
+Result: 1000 simultaneous ECB API calls (should be 1)
+```
+
+**Why this happens:**
+- ECB publishes rates once daily at 16:00 CET
+- All currency pairs expire at same time (24h TTL from previous day's 16:00)
+- Burst of user activity (users check conversions after new rates published)
+
+**Consequences:**
+- ECB rate limit exhausted instantly (1000 req/day limit)
+- Cascading failures (API 429 errors → fallback to FED → FED exhausted)
+- User-facing errors ("Rate unavailable, try again later")
+
+### Solution: Probabilistic Early Expiration
+
+**Strategy**: Add random jitter to TTL to spread cache refreshes over time:
+
+```python
+def get_cache_ttl(base_ttl: int = 86400) -> int:
+    """
+    Return TTL with ±10% random jitter.
+
+    Base: 24 hours (86400 seconds)
+    Range: 21.6h - 24h (77760 - 86400 seconds)
+
+    Effect: Spreads expirations over 2.4-hour window instead of instant
+    """
+    jitter = random.uniform(0.9, 1.0)  # 90% - 100% of base TTL
+    return int(base_ttl * jitter)
+
+# Usage
+redis.setex(
+    key="USD_EUR_2025-10-24",
+    value=0.9234,
+    ttl=get_cache_ttl()  # 77760-86400 seconds instead of 86400
+)
+```
+
+**Result**:
+- Some keys expire at 14:30 CET (early)
+- Most keys expire between 15:00-16:00 CET
+- Last keys expire at 16:00 CET
+- API calls spread over 1.5-hour window instead of 1 second
+
+**Benefits**:
+- ✅ No thundering herd (gradual refresh instead of burst)
+- ✅ API rate limits respected (10 calls/min vs 1000 calls/sec)
+- ✅ No user-facing errors (smooth degradation)
+- ✅ Simple implementation (2 lines of code)
+
+### Alternative Mitigation: Request Coalescing
+
+**Strategy**: If cache miss detected, check if refresh already in progress:
+
+```python
+def get_exchange_rate_with_coalescing(base: str, quote: str, date: str):
+    cache_key = f"{base}_{quote}_{date}"
+    lock_key = f"refresh_lock:{cache_key}"
+
+    # Step 1: Check cache
+    cached_rate = redis.get(cache_key)
+    if cached_rate:
+        return cached_rate
+
+    # Step 2: Try to acquire refresh lock
+    if redis.setnx(lock_key, "1", ex=10):  # 10-second lock
+        # We got the lock - we are responsible for refreshing
+        try:
+            rate = fetch_from_ecb(base, quote, date)
+            redis.setex(cache_key, rate, ttl=get_cache_ttl())
+            return rate
+        finally:
+            redis.delete(lock_key)
+    else:
+        # Someone else is refreshing - wait and retry
+        time.sleep(0.1)  # Wait 100ms
+
+        # Check cache again (other thread should have populated it)
+        cached_rate = redis.get(cache_key)
+        if cached_rate:
+            return cached_rate
+
+        # Still missing - fallback to last known rate
+        return get_last_known_rate(base, quote)
+```
+
+**Benefits**:
+- ✅ Only 1 API call per currency pair (even with 1000 concurrent requests)
+- ✅ Guaranteed deduplication (lock ensures single refresh)
+- ✅ Works with existing cache strategy
+
+**Trade-offs**:
+- ⚠️ More complex (lock management, retry logic)
+- ⚠️ Potential deadlocks (if lock holder crashes)
+- ⚠️ 100ms latency for waiting threads
+
+### Recommendation
+
+**Use probabilistic early expiration** (simpler, good enough):
+- 10% jitter spreads load over 1.5 hours
+- No lock complexity or deadlock risk
+- Worst case: 10% of requests hit API (still within rate limits)
+
+**Add request coalescing later** if needed (production optimization):
+- Only if probabilistic jitter insufficient (high-traffic scenario)
+- Adds complexity but guarantees single API call per key
+
+---
+
 ## Alternatives Considered
 
 ### Alternative A: No Cache (Direct API Calls) — Rejected

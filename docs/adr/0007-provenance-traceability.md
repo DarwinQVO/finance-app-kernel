@@ -187,6 +187,125 @@ ON uploads (artifact_ref);
 
 ---
 
+## Retention Strategy
+
+**Problem**: Without retention policies, provenance ledger grows unbounded:
+```
+1M transactions × 5 fields × 3 edits = 15M provenance records
+At 2KB each = 30 GB/year (grows forever)
+```
+
+**Solution**: Implement tiered retention with archival workflows.
+
+### Retention Classes
+
+| Class | Duration | Use Case | Storage Cost |
+|-------|----------|----------|--------------|
+| `regulatory_7yr` | 7 years hot | SOX, HIPAA compliance | $0.023/GB/month (PostgreSQL) |
+| `operational_2yr` | 2 years hot + archive | Business analytics | $0.023/GB → $0.004/GB (S3) |
+| `temporary_90d` | 90 days then delete | Non-critical changes | $0.023/GB → $0 (deleted) |
+
+### Archival Workflow
+
+```
+active (PostgreSQL)
+  ↓ (after retention_class period)
+archived_s3 (S3 cold storage, 74% compression)
+  ↓ (after legal retention met)
+deleted (removed from both PostgreSQL + S3)
+```
+
+### Implementation
+
+**Schema fields** (added to provenance-record.schema.json):
+```json
+{
+  "retention_class": {
+    "enum": ["regulatory_7yr", "operational_2yr", "temporary_90d"]
+  },
+  "archival_status": {
+    "enum": ["active", "archived_s3", "deleted"]
+  },
+  "previous_signature": {
+    "description": "SHA-256 of previous record for hash chain validation"
+  }
+}
+```
+
+**Archival job** (runs nightly):
+```sql
+-- Move records past retention to S3
+UPDATE provenance_ledger
+SET archival_status = 'archived_s3'
+WHERE archival_status = 'active'
+  AND retention_class = 'operational_2yr'
+  AND transaction_time < NOW() - INTERVAL '2 years';
+
+-- Export to S3 (compressed JSONL)
+COPY (SELECT * FROM provenance_ledger WHERE archival_status = 'archived_s3')
+TO 's3://bucket/provenance/2023-10.jsonl.gz' WITH (FORMAT json, COMPRESSION gzip);
+
+-- Delete after legal retention met
+DELETE FROM provenance_ledger
+WHERE retention_class = 'temporary_90d'
+  AND transaction_time < NOW() - INTERVAL '90 days';
+```
+
+### Hash Chain Validation
+
+**Purpose**: Detect tampering or missing records in provenance chain.
+
+**Algorithm**:
+```python
+def validate_provenance_chain(entity_id: str, field_name: str):
+    """
+    Verify cryptographic integrity of provenance chain.
+    Returns True if chain valid, False if tampered.
+    """
+    records = db.query(ProvenanceLedger).filter_by(
+        entity_id=entity_id,
+        field_name=field_name
+    ).order_by(ProvenanceLedger.transaction_time.asc())
+
+    for i, record in enumerate(records):
+        if i == 0:
+            # First record should have null previous_signature
+            if record.previous_signature is not None:
+                return False
+        else:
+            # Verify hash chain
+            expected_hash = records[i-1].signature
+            if record.previous_signature != expected_hash:
+                return False  # Chain broken - tampering detected
+
+        # Verify current record signature
+        computed_hash = hashlib.sha256(
+            f"{record.provenance_id}:{record.entity_id}:"
+            f"{record.transaction_time}:{record.value}".encode()
+        ).hexdigest()
+
+        if record.signature != computed_hash:
+            return False  # Record tampered
+
+    return True  # Chain valid
+```
+
+### Storage Growth Mitigation
+
+**Before retention**:
+- Year 1: 30 GB (all in PostgreSQL)
+- Year 2: 60 GB
+- Year 5: 150 GB
+- **Problem**: Database storage expensive (~$0.023/GB/month)
+
+**After retention**:
+- Year 1: 30 GB hot (PostgreSQL)
+- Year 2: 30 GB hot + 7.8 GB cold (S3, 74% compression)
+- Year 5: 30 GB hot + 31.2 GB cold
+- **Savings**: 80% reduction in hot storage costs
+
+---
+
 ## Related Decisions
 
 - **ADR-0001**: Uses `upload_id` as stable identifier in provenance chain
