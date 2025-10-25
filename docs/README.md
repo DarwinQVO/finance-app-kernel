@@ -239,11 +239,28 @@ Executable contracts extracted from vertical specifications:
 
 Key architectural decisions with rationale:
 
+**Group 1: Upload & Ingestion**
 - **[ADR-0001: Canonical ID Decision](adr/0001-canonical-id-decision.md)** - Why `upload_id` not `file_id`
 - **[ADR-0002: State Machine Global](adr/0002-state-machine-global.md)** - Why single `status` field
 - **[ADR-0003: Runner/Coordinator Split](adr/0003-runner-coordinator-split.md)** - Separation of concerns
 - **[ADR-0004: Raw-First Extraction](adr/0004-raw-first-extraction.md)** - Store AS-IS, validate later
 - **[ADR-0005: Configurable Normalization Rules](adr/0005-configurable-normalization-rules.md)** - Externalized, versioned rule sets
+
+**Group 2: Exploration & Visualization**
+- **[ADR-0006: Cursor-Based Pagination Strategy](adr/0006-cursor-based-pagination.md)** - Keyset pagination for stability under concurrent inserts
+- **[ADR-0007: Provenance Traceability Architecture](adr/0007-provenance-traceability.md)** - Full trace canonical → observation → artifact with signed URLs
+- **[ADR-0008: Saved Views Persistence Strategy](adr/0008-saved-views-persistence.md)** - JSON config in database for cross-device sync
+
+**Group 3: Registries**
+- **[ADR-0009: Counterparty Merge Strategy](adr/0009-counterparty-merge-strategy.md)** - Cascade update with transaction migration
+- **[ADR-0010: Auto-Link Matching Criteria](adr/0010-auto-link-matching-criteria.md)** - Exact account/counterparty + ±5% amount + ±3 day tolerance
+- **[ADR-0011: Multi-Jurisdiction Taxonomy Design](adr/0011-multi-jurisdiction-taxonomy.md)** - Hierarchical tree per jurisdiction (USA, Mexico)
+- **[ADR-0012: Transfer Detection Confidence Scoring](adr/0012-transfer-detection-scoring.md)** - Weighted multi-feature (40% amount, 30% date, 20% signs, 10% accounts)
+- **[ADR-0013: Exchange Rate Caching Strategy](adr/0013-exchange-rate-caching.md)** - 24-hour cache with staleness detection and fallback sources
+- **[ADR-0014: Parser Auto-Selection Algorithm](adr/0014-parser-auto-selection.md)** - Capability-based selection with confidence scoring
+- **[ADR-0015: Rule Precedence System](adr/0015-rule-precedence.md)** - Priority-based (0-100) with type fallback (exact > regex > fuzzy > soundex)
+- **[ADR-0016: Reconciliation Threshold Strategy](adr/0016-reconciliation-thresholds.md)** - 3-tier thresholds (auto-link ≥0.95, suggest 0.70-0.94, manual 0.50-0.69)
+- **[ADR-0017: Blocking Strategy for Performance](adr/0017-blocking-strategy-performance.md)** - Date ±30d and amount ±20% pre-filtering for 150x speedup
 
 ---
 

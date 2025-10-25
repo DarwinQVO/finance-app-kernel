@@ -90,6 +90,7 @@
 - TransactionTable (IL - data grid component with sorting/pagination)
 
 **Schemas:** transaction-query-response.schema.json
+**ADRs:** 0006 (cursor-based pagination)
 **UX Flow:** [2.1-transaction-list-experience.md](docs/ux-flows/2.1-transaction-list-experience.md)
 
 **Delivered:**
@@ -117,6 +118,7 @@
 - ProvenanceTimeline (IL) - Visual timeline for audit trail
 
 **Schemas:** drill-down-response.schema.json, decision-explanation.schema.json
+**ADRs:** 0007 (provenance traceability)
 **UX Flow:** [2.2-ol-exploration-experience.md](docs/ux-flows/2.2-ol-exploration-experience.md)
 
 **Delivered:**
@@ -145,6 +147,7 @@
 - SavedViewSelector (IL) - Dropdown for selecting and managing saved views with MRU
 
 **Schemas:** saved-view.schema.json, dashboard-config.schema.json
+**ADRs:** 0008 (saved views persistence)
 **UX Flow:** [2.3-finance-dashboard-experience.md](docs/ux-flows/2.3-finance-dashboard-experience.md)
 
 **Delivered:**
@@ -185,14 +188,17 @@
 
 ### **3.2 Counterparty**
 **Status:** ✅ Complete
-**Status:** ✅ Complete
-**Full Name:** Counterparty (open registry)
-**Spec:** TBD
+**Full Name:** Counterparty Registry (Open Registry, Fuzzy Matching, Merge Duplicates)
+**Spec:** [docs/verticals/3.2-counterparty-registry.md](docs/verticals/3.2-counterparty-registry.md)
 
-**Expected:**
-- Open registry = dynamic, grows as new merchants/people appear
-- Examples: OpenAI, HubSpot, Uber, Diana de la Tejera
-- Attributes: counterparty_id, canonical_name, aliases, type (merchant, person, business)
+**Primitives Delivered:**
+- CounterpartyStore (OL) - CRUD with find_or_create pattern, alias management
+- CounterpartyMatcher (OL) - Fuzzy matching (Levenshtein, Jaro-Winkler, token-based)
+- AliasMerger (OL) - Safe merge with transaction migration and rollback
+
+**Schemas:** counterparty.schema.json
+**ADRs:** 0009 (counterparty merge strategy)
+**UX Flow:** [3.2-counterparty-registry-experience.md](docs/ux-flows/3.2-counterparty-registry-experience.md)
 
 ---
 
@@ -210,6 +216,7 @@
 - RecurrenceConfigDialog (IL) - Dialog for configuring recurrence patterns
 
 **Schemas:** series.schema.json, series-instance.schema.json
+**ADRs:** 0010 (auto-link matching criteria)
 **UX Flow:** [3.3-series-registry-experience.md](docs/ux-flows/3.3-series-registry-experience.md)
 
 **Delivered:**
@@ -240,6 +247,7 @@
 - FacturaUploadDialog (IL) - Upload and link Factura XML to transaction
 
 **Schemas:** tax-category.schema.json, tax-classification.schema.json, factura-record.schema.json
+**ADRs:** 0011 (multi-jurisdiction taxonomy)
 **UX Flow:** [3.4-tax-categorization-experience.md](docs/ux-flows/3.4-tax-categorization-experience.md)
 
 **Delivered:**
@@ -270,6 +278,7 @@
 - FXConversionCard (IL) - FX conversion details display
 
 **Schemas:** relationship.schema.json, relationship-candidate.schema.json, fx-details.schema.json
+**ADRs:** 0012 (transfer detection confidence scoring)
 **UX Flow:** [3.5-relationships-experience.md](docs/ux-flows/3.5-relationships-experience.md)
 
 **Delivered:**
@@ -301,6 +310,7 @@
 - ExchangeRateWidget (IL) - Display rate with refresh button and staleness indicator
 
 **Schemas:** normalized-amount.schema.json, exchange-rate-record.schema.json, currency-config.schema.json
+**ADRs:** 0013 (exchange rate caching strategy)
 **UX Flow:** [3.6-unit-experience.md](docs/ux-flows/3.6-unit-experience.md)
 
 **Delivered:**
@@ -333,6 +343,7 @@
 - ParserVersionDropdown (IL) - Version selector with deprecation warnings
 
 **Schemas:** parser-registration.schema.json, parser-capability.schema.json, parser-version.schema.json
+**ADRs:** 0014 (parser auto-selection algorithm)
 **UX Flow:** [3.7-parser-registry-experience.md](docs/ux-flows/3.7-parser-registry-experience.md)
 
 **Delivered:**
@@ -363,6 +374,7 @@
 - RuleEditorDialog (IL) - Create/edit rule dialog with pattern testing and preview
 
 **Schemas:** normalization-rule.schema.json, merchant-cluster.schema.json, rule-execution-log.schema.json
+**ADRs:** 0015 (rule precedence system)
 **UX Flow:** [3.8-cluster-rules-experience.md](docs/ux-flows/3.8-cluster-rules-experience.md)
 
 **Delivered:**
@@ -394,6 +406,7 @@
 - ManualMatchDialog (IL) - Manual match creation with search, multi-select for one-to-many, amount validation
 
 **Schemas:** reconciliation-result.schema.json, match-candidate.schema.json, reconciliation-config.schema.json
+**ADRs:** 0016 (reconciliation thresholds), 0017 (blocking strategy)
 **UX Flow:** [3.9-reconciliation-strategies-experience.md](docs/ux-flows/3.9-reconciliation-strategies-experience.md)
 
 **Delivered:**
