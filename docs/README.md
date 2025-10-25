@@ -34,6 +34,9 @@
 - **[4.2 Forecast](verticals/4.2-forecast.md)** ✅ Complete - Income/expense projections, goal tracking, burn rate, cash runway, scenario analysis
 - **[4.3 Corrections Flow](verticals/4.3-corrections-flow.md)** ✅ Complete - Field-level overrides, audit trail, precedence resolution, validation engine, bulk corrections, revert capability
 
+### Group 5: Governance & Meta
+- **[5.1 Provenance Ledger](verticals/5.1-provenance-ledger.md)** ✅ Complete - Bitemporal tracking (transaction time + valid time), "as of" queries, retroactive corrections, timeline visualization, immutable audit trail, compliance (HIPAA/SOX/GDPR)
+
 ---
 
 ## 🧩 Primitives Catalog
@@ -148,6 +151,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[PrecedenceEngine](primitives/ol/PrecedenceEngine.md)** - Resolve field values using precedence rules (manual > rule > extraction > default)
 - **[ValidationEngine](primitives/ol/ValidationEngine.md)** - Validate field overrides before accepting (type, range, format, business logic validation)
 
+**Vertical 5.1 (Provenance Ledger):**
+- **[ProvenanceLedger](primitives/ol/ProvenanceLedger.md)** - Bitemporal event storage (append-only, SHA-256 signatures, <100ms queries on 10M+ records)
+- **[BitemporalQuery](primitives/ol/BitemporalQuery.md)** - Query provenance with transaction time and/or valid time filters ("as of" queries)
+- **[TimelineReconstructor](primitives/ol/TimelineReconstructor.md)** - Reconstruct complete entity history across both timelines for visualization
+- **[RetroactiveCorrector](primitives/ol/RetroactiveCorrector.md)** - Handle retroactive corrections with validation and impact analysis
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -193,6 +202,9 @@ Reusable UI components:
 - **[CorrectionDialog](primitives/il/CorrectionDialog.md)** - Modal/drawer for editing field values with inline validation, single-item and bulk modes, field history viewer
 - **[AuditTrailViewer](primitives/il/AuditTrailViewer.md)** - Timeline visualization showing complete history of field changes with filters, export capability
 - **[FieldOverrideIndicator](primitives/il/FieldOverrideIndicator.md)** - Badge/icon showing field was manually corrected with tooltip (who, when), clickable to open audit trail
+- **[TimelineViewer](primitives/il/TimelineViewer.md)** - Bitemporal timeline visualization (D3.js) with dual axes (transaction time, valid time), event color coding, zoom/pan, export
+- **[AsOfQueryBuilder](primitives/il/AsOfQueryBuilder.md)** - Date picker interface for building "as of" queries (transaction time, valid time, bitemporal modes)
+- **[RetroactiveCorrectionDialog](primitives/il/RetroactiveCorrectionDialog.md)** - Modal for making retroactive corrections with effective date selector (Today, Original Date, Custom)
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -280,6 +292,11 @@ Executable contracts extracted from vertical specifications:
 - **[audit-entry.schema.json](schemas/audit-entry.schema.json)** - Immutable audit log entry (action type, before/after values, user, timestamp, source, signature for tamper detection)
 - **[precedence-resolution.schema.json](schemas/precedence-resolution.schema.json)** - Final field value after precedence resolution (manual > rule > extraction > default) with all sources visible
 
+**Vertical 5.1 (Provenance Ledger):**
+- **[provenance-record.schema.json](schemas/provenance-record.schema.json)** - Bitemporal provenance record (transaction_time, valid_time_start/end, value, signature for tamper detection)
+- **[bitemporal-query.schema.json](schemas/bitemporal-query.schema.json)** - Query structure for "as of" queries (transaction time, valid time, bitemporal modes, filters, pagination)
+- **[timeline-event.schema.json](schemas/timeline-event.schema.json)** - Timeline event for visualization (transaction_time, valid_time, action, value, metadata for color/icon)
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -319,6 +336,9 @@ Key architectural decisions with rationale:
 - **[ADR-0024: Field-Level Overrides](adr/0024-field-level-overrides.md)** - Field-level granularity (vs record-level) for corrections with independent override capability per field
 - **[ADR-0025: Audit Storage Strategy](adr/0025-audit-storage-strategy.md)** - PostgreSQL append-only table with JSONB metadata, database-enforced immutability, cryptographic signatures
 - **[ADR-0026: Precedence Resolution](adr/0026-precedence-resolution.md)** - Static precedence rules (manual > rule > extraction > default), predictable and deterministic value resolution
+- **[ADR-0027: Bitemporal Model](adr/0027-bitemporal-model.md)** - Full bitemporal tracking (transaction time + valid time) for retroactive corrections and audit compliance
+- **[ADR-0028: Provenance Storage Strategy](adr/0028-provenance-storage-strategy.md)** - PostgreSQL append-only with monthly partitioning, S3 archival for >2 years, <100ms queries on 10M+ records
+- **[ADR-0029: Query Performance Optimization](adr/0029-query-performance-optimization.md)** - Layered optimization (indexes + materialized views + Redis cache + partitioning) for sub-100ms "as of" queries
 
 ---
 
@@ -344,6 +364,7 @@ User experience specifications with wireframes and journeys:
 - **[4.1 Reminders Experience](ux-flows/4.1-reminders-experience.md)** - Create alert rules, receive notifications, snooze/dismiss, configure channels, view notification history, test conditions
 - **[4.2 Forecast Experience](ux-flows/4.2-forecast-experience.md)** - View projections, compare algorithms, create goals, track progress, analyze burn rate, run scenarios
 - **[4.3 Corrections Experience](ux-flows/4.3-corrections-experience.md)** - Correct single field, view audit trail, revert override, bulk corrections, handle validation errors, concurrent edit warnings
+- **[5.1 Provenance Experience](ux-flows/5.1-provenance-experience.md)** - Run "as of" query, make retroactive correction, view bitemporal timeline, export audit report, handle validation errors, compare snapshots, schedule future-dated change
 
 ---
 
@@ -369,7 +390,8 @@ User experience specifications with wireframes and journeys:
 | **4. Derivatives** | 4.1 Reminders | ✅ Complete |
 | | 4.2 Forecast | ✅ Complete |
 | | 4.3 Corrections Flow | ✅ Complete |
-| **5. Governance** | 5.1-5.5 | 📝 Pending |
+| **5. Governance** | 5.1 Provenance Ledger | ✅ Complete |
+| | 5.2-5.5 | 📝 Pending |
 
 ---
 

@@ -1,0 +1,317 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://personal-os.dev/schemas/bitemporal-query.schema.json",
+  "title": "Bitemporal Query",
+  "description": "Schema for bitemporal provenance queries. Supports three query types: transaction time ('what did we know on date X?'), valid time ('what was true on date X?'), and bitemporal ('what did we know on X about what was true on Y?').",
+  "type": "object",
+  "required": ["entity_id"],
+  "properties": {
+    "entity_id": {
+      "type": "string",
+      "description": "ID of the entity to query",
+      "minLength": 1,
+      "examples": ["txn_xyz789", "patient_456", "case_2025cv1234"]
+    },
+    "entity_type": {
+      "type": "string",
+      "description": "Optional: Filter by entity type for performance",
+      "enum": [
+        "transaction",
+        "patient_record",
+        "case",
+        "publication",
+        "product",
+        "subscription",
+        "policy",
+        "claim"
+      ],
+      "examples": ["transaction", "patient_record"]
+    },
+    "field_name": {
+      "type": "string",
+      "description": "Optional: Query specific field only (null = all fields)",
+      "pattern": "^[a-z_][a-z0-9_]*$",
+      "examples": ["merchant", "diagnosis_code", "category", null]
+    },
+    "as_of_transaction_time": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Transaction time query: 'What did we know on this date?' Returns data as it existed in the database at this timestamp. Null = current (latest).",
+      "examples": [
+        "2025-02-01T00:00:00Z",
+        "2025-10-24T10:30:00Z",
+        null
+      ]
+    },
+    "as_of_valid_time": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Valid time query: 'What was true on this date?' Returns data that was actually true in the real world on this date, including retroactive corrections. Null = current (today).",
+      "examples": [
+        "2025-01-15",
+        "2025-10-24",
+        null
+      ]
+    },
+    "transaction_time_range": {
+      "type": "object",
+      "description": "Optional: Query range of transaction times instead of single point",
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Start of transaction time range (inclusive)"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "End of transaction time range (inclusive)"
+        }
+      },
+      "required": ["start", "end"],
+      "examples": [
+        {
+          "start": "2025-01-01T00:00:00Z",
+          "end": "2025-03-31T23:59:59Z"
+        }
+      ]
+    },
+    "valid_time_range": {
+      "type": "object",
+      "description": "Optional: Query range of valid times instead of single point",
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date",
+          "description": "Start of valid time range (inclusive)"
+        },
+        "end": {
+          "type": "string",
+          "format": "date",
+          "description": "End of valid time range (inclusive)"
+        }
+      },
+      "required": ["start", "end"],
+      "examples": [
+        {
+          "start": "2025-01-01",
+          "end": "2025-03-31"
+        }
+      ]
+    },
+    "include_provenance": {
+      "type": "boolean",
+      "description": "If true, include full provenance metadata (who changed, when, why) in result. Default: false.",
+      "default": false
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Maximum number of records to return (for pagination). Default: 100.",
+      "minimum": 1,
+      "maximum": 1000,
+      "default": 100,
+      "examples": [10, 50, 100]
+    },
+    "offset": {
+      "type": "integer",
+      "description": "Number of records to skip (for pagination). Default: 0.",
+      "minimum": 0,
+      "default": 0,
+      "examples": [0, 100, 200]
+    },
+    "order_by": {
+      "type": "string",
+      "description": "Field to sort results by",
+      "enum": [
+        "transaction_time",
+        "valid_time_start",
+        "field_name",
+        "changed_by"
+      ],
+      "default": "transaction_time",
+      "examples": ["transaction_time", "valid_time_start"]
+    },
+    "order": {
+      "type": "string",
+      "description": "Sort order (ascending or descending)",
+      "enum": ["asc", "desc"],
+      "default": "desc",
+      "examples": ["desc", "asc"]
+    },
+    "filters": {
+      "type": "object",
+      "description": "Optional: Additional filters for query refinement",
+      "properties": {
+        "changed_by": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Filter by who made the change (user IDs or system identifiers)"
+        },
+        "action": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "extracted",
+              "override",
+              "revert",
+              "delete",
+              "rule_applied",
+              "ai_suggested",
+              "bulk_update"
+            ]
+          },
+          "description": "Filter by action type"
+        },
+        "source": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Filter by source system/process"
+        }
+      },
+      "additionalProperties": false,
+      "examples": [
+        {
+          "changed_by": ["user_123", "nurse_789"],
+          "action": ["override", "revert"]
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "description": "Current state query (no time constraints)",
+      "properties": {
+        "entity_id": {},
+        "as_of_transaction_time": { "type": "null" },
+        "as_of_valid_time": { "type": "null" }
+      }
+    },
+    {
+      "description": "Transaction time query",
+      "properties": {
+        "entity_id": {},
+        "as_of_transaction_time": { "type": "string" }
+      },
+      "required": ["as_of_transaction_time"]
+    },
+    {
+      "description": "Valid time query",
+      "properties": {
+        "entity_id": {},
+        "as_of_valid_time": { "type": "string" }
+      },
+      "required": ["as_of_valid_time"]
+    },
+    {
+      "description": "Bitemporal query",
+      "properties": {
+        "entity_id": {},
+        "as_of_transaction_time": { "type": "string" },
+        "as_of_valid_time": { "type": "string" }
+      },
+      "required": ["as_of_transaction_time", "as_of_valid_time"]
+    }
+  ],
+  "examples": [
+    {
+      "$comment": "Example 1: Current state query (latest values)",
+      "entity_id": "txn_xyz789",
+      "as_of_transaction_time": null,
+      "as_of_valid_time": null,
+      "include_provenance": false
+    },
+    {
+      "$comment": "Example 2: Transaction time query - 'What did we know on Feb 1?'",
+      "entity_id": "txn_xyz789",
+      "as_of_transaction_time": "2025-02-01T00:00:00Z",
+      "include_provenance": true
+    },
+    {
+      "$comment": "Example 3: Valid time query - 'What was true on Jan 15?'",
+      "entity_id": "patient_456",
+      "field_name": "diagnosis_code",
+      "as_of_valid_time": "2025-01-15",
+      "include_provenance": true
+    },
+    {
+      "$comment": "Example 4: Bitemporal query - 'What did we know on March 1 about what was true on Jan 15?'",
+      "entity_id": "txn_xyz789",
+      "as_of_transaction_time": "2025-03-01T00:00:00Z",
+      "as_of_valid_time": "2025-01-15",
+      "include_provenance": true
+    },
+    {
+      "$comment": "Example 5: Transaction time range query (audit export for Q1)",
+      "entity_id": "case_2025cv1234",
+      "transaction_time_range": {
+        "start": "2025-01-01T00:00:00Z",
+        "end": "2025-03-31T23:59:59Z"
+      },
+      "include_provenance": true,
+      "limit": 1000
+    },
+    {
+      "$comment": "Example 6: Filtered query - manual overrides only",
+      "entity_id": "sub_789",
+      "filters": {
+        "action": ["override"],
+        "changed_by": ["user_123"]
+      },
+      "order_by": "transaction_time",
+      "order": "desc",
+      "limit": 50
+    }
+  ],
+  "definitions": {
+    "QueryResult": {
+      "type": "object",
+      "description": "Result of a bitemporal query",
+      "properties": {
+        "entity_id": { "type": "string" },
+        "entity_type": { "type": "string" },
+        "snapshot": {
+          "type": "object",
+          "description": "Entity state at queried time(s) - keys are field names, values are field values",
+          "additionalProperties": true
+        },
+        "provenance": {
+          "type": "array",
+          "description": "Optional: Full provenance records if include_provenance=true",
+          "items": {
+            "$ref": "https://personal-os.dev/schemas/provenance-record.schema.json"
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "query_type": {
+              "type": "string",
+              "enum": ["current", "transaction_time", "valid_time", "bitemporal"]
+            },
+            "as_of_transaction_time": { "type": ["string", "null"] },
+            "as_of_valid_time": { "type": ["string", "null"] },
+            "total_records": { "type": "integer" },
+            "query_time_ms": { "type": "number" }
+          }
+        }
+      }
+    }
+  },
+  "notes": [
+    "Query types: 1) Current state (both null), 2) Transaction time (as_of_transaction_time set), 3) Valid time (as_of_valid_time set), 4) Bitemporal (both set).",
+    "Transaction time query: Returns data AS IT EXISTED in the database on specified date (what we knew then).",
+    "Valid time query: Returns data that WAS TRUE in the real world on specified date, including retroactive corrections.",
+    "Bitemporal query: Combines both - useful for audit trails ('What did we report on X given what we knew then?').",
+    "For current state, leave both as_of timestamps null (returns latest transaction time, current valid time).",
+    "Use transaction_time_range or valid_time_range for audit exports over date ranges.",
+    "Set include_provenance=true to get full audit trail (who, when, why) - adds ~50ms latency.",
+    "Pagination: Use limit + offset for large result sets (e.g., limit=100, offset=0 for page 1).",
+    "Performance: Queries with entity_type filter are ~2x faster (uses partial index).",
+    "Performance: Queries with field_name filter are ~5x faster (smaller result set).",
+    "Filters are AND-combined (all must match). For OR logic, make multiple queries.",
+    "This schema is INPUT to BitemporalQuery.query() method.",
+    "Expected response conforms to QueryResult definition (see definitions section)."
+  ]
+}

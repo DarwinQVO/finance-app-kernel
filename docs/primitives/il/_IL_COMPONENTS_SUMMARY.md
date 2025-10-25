@@ -2362,6 +2362,41 @@ Dropdown open:
 
 ---
 
-**Component Count**: 46 components across 18 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.3)
+### Vertical 5.1: Provenance Ledger
+
+#### 47. TimelineViewer ✅
+**Full spec**: [TimelineViewer.md](TimelineViewer.md)
+
+**Props**: `entityId`, `entityType`, `timelineEvents`, `viewMode` (timeline/table/compact), `showBitemporalView`, `onEventClick`, `onExport`
+**States**: loading | loaded | empty | error
+**Reusable across**: Finance audit trails, Healthcare patient histories, Legal case timelines, Research publication histories, E-commerce inventory changes, SaaS subscription changes
+
+**Purpose**: Bitemporal timeline visualization (D3.js) with dual axes (transaction time, valid time), event color coding, zoom/pan, export.
+
+---
+
+#### 48. AsOfQueryBuilder ✅
+**Full spec**: [AsOfQueryBuilder.md](AsOfQueryBuilder.md)
+
+**Props**: `entityId`, `onQuery`, `defaultQueryType`, `dateRange`, `enableBitemporalMode`
+**States**: idle | building | querying | results | error
+**Reusable across**: Finance reconciliations, Healthcare audit queries, Legal e-discovery, Research data lineage, E-commerce inventory snapshots, SaaS billing snapshots
+
+**Purpose**: Date picker interface for building "as of" queries (transaction time, valid time, bitemporal modes).
+
+---
+
+#### 49. RetroactiveCorrectionDialog ✅
+**Full spec**: [RetroactiveCorrectionDialog.md](RetroactiveCorrectionDialog.md)
+
+**Props**: `entity`, `editableFields`, `onSave`, `onCancel`, `showImpactAnalysis`
+**States**: editing | validating | analyzing | saving | error
+**Reusable across**: Finance transaction corrections, Healthcare diagnosis updates, Legal filing date corrections, Research publication year updates, E-commerce scheduled price changes, SaaS plan change scheduling
+
+**Purpose**: Modal for making retroactive corrections with effective date selector (Today, Original Date, Custom).
+
+---
+
+**Component Count**: 49 components across 19 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.3, 5.1)
 
 **Last Updated**: 2025-10-24

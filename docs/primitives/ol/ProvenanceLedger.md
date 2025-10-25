@@ -1,225 +1,1294 @@
-# OL Primitive: ProvenanceLedger
+# ProvenanceLedger OL Primitive
 
-**Type**: Audit / Governance
-**Domain**: Universal (domain-agnostic)
-**Version**: 1.0
-**Status**: Specification
-
----
-
-## Purpose
-
-Append-only, immutable audit trail that records every event, decision, and transformation in the system. Provides complete lineage from raw input to final output, enabling compliance, debugging, and trust.
+**Domain:** Provenance Ledger (Vertical 5.1)
+**Layer:** Objective Layer (OL)
+**Version:** 1.0.0
+**Status:** Specification
 
 ---
 
-## Interface Contract
+## Table of Contents
 
-### Core Methods
+1. [Overview](#overview)
+2. [Purpose & Scope](#purpose--scope)
+3. [Multi-Domain Applicability](#multi-domain-applicability)
+4. [Core Concepts](#core-concepts)
+5. [Interface Definition](#interface-definition)
+6. [Data Model](#data-model)
+7. [Core Functionality](#core-functionality)
+8. [Bitemporal Architecture](#bitemporal-architecture)
+9. [Integrity & Verification](#integrity--verification)
+10. [Query Patterns](#query-patterns)
+11. [Edge Cases](#edge-cases)
+12. [Performance Characteristics](#performance-characteristics)
+13. [Implementation Notes](#implementation-notes)
+14. [Security Considerations](#security-considerations)
+15. [Integration Patterns](#integration-patterns)
+16. [Multi-Domain Examples](#multi-domain-examples)
+17. [Testing Strategy](#testing-strategy)
+18. [Migration Guide](#migration-guide)
+19. [Related Primitives](#related-primitives)
+20. [References](#references)
+
+---
+
+## Overview
+
+The **ProvenanceLedger** is an append-only bitemporal event storage primitive that maintains a complete, immutable history of all changes to entities in the system. It serves as the authoritative source of truth for understanding "what happened when" and "what we knew when" across all domain entities.
+
+### Key Capabilities
+
+- **Append-Only Storage**: Events can only be added, never modified or deleted
+- **Bitemporal Tracking**: Captures both transaction time (when recorded) and valid time (when effective)
+- **Cryptographic Integrity**: SHA-256 hashing ensures tampering detection
+- **Complete Audit Trail**: Every field change, correction, and retroactive update is logged
+- **High-Performance Queries**: Optimized indexes for common temporal queries
+- **Export Capabilities**: Generate compliance reports in JSON or CSV formats
+
+### Design Philosophy
+
+The ProvenanceLedger follows four core principles:
+
+1. **Immutability**: Once written, records cannot be changed (enforced at database level)
+2. **Completeness**: Every state change is captured with full context
+3. **Verifiability**: Cryptographic hashes enable integrity verification
+4. **Queryability**: Efficient temporal queries for audit and analysis
+
+---
+
+## Purpose & Scope
+
+### Problem Statement
+
+In data-intensive systems, understanding the provenance of information is critical:
+
+- **Compliance**: Regulatory requirements demand complete audit trails (SOX, HIPAA, GDPR)
+- **Debugging**: When data is wrong, we need to know when and why it changed
+- **Analytics**: Historical analysis requires accurate "point-in-time" snapshots
+- **Trust**: Users need confidence that the system accurately reflects reality
+
+Traditional approaches have significant limitations:
+
+**Approach 1: Update-in-Place**
+- ❌ Loses historical values
+- ❌ No audit trail
+- ❌ Can't answer "what did we know on date X?"
+
+**Approach 2: Versioned Entities**
+- ❌ Complex version management
+- ❌ Difficult to query across entity types
+- ❌ No distinction between transaction time and valid time
+
+**Approach 3: Append-Only Event Log (Provenance Ledger)**
+- ✅ Complete history preserved
+- ✅ Bitemporal queries supported
+- ✅ Tamper-evident with cryptographic hashing
+- ✅ Scales to billions of events
+
+### Solution
+
+The ProvenanceLedger implements an **append-only bitemporal event log** with:
+
+1. **Immutable Storage**: PostgreSQL table with REVOKE UPDATE/DELETE privileges
+2. **Bitemporal Timestamps**: Both `transaction_time` (when recorded) and `valid_time` (when effective)
+3. **Event Sourcing**: Every change captured as an event, not a state mutation
+4. **Cryptographic Integrity**: SHA-256 hash chain for tamper detection
+5. **Efficient Indexing**: B-tree and GiST indexes for temporal queries
+
+---
+
+## Multi-Domain Applicability
+
+The ProvenanceLedger is universally applicable across domains. Below are 7+ domain-specific use cases:
+
+### 1. Finance
+
+**Use Case**: Track every transaction, correction, and reconciliation with complete audit trail.
+
+**Events Tracked**:
+- Transaction extraction from bank statement
+- Merchant name normalization
+- Category classification
+- Amount corrections
+- Transfer linking
+- Reconciliation status changes
+
+**Compliance**: SOX (Sarbanes-Oxley) requires complete audit trails for financial data.
+
+**Example**:
+```typescript
+// Original transaction extracted
+await ledger.append({
+  entity_id: "txn_001",
+  entity_type: "transaction",
+  event_type: "extracted",
+  field_name: "merchant",
+  old_value: null,
+  new_value: "AMZN MKTP US*1234",
+  valid_time: "2025-01-15T10:00:00Z",
+  user_id: "system",
+  reason: "Extracted from Chase bank statement"
+});
+
+// User corrects merchant name
+await ledger.append({
+  entity_id: "txn_001",
+  entity_type: "transaction",
+  event_type: "corrected",
+  field_name: "merchant",
+  old_value: "AMZN MKTP US*1234",
+  new_value: "Amazon.com",
+  valid_time: "2025-01-15T10:00:00Z", // Still effective on original date
+  user_id: "user_jane_doe",
+  reason: "Normalized merchant name for reporting"
+});
+```
+
+### 2. Healthcare
+
+**Use Case**: HIPAA-compliant audit trail for patient records, diagnoses, and treatments.
+
+**Events Tracked**:
+- Diagnosis code assignments
+- Treatment plan updates
+- Lab result corrections
+- Provider assignments
+- Insurance claim status changes
+- Patient consent updates
+
+**Compliance**: HIPAA requires tracking who accessed/modified patient data and when.
+
+**Example**:
+```typescript
+// Initial diagnosis from ER visit
+await ledger.append({
+  entity_id: "enc_001",
+  entity_type: "encounter",
+  event_type: "diagnosed",
+  field_name: "diagnosis_code",
+  old_value: null,
+  new_value: "R07.9", // Chest pain, unspecified
+  valid_time: "2025-01-15T14:30:00Z",
+  user_id: "dr_smith",
+  reason: "Initial ER diagnosis"
+});
+
+// Updated diagnosis after further testing
+await ledger.append({
+  entity_id: "enc_001",
+  entity_type: "encounter",
+  event_type: "corrected",
+  field_name: "diagnosis_code",
+  old_value: "R07.9",
+  new_value: "I20.9", // Angina pectoris
+  valid_time: "2025-01-15T14:30:00Z", // Retroactively effective at encounter time
+  user_id: "dr_jones",
+  reason: "Updated after EKG results"
+});
+```
+
+### 3. Legal
+
+**Use Case**: Document chain of custody, case status changes, and evidence handling.
+
+**Events Tracked**:
+- Document filed timestamps
+- Case status transitions
+- Attorney assignments
+- Evidence logged
+- Settlement negotiations
+- Court ruling records
+
+**Compliance**: Legal discovery requires proving when documents were created/modified.
+
+**Example**:
+```typescript
+// Case filed
+await ledger.append({
+  entity_id: "case_001",
+  entity_type: "legal_case",
+  event_type: "filed",
+  field_name: "status",
+  old_value: null,
+  new_value: "filed",
+  valid_time: "2024-12-01T09:00:00Z",
+  user_id: "attorney_sarah_lee",
+  reason: "Case filed in district court"
+});
+
+// Discovery phase begins
+await ledger.append({
+  entity_id: "case_001",
+  entity_type: "legal_case",
+  event_type: "status_change",
+  field_name: "status",
+  old_value: "filed",
+  new_value: "discovery",
+  valid_time: "2024-12-15T10:00:00Z",
+  user_id: "system",
+  reason: "Discovery phase initiated by court order"
+});
+```
+
+### 4. Research
+
+**Use Case**: Track citation corrections, author affiliations, and paper versions.
+
+**Events Tracked**:
+- Citation metadata extraction
+- Author name corrections
+- Publication year updates
+- DOI assignments
+- Retraction notices
+- Version updates
+
+**Compliance**: Academic integrity requires tracking all corrections to published work.
+
+**Example**:
+```typescript
+// Initial citation extracted from PDF
+await ledger.append({
+  entity_id: "cite_001",
+  entity_type: "citation",
+  event_type: "extracted",
+  field_name: "authors",
+  old_value: null,
+  new_value: "J. Smith, et al.",
+  valid_time: "2024-11-01T00:00:00Z",
+  user_id: "pdf_parser_v2",
+  reason: "Extracted from PDF reference section"
+});
+
+// Researcher corrects to full author list
+await ledger.append({
+  entity_id: "cite_001",
+  entity_type: "citation",
+  event_type: "corrected",
+  field_name: "authors",
+  old_value: "J. Smith, et al.",
+  new_value: "Jane Smith, Robert Johnson, Maria Garcia, Li Wei",
+  valid_time: "2024-11-01T00:00:00Z", // Effective from original publication
+  user_id: "researcher_alice_wong",
+  reason: "Full author list from DOI lookup"
+});
+```
+
+### 5. E-commerce
+
+**Use Case**: Track product catalog changes, price updates, and inventory corrections.
+
+**Events Tracked**:
+- Product created
+- Price changes
+- Inventory adjustments
+- Category reassignments
+- Description updates
+- SKU corrections
+
+**Compliance**: Consumer protection laws require tracking price history.
+
+**Example**:
+```typescript
+// Product created
+await ledger.append({
+  entity_id: "prod_001",
+  entity_type: "product",
+  event_type: "created",
+  field_name: "price",
+  old_value: null,
+  new_value: 29.99,
+  valid_time: "2025-01-01T00:00:00Z",
+  user_id: "catalog_manager_tom",
+  reason: "New product added to catalog"
+});
+
+// Sale price applied
+await ledger.append({
+  entity_id: "prod_001",
+  entity_type: "product",
+  event_type: "price_change",
+  field_name: "price",
+  old_value: 29.99,
+  new_value: 24.99,
+  valid_time: "2025-01-15T00:00:00Z", // Sale starts Jan 15
+  user_id: "pricing_automation",
+  reason: "Winter sale - 20% off"
+});
+```
+
+### 6. SaaS
+
+**Use Case**: Track subscription changes, feature flag toggles, and billing adjustments.
+
+**Events Tracked**:
+- Subscription plan changes
+- Feature flag toggles
+- Usage limit adjustments
+- Billing corrections
+- Trial conversions
+- Cancellations/reactivations
+
+**Compliance**: Revenue recognition (ASC 606) requires tracking subscription changes.
+
+**Example**:
+```typescript
+// Subscription created
+await ledger.append({
+  entity_id: "sub_001",
+  entity_type: "subscription",
+  event_type: "created",
+  field_name: "plan",
+  old_value: null,
+  new_value: "starter_monthly",
+  valid_time: "2024-12-01T00:00:00Z",
+  user_id: "cust_abc123",
+  reason: "Customer signed up for Starter plan"
+});
+
+// Upgraded to Pro plan
+await ledger.append({
+  entity_id: "sub_001",
+  entity_type: "subscription",
+  event_type: "upgraded",
+  field_name: "plan",
+  old_value: "starter_monthly",
+  new_value: "pro_monthly",
+  valid_time: "2025-01-15T00:00:00Z",
+  user_id: "cust_abc123",
+  reason: "Customer upgraded to Pro plan"
+});
+```
+
+### 7. Insurance
+
+**Use Case**: Track policy changes, claim status, and premium adjustments.
+
+**Events Tracked**:
+- Policy issued
+- Coverage changes
+- Premium adjustments
+- Claim filed
+- Claim status updates
+- Payout recorded
+
+**Compliance**: Insurance regulations require complete audit trail of policy changes.
+
+**Example**:
+```typescript
+// Policy issued
+await ledger.append({
+  entity_id: "pol_001",
+  entity_type: "insurance_policy",
+  event_type: "issued",
+  field_name: "premium",
+  old_value: null,
+  new_value: 1200.00,
+  valid_time: "2025-01-01T00:00:00Z",
+  user_id: "underwriter_mike",
+  reason: "Annual auto insurance policy issued"
+});
+
+// Premium adjusted after claim
+await ledger.append({
+  entity_id: "pol_001",
+  entity_type: "insurance_policy",
+  event_type: "premium_adjustment",
+  field_name: "premium",
+  old_value: 1200.00,
+  new_value: 1440.00, // 20% increase
+  valid_time: "2025-06-01T00:00:00Z", // Effective at renewal
+  user_id: "system",
+  reason: "Premium increase due to at-fault accident claim"
+});
+```
+
+### Cross-Domain Benefits
+
+**Consistent Audit Trail**: All domains benefit from:
+- Complete history of changes
+- Who made each change and why
+- When changes were effective vs. when recorded
+- Ability to reconstruct state at any point in time
+
+**Regulatory Compliance**: Supports:
+- SOX (Finance)
+- HIPAA (Healthcare)
+- GDPR (Privacy/Right to access)
+- ASC 606 (Revenue Recognition)
+- Legal discovery requirements
+- Academic integrity standards
+
+---
+
+## Core Concepts
+
+### Bitemporal Events
+
+Every event in the ProvenanceLedger has **two timestamps**:
+
+1. **Transaction Time (`transaction_time`)**: When the event was recorded in the ledger
+2. **Valid Time (`valid_time`)**: When the change was effective in reality
+
+**Example**:
+```typescript
+{
+  entity_id: "txn_001",
+  field_name: "amount",
+  old_value: 100.00,
+  new_value: 105.00,
+
+  // Change was effective on Jan 15 (when transaction occurred)
+  valid_time: "2025-01-15T10:00:00Z",
+
+  // But we didn't discover error until Jan 20 (when we recorded correction)
+  transaction_time: "2025-01-20T14:30:00Z",
+
+  reason: "Corrected amount from receipt - original extraction was wrong"
+}
+```
+
+### Event Types
+
+The ledger tracks various event types:
+
+- `created`: Entity first created
+- `updated`: Field value changed
+- `corrected`: Retroactive correction (valid_time in past)
+- `deleted`: Entity soft-deleted
+- `restored`: Entity restored from deletion
+- `reconciled`: Field reconciled across sources
+- `normalized`: Field normalized (e.g., merchant name)
+- `classified`: Field classified (e.g., category assigned)
+- `linked`: Relationship established (e.g., transfer linked)
+- `unlinked`: Relationship removed
+
+### Immutability
+
+**Database-Level Enforcement**:
+
+```sql
+-- Revoke UPDATE and DELETE privileges
+REVOKE UPDATE, DELETE ON provenance_ledger FROM application_user;
+
+-- Only INSERT allowed
+GRANT INSERT, SELECT ON provenance_ledger TO application_user;
+```
+
+**Application-Level**: The ProvenanceLedger interface provides only `append()` - no update or delete methods.
+
+### Cryptographic Integrity
+
+Each record includes a SHA-256 hash of:
+- Previous record's hash (forming a chain)
+- Current record's data (entity_id, field_name, old_value, new_value, timestamps)
+
+**Hash Chain**:
+```
+Record 1: hash = SHA256(data1)
+Record 2: hash = SHA256(hash1 + data2)
+Record 3: hash = SHA256(hash2 + data3)
+```
+
+This creates a **tamper-evident** ledger - any modification breaks the hash chain.
+
+---
+
+## Interface Definition
+
+### TypeScript Interface
 
 ```typescript
 interface ProvenanceLedger {
-  // Append new entry (returns entry ID)
-  append(entry: ProvenanceEntry): EntryID
+  /**
+   * Append a new event to the provenance ledger
+   *
+   * @param record - Bitemporal event record
+   * @returns Promise<void> when record is durably stored
+   * @throws ValidationError if record is invalid
+   * @throws DatabaseError if append fails
+   */
+  append(record: BitemporalRecord): Promise<void>;
 
-  // Query entries by upload_id
-  getByUploadId(upload_id: string): ProvenanceEntry[]
+  /**
+   * Get complete history for an entity (all fields)
+   *
+   * @param entityId - Entity identifier
+   * @param fieldName - Optional: filter to specific field
+   * @returns Array of events in chronological order (by transaction_time)
+   */
+  getHistory(
+    entityId: string,
+    fieldName?: string
+  ): Promise<BitemporalRecord[]>;
 
-  // Query entries by timestamp range
-  getByTimeRange(start: ISO8601, end: ISO8601): ProvenanceEntry[]
+  /**
+   * Verify cryptographic integrity of a record
+   *
+   * @param recordId - Record to verify
+   * @returns true if hash chain is valid, false if tampered
+   */
+  verifyIntegrity(recordId: string): Promise<boolean>;
 
-  // Query entries by event type
-  getByEventType(event_type: string): ProvenanceEntry[]
+  /**
+   * Export provenance data matching filters
+   *
+   * @param filters - Query filters
+   * @param format - Output format (json or csv)
+   * @returns Serialized data as string
+   */
+  export(
+    filters: ProvenanceQueryFilters,
+    format: 'json' | 'csv'
+  ): Promise<string>;
 
-  // Get full chain for a canonical fact
-  getChain(canonical_id: string): ProvenanceChain
+  /**
+   * Get events within transaction time range
+   *
+   * @param startTime - Start of time range (transaction_time)
+   * @param endTime - End of time range (transaction_time)
+   * @param filters - Additional filters
+   * @returns Array of events
+   */
+  getEventsByTransactionTime(
+    startTime: string,
+    endTime: string,
+    filters?: ProvenanceQueryFilters
+  ): Promise<BitemporalRecord[]>;
 
-  // Verify integrity (check no tampering)
-  verifyIntegrity(): IntegrityReport
+  /**
+   * Get events within valid time range
+   *
+   * @param startTime - Start of time range (valid_time)
+   * @param endTime - End of time range (valid_time)
+   * @param filters - Additional filters
+   * @returns Array of events
+   */
+  getEventsByValidTime(
+    startTime: string,
+    endTime: string,
+    filters?: ProvenanceQueryFilters
+  ): Promise<BitemporalRecord[]>;
+
+  /**
+   * Count events matching filters
+   *
+   * @param filters - Query filters
+   * @returns Number of matching events
+   */
+  count(filters: ProvenanceQueryFilters): Promise<number>;
+
+  /**
+   * Get the last N events (most recent by transaction_time)
+   *
+   * @param limit - Maximum number of events to return
+   * @param filters - Optional filters
+   * @returns Array of most recent events
+   */
+  getRecentEvents(
+    limit: number,
+    filters?: ProvenanceQueryFilters
+  ): Promise<BitemporalRecord[]>;
 }
 ```
 
-### Types
+---
+
+## Data Model
+
+### BitemporalRecord Type
 
 ```typescript
-type EntryID = string  // Format: "PE_{timestamp}_{sequence}"
+interface BitemporalRecord {
+  // Record Identity
+  record_id: string;              // Unique ID (e.g., "prov_1234567890")
+  sequence_number: number;        // Auto-incrementing sequence for ordering
 
-interface ProvenanceEntry {
-  entry_id: EntryID
-  timestamp: ISO8601Timestamp
-  upload_id: string
-  event_type: string  // e.g., "upload.created", "parse.completed"
-  actor: Actor  // Who/what caused this event
-  data: Record<string, any>  // Event-specific payload
-  previous_entry_id: EntryID | null  // For chain validation
-  signature?: string  // Cryptographic signature (optional)
+  // Entity Context
+  entity_id: string;              // Entity being tracked (e.g., "txn_001")
+  entity_type: string;            // Type of entity (e.g., "transaction", "quote")
+
+  // Event Details
+  event_type: string;             // Type of change (e.g., "created", "updated", "corrected")
+  field_name: string;             // Field that changed (e.g., "merchant", "category")
+
+  // Values
+  old_value: any;                 // Value before change (JSONB, null if created)
+  new_value: any;                 // Value after change (JSONB)
+
+  // Bitemporal Timestamps
+  transaction_time: string;       // ISO timestamp: when recorded in ledger
+  valid_time: string;             // ISO timestamp: when effective in reality
+
+  // Metadata
+  user_id: string;                // Who made the change
+  reason?: string;                // Optional: why the change was made
+  source_system?: string;         // Optional: which system originated the change
+  correlation_id?: string;        // Optional: group related changes
+
+  // Integrity
+  hash: string;                   // SHA-256 hash of this record + previous hash
+  previous_hash: string;          // Hash of previous record (forms chain)
+
+  // System
+  created_at: string;             // ISO timestamp: when row was inserted (same as transaction_time)
+}
+```
+
+### ProvenanceQueryFilters Type
+
+```typescript
+interface ProvenanceQueryFilters {
+  // Entity Filters
+  entity_ids?: string[];          // Filter by entity IDs
+  entity_types?: string[];        // Filter by entity types
+
+  // Event Filters
+  event_types?: string[];         // Filter by event types
+  field_names?: string[];         // Filter by field names
+
+  // User Filters
+  user_ids?: string[];            // Filter by user IDs
+
+  // Time Range Filters
+  transaction_time_start?: string; // Transaction time >= this
+  transaction_time_end?: string;   // Transaction time <= this
+  valid_time_start?: string;       // Valid time >= this
+  valid_time_end?: string;         // Valid time <= this
+
+  // Pagination
+  limit?: number;                 // Max results (default: 1000)
+  offset?: number;                // Skip N results (default: 0)
+
+  // Sorting
+  sort_by?: 'transaction_time' | 'valid_time' | 'sequence_number';
+  sort_order?: 'asc' | 'desc';    // Default: 'asc'
+}
+```
+
+### Database Schema (PostgreSQL)
+
+```sql
+CREATE TABLE provenance_ledger (
+  -- Primary Key
+  record_id VARCHAR(64) PRIMARY KEY,
+  sequence_number BIGSERIAL UNIQUE NOT NULL, -- Auto-incrementing sequence
+
+  -- Entity Context
+  entity_id VARCHAR(128) NOT NULL,
+  entity_type VARCHAR(64) NOT NULL,
+
+  -- Event Details
+  event_type VARCHAR(64) NOT NULL,
+  field_name VARCHAR(128) NOT NULL,
+
+  -- Values (JSONB for flexibility)
+  old_value JSONB,
+  new_value JSONB NOT NULL,
+
+  -- Bitemporal Timestamps
+  transaction_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  valid_time TIMESTAMP WITH TIME ZONE NOT NULL,
+
+  -- Metadata
+  user_id VARCHAR(128) NOT NULL,
+  reason TEXT,
+  source_system VARCHAR(128),
+  correlation_id VARCHAR(128),
+
+  -- Cryptographic Integrity
+  hash VARCHAR(64) NOT NULL,
+  previous_hash VARCHAR(64),
+
+  -- System Timestamp
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for Performance
+CREATE INDEX idx_provenance_entity_id ON provenance_ledger(entity_id);
+CREATE INDEX idx_provenance_entity_type ON provenance_ledger(entity_type);
+CREATE INDEX idx_provenance_event_type ON provenance_ledger(event_type);
+CREATE INDEX idx_provenance_field_name ON provenance_ledger(field_name);
+CREATE INDEX idx_provenance_user_id ON provenance_ledger(user_id);
+CREATE INDEX idx_provenance_transaction_time ON provenance_ledger(transaction_time DESC);
+CREATE INDEX idx_provenance_valid_time ON provenance_ledger(valid_time DESC);
+CREATE INDEX idx_provenance_sequence ON provenance_ledger(sequence_number DESC);
+
+-- GiST Index for Bitemporal Range Queries
+CREATE INDEX idx_provenance_bitemporal ON provenance_ledger
+  USING GIST (
+    tstzrange(transaction_time, transaction_time + INTERVAL '1 microsecond'),
+    tstzrange(valid_time, valid_time + INTERVAL '1 microsecond')
+  );
+
+-- Revoke UPDATE and DELETE to enforce immutability
+REVOKE UPDATE, DELETE ON provenance_ledger FROM application_user;
+GRANT INSERT, SELECT ON provenance_ledger TO application_user;
+
+-- Trigger to set created_at = transaction_time
+CREATE OR REPLACE FUNCTION set_created_at_from_transaction_time()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.created_at = NEW.transaction_time;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_provenance_created_at
+BEFORE INSERT ON provenance_ledger
+FOR EACH ROW
+EXECUTE FUNCTION set_created_at_from_transaction_time();
+```
+
+---
+
+## Core Functionality
+
+### 1. append()
+
+Append a new event to the provenance ledger.
+
+#### Signature
+
+```typescript
+append(record: BitemporalRecord): Promise<void>
+```
+
+#### Behavior
+
+1. **Validation**:
+   - All required fields present
+   - `transaction_time` defaults to NOW() if not provided
+   - `valid_time` must be valid ISO timestamp
+   - `entity_id` and `field_name` are non-empty strings
+
+2. **ID Generation**:
+   - Generate unique `record_id` (e.g., `prov_` + timestamp + random)
+   - `sequence_number` auto-generated by database
+
+3. **Hash Calculation**:
+   - Get `previous_hash` from most recent record in ledger
+   - Calculate `hash = SHA256(previous_hash + record_data)`
+   - Store both `hash` and `previous_hash`
+
+4. **Insert**:
+   - INSERT into `provenance_ledger` table
+   - Transaction ensures atomicity with hash chain
+
+5. **Return**:
+   - Return void (success) or throw error
+
+#### Example
+
+```typescript
+await ledger.append({
+  entity_id: "txn_001",
+  entity_type: "transaction",
+  event_type: "corrected",
+  field_name: "merchant",
+  old_value: "AMZN MKTP US*1234",
+  new_value: "Amazon.com",
+  valid_time: "2025-01-15T10:00:00Z",
+  transaction_time: "2025-01-20T14:30:00Z", // Optional, defaults to NOW()
+  user_id: "user_jane_doe",
+  reason: "Normalized merchant name for reporting"
+});
+```
+
+#### Error Cases
+
+```typescript
+// Case 1: Missing required field
+try {
+  await ledger.append({
+    entity_id: "txn_001",
+    // missing entity_type
+    event_type: "updated",
+    field_name: "merchant",
+    old_value: "AMZN",
+    new_value: "Amazon.com",
+    valid_time: "2025-01-15T10:00:00Z",
+    user_id: "user_jane"
+  });
+} catch (error) {
+  console.log(error.code); // "VALIDATION_ERROR"
+  console.log(error.message); // "entity_type is required"
 }
 
-interface Actor {
-  type: "user" | "system" | "runner"
-  id: string  // user_id, system_component_name, or runner_instance_id
-}
-
-interface ProvenanceChain {
-  canonical_id: string
-  entries: ProvenanceEntry[]  // Ordered by timestamp
-  lineage_summary: string  // Human-readable description
-}
-
-interface IntegrityReport {
-  total_entries: number
-  verified_entries: number
-  broken_chains: number
-  tampered_entries: EntryID[]
+// Case 2: Invalid timestamp
+try {
+  await ledger.append({
+    entity_id: "txn_001",
+    entity_type: "transaction",
+    event_type: "updated",
+    field_name: "merchant",
+    old_value: "AMZN",
+    new_value: "Amazon.com",
+    valid_time: "invalid-timestamp",
+    user_id: "user_jane"
+  });
+} catch (error) {
+  console.log(error.code); // "VALIDATION_ERROR"
+  console.log(error.message); // "valid_time must be valid ISO timestamp"
 }
 ```
 
 ---
 
-## Behavior Specifications
+### 2. getHistory()
 
-### 1. Append-Only Guarantee
+Get complete history for an entity, optionally filtered by field.
 
-**Property**: Once written, entries NEVER change or delete
+#### Signature
 
-**Enforcement:**
-```python
-class ProvenanceLedger:
-    def append(self, entry: ProvenanceEntry) -> EntryID:
-        # No update or delete methods exist
-        # Writes are atomic (single transaction)
-        return self._atomic_append(entry)
-
-    # ❌ NO update() method
-    # ❌ NO delete() method
+```typescript
+getHistory(entityId: string, fieldName?: string): Promise<BitemporalRecord[]>
 ```
 
-**Implications:**
-- Corrections create new entries (don't modify old)
-- Soft delete: Add `deleted=true` entry (original stays)
-- Full history always available
+#### Behavior
+
+1. Query `provenance_ledger` WHERE `entity_id = $1`
+2. Optionally filter by `field_name = $2` if provided
+3. Sort by `transaction_time ASC` (chronological order)
+4. Return array of events
+
+#### Example
+
+```typescript
+// Get all events for entity
+const history = await ledger.getHistory("txn_001");
+
+console.log(`${history.length} events for txn_001`);
+
+for (const event of history) {
+  console.log(`${event.transaction_time}: ${event.event_type} ${event.field_name}`);
+  console.log(`  ${event.old_value} -> ${event.new_value}`);
+}
+
+// Output:
+// 2025-01-15T10:00:00Z: created merchant
+//   null -> "AMZN MKTP US*1234"
+// 2025-01-15T10:00:00Z: created category
+//   null -> "Uncategorized"
+// 2025-01-20T14:30:00Z: corrected merchant
+//   "AMZN MKTP US*1234" -> "Amazon.com"
+```
+
+#### Get History for Single Field
+
+```typescript
+// Get history for specific field
+const merchantHistory = await ledger.getHistory("txn_001", "merchant");
+
+console.log(`${merchantHistory.length} changes to merchant field`);
+
+for (const event of merchantHistory) {
+  console.log(`${event.transaction_time}: ${event.old_value} -> ${event.new_value}`);
+  console.log(`  Reason: ${event.reason}`);
+}
+```
 
 ---
 
-### 2. Chain Validation
+### 3. verifyIntegrity()
 
-**Property**: Each entry references previous entry (blockchain-like)
+Verify cryptographic integrity of a record by validating the hash chain.
 
-**Structure:**
-```
-Entry 1: upload.created
-  ↓ previous_entry_id = null
-Entry 2: parse.started
-  ↓ previous_entry_id = Entry 1 ID
-Entry 3: parse.completed
-  ↓ previous_entry_id = Entry 2 ID
-Entry 4: normalize.completed
-    previous_entry_id = Entry 3 ID
+#### Signature
+
+```typescript
+verifyIntegrity(recordId: string): Promise<boolean>
 ```
 
-**Validation:**
-```python
-def verify_chain(self, upload_id: str) -> bool:
-    entries = self.get_by_upload_id(upload_id)
+#### Behavior
 
-    for i, entry in enumerate(entries):
-        if i == 0:
-            assert entry.previous_entry_id is None
-        else:
-            expected_prev = entries[i - 1].entry_id
-            if entry.previous_entry_id != expected_prev:
-                raise ChainBrokenError(f"Entry {entry.entry_id} points to wrong previous")
+1. Fetch record by `record_id`
+2. Fetch previous record by `sequence_number - 1`
+3. Verify `record.previous_hash === previous_record.hash`
+4. Re-calculate hash from record data
+5. Verify calculated hash matches stored hash
+6. Return `true` if valid, `false` if tampered
 
-    return True
+#### Example
+
+```typescript
+const isValid = await ledger.verifyIntegrity("prov_1234567890");
+
+if (isValid) {
+  console.log("Record integrity verified ✓");
+} else {
+  console.error("Record integrity FAILED - possible tampering!");
+}
 ```
 
-**Benefit**: Detect tampering (if entry removed, chain breaks)
+#### Batch Verification
+
+```typescript
+async function verifyLedgerIntegrity(
+  startSequence: number,
+  endSequence: number
+): Promise<boolean> {
+  for (let seq = startSequence; seq <= endSequence; seq++) {
+    const record = await getRecordBySequence(seq);
+    const isValid = await ledger.verifyIntegrity(record.record_id);
+
+    if (!isValid) {
+      console.error(`Integrity check failed at sequence ${seq}`);
+      return false;
+    }
+  }
+
+  console.log(`Verified ${endSequence - startSequence + 1} records ✓`);
+  return true;
+}
+```
 
 ---
 
-### 3. Event Types (Standard Taxonomy)
+### 4. export()
 
-**Upload Lifecycle:**
-- `upload.created`
-- `upload.dedupe_hit`
+Export provenance data matching filters in JSON or CSV format.
 
-**Parse Lifecycle:**
-- `parse.started`
-- `parse.completed`
-- `parse.failed`
+#### Signature
 
-**Normalize Lifecycle:**
-- `normalize.started`
-- `normalize.completed`
-- `normalize.failed`
+```typescript
+export(
+  filters: ProvenanceQueryFilters,
+  format: 'json' | 'csv'
+): Promise<string>
+```
 
-**State Transitions:**
-- `state.transition` (from → to, reason)
+#### Behavior
 
-**Corrections:**
-- `correction.proposed`
-- `correction.applied`
-- `correction.rejected`
+1. Query provenance_ledger with filters
+2. Serialize results to requested format
+3. Return string (JSON array or CSV text)
 
-**User Actions:**
-- `user.flag_review`
-- `user.add_note`
+#### Example: JSON Export
 
----
-
-### 4. Data Payload Structure
-
-**upload.created:**
-```json
-{
-  "entry_id": "PE_20251022143201_001",
-  "timestamp": "2025-10-22T14:32:01Z",
-  "upload_id": "UL_abc123",
-  "event_type": "upload.created",
-  "actor": {"type": "user", "id": "user_001"},
-  "data": {
-    "source_type": "bofa_pdf",
-    "file_name": "statement.pdf",
-    "file_hash": "sha256:abc123...",
-    "file_size_bytes": 2457600
+```typescript
+const jsonData = await ledger.export(
+  {
+    entity_ids: ["txn_001", "txn_002"],
+    event_types: ["corrected"],
+    transaction_time_start: "2025-01-01T00:00:00Z",
+    transaction_time_end: "2025-01-31T23:59:59Z"
   },
-  "previous_entry_id": null
+  'json'
+);
+
+// Write to file
+fs.writeFileSync('provenance-export.json', jsonData);
+```
+
+#### Example: CSV Export
+
+```typescript
+const csvData = await ledger.export(
+  {
+    entity_type: ["transaction"],
+    field_names: ["merchant", "category"],
+    limit: 10000
+  },
+  'csv'
+);
+
+// Headers: record_id,entity_id,entity_type,event_type,field_name,old_value,new_value,transaction_time,valid_time,user_id,reason
+// Row: prov_001,txn_001,transaction,corrected,merchant,"AMZN MKTP US*1234","Amazon.com",2025-01-20T14:30:00Z,2025-01-15T10:00:00Z,user_jane_doe,"Normalized merchant name"
+```
+
+---
+
+### 5. getEventsByTransactionTime()
+
+Get events within a transaction time range (when recorded).
+
+#### Signature
+
+```typescript
+getEventsByTransactionTime(
+  startTime: string,
+  endTime: string,
+  filters?: ProvenanceQueryFilters
+): Promise<BitemporalRecord[]>
+```
+
+#### Behavior
+
+Query events where `transaction_time BETWEEN startTime AND endTime`.
+
+#### Example
+
+```typescript
+// Get all changes recorded in January 2025
+const events = await ledger.getEventsByTransactionTime(
+  "2025-01-01T00:00:00Z",
+  "2025-01-31T23:59:59Z"
+);
+
+console.log(`${events.length} changes recorded in January 2025`);
+
+// Group by event type
+const byType = events.reduce((acc, event) => {
+  acc[event.event_type] = (acc[event.event_type] || 0) + 1;
+  return acc;
+}, {} as Record<string, number>);
+
+console.log("Changes by type:", byType);
+// { created: 150, updated: 75, corrected: 25 }
+```
+
+---
+
+### 6. getEventsByValidTime()
+
+Get events within a valid time range (when effective).
+
+#### Signature
+
+```typescript
+getEventsByValidTime(
+  startTime: string,
+  endTime: string,
+  filters?: ProvenanceQueryFilters
+): Promise<BitemporalRecord[]>
+```
+
+#### Behavior
+
+Query events where `valid_time BETWEEN startTime AND endTime`.
+
+#### Example
+
+```typescript
+// Get all changes effective in January 2025
+// (includes retroactive corrections recorded later)
+const events = await ledger.getEventsByValidTime(
+  "2025-01-01T00:00:00Z",
+  "2025-01-31T23:59:59Z"
+);
+
+console.log(`${events.length} changes effective in January 2025`);
+
+// Find retroactive corrections
+const retroactive = events.filter(
+  e => e.transaction_time > e.valid_time
+);
+
+console.log(`${retroactive.length} retroactive corrections`);
+```
+
+---
+
+## Bitemporal Architecture
+
+### Two Time Dimensions
+
+**Transaction Time**: When we recorded the information
+**Valid Time**: When the information was true in reality
+
+### Query Types
+
+#### 1. Current State Query
+
+"What is the current state of entity X?"
+
+```typescript
+async function getCurrentState(entityId: string): Promise<Record<string, any>> {
+  // Get all events for entity
+  const history = await ledger.getHistory(entityId);
+
+  // Build current state by applying events in order
+  const state: Record<string, any> = {};
+
+  for (const event of history) {
+    state[event.field_name] = event.new_value;
+  }
+
+  return state;
 }
 ```
 
-**parse.completed:**
-```json
-{
-  "entry_id": "PE_20251022143545_002",
-  "timestamp": "2025-10-22T14:35:45Z",
-  "upload_id": "UL_abc123",
-  "event_type": "parse.completed",
-  "actor": {"type": "runner", "id": "parser-worker-3"},
-  "data": {
-    "parser_id": "bofa_pdf_parser",
-    "parser_version": "1.2.0",
-    "observations_count": 42,
-    "parse_log_ref": "/logs/parse/UL_abc123.log.json",
-    "duration_ms": 3421
-  },
-  "previous_entry_id": "PE_20251022143201_001"
+#### 2. Transaction Time Query
+
+"What did we know on date X?" (System's knowledge at that time)
+
+```typescript
+async function getKnownStateAt(
+  entityId: string,
+  asOfTransactionTime: string
+): Promise<Record<string, any>> {
+  // Get events recorded on or before the transaction time
+  const history = await ledger.getHistory(entityId);
+  const relevantEvents = history.filter(
+    e => e.transaction_time <= asOfTransactionTime
+  );
+
+  // Build state as of that transaction time
+  const state: Record<string, any> = {};
+  for (const event of relevantEvents) {
+    state[event.field_name] = event.new_value;
+  }
+
+  return state;
+}
+
+// Example: What did we know on Jan 18?
+const stateOnJan18 = await getKnownStateAt(
+  "txn_001",
+  "2025-01-18T23:59:59Z"
+);
+// Returns: { merchant: "AMZN MKTP US*1234" }
+// (Correction to "Amazon.com" wasn't recorded until Jan 20)
+```
+
+#### 3. Valid Time Query
+
+"What was true on date X?" (Reality at that time)
+
+```typescript
+async function getTrueStateAt(
+  entityId: string,
+  asOfValidTime: string
+): Promise<Record<string, any>> {
+  // Get events effective on or before the valid time
+  const history = await ledger.getHistory(entityId);
+  const relevantEvents = history.filter(
+    e => e.valid_time <= asOfValidTime
+  );
+
+  // Sort by transaction time to get latest knowledge
+  relevantEvents.sort(
+    (a, b) => a.transaction_time.localeCompare(b.transaction_time)
+  );
+
+  // Build state as of that valid time
+  const state: Record<string, any> = {};
+  for (const event of relevantEvents) {
+    state[event.field_name] = event.new_value;
+  }
+
+  return state;
+}
+
+// Example: What was true on Jan 15?
+const stateOnJan15 = await getTrueStateAt(
+  "txn_001",
+  "2025-01-15T23:59:59Z"
+);
+// Returns: { merchant: "Amazon.com" }
+// (Retroactive correction applied, so we now know it was Amazon.com all along)
+```
+
+#### 4. Bitemporal Query
+
+"What did we know on date X about what was true on date Y?"
+
+```typescript
+async function getBitemporalState(
+  entityId: string,
+  asOfTransactionTime: string,
+  asOfValidTime: string
+): Promise<Record<string, any>> {
+  // Get events recorded before transaction time AND effective before valid time
+  const history = await ledger.getHistory(entityId);
+  const relevantEvents = history.filter(
+    e => e.transaction_time <= asOfTransactionTime
+      && e.valid_time <= asOfValidTime
+  );
+
+  const state: Record<string, any> = {};
+  for (const event of relevantEvents) {
+    state[event.field_name] = event.new_value;
+  }
+
+  return state;
+}
+
+// Example: What did we know on Jan 18 about what was true on Jan 15?
+const state = await getBitemporalState(
+  "txn_001",
+  "2025-01-18T23:59:59Z", // Transaction time
+  "2025-01-15T23:59:59Z"  // Valid time
+);
+// Returns: { merchant: "AMZN MKTP US*1234" }
+// (We knew AMZN on Jan 18, didn't learn about correction until Jan 20)
+```
+
+---
+
+## Integrity & Verification
+
+### Hash Chain Implementation
+
+```typescript
+function calculateHash(
+  record: BitemporalRecord,
+  previousHash: string
+): string {
+  // Create deterministic string from record data
+  const data = [
+    record.entity_id,
+    record.entity_type,
+    record.event_type,
+    record.field_name,
+    JSON.stringify(record.old_value),
+    JSON.stringify(record.new_value),
+    record.transaction_time,
+    record.valid_time,
+    record.user_id,
+    record.reason || '',
+    previousHash
+  ].join('|');
+
+  // Calculate SHA-256 hash
+  const hash = crypto.createHash('sha256');
+  hash.update(data);
+  return hash.digest('hex');
 }
 ```
 
-**state.transition:**
-```json
-{
-  "entry_id": "PE_20251022143546_003",
-  "timestamp": "2025-10-22T14:35:46Z",
-  "upload_id": "UL_abc123",
-  "event_type": "state.transition",
-  "actor": {"type": "system", "id": "coordinator"},
-  "data": {
-    "from_state": "parsing",
-    "to_state": "parsed",
-    "trigger": "parse.completed"
-  },
-  "previous_entry_id": "PE_20251022143545_002"
+### Tamper Detection
+
+```typescript
+async function detectTampering(
+  startSequence: number,
+  endSequence: number
+): Promise<TamperReport> {
+  const tamperedRecords: string[] = [];
+  const brokenChains: { sequence: number; reason: string }[] = [];
+
+  for (let seq = startSequence; seq <= endSequence; seq++) {
+    const record = await getRecordBySequence(seq);
+
+    if (!record) {
+      brokenChains.push({ sequence: seq, reason: 'Record missing' });
+      continue;
+    }
+
+    // Verify hash chain
+    if (seq > 1) {
+      const prevRecord = await getRecordBySequence(seq - 1);
+      if (record.previous_hash !== prevRecord.hash) {
+        brokenChains.push({
+          sequence: seq,
+          reason: 'Previous hash mismatch'
+        });
+      }
+    }
+
+    // Verify record hash
+    const expectedHash = calculateHash(record, record.previous_hash);
+    if (record.hash !== expectedHash) {
+      tamperedRecords.push(record.record_id);
+    }
+  }
+
+  return {
+    total_checked: endSequence - startSequence + 1,
+    tampered_records: tamperedRecords,
+    broken_chains: brokenChains,
+    is_valid: tamperedRecords.length === 0 && brokenChains.length === 0
+  };
 }
 ```
 
@@ -227,333 +1296,572 @@ def verify_chain(self, upload_id: str) -> bool:
 
 ## Query Patterns
 
-### 1. Full Upload Timeline
+### Pattern 1: Entity Timeline
 
-```python
-def get_upload_timeline(upload_id: str) -> List[ProvenanceEntry]:
-    return ledger.get_by_upload_id(upload_id)
+```typescript
+async function getEntityTimeline(entityId: string): Promise<Timeline> {
+  const history = await ledger.getHistory(entityId);
 
-# Returns:
-# [
-#   upload.created,
-#   parse.started,
-#   parse.completed,
-#   state.transition (parsing → parsed),
-#   normalize.started,
-#   normalize.completed,
-#   state.transition (normalizing → normalized)
-# ]
+  return {
+    entity_id: entityId,
+    total_events: history.length,
+    first_event: history[0]?.transaction_time,
+    last_event: history[history.length - 1]?.transaction_time,
+    events: history.map(e => ({
+      timestamp: e.transaction_time,
+      event_type: e.event_type,
+      field: e.field_name,
+      change: `${e.old_value} → ${e.new_value}`,
+      user: e.user_id,
+      reason: e.reason
+    }))
+  };
+}
 ```
 
-### 2. Canonical Fact Lineage
+### Pattern 2: Field History
 
-```python
-def get_canonical_lineage(canonical_id: str) -> ProvenanceChain:
-    # Find which upload created this canonical
-    upload_id = canonical_store.get_upload_id(canonical_id)
+```typescript
+async function getFieldHistory(
+  entityId: string,
+  fieldName: string
+): Promise<FieldTimeline> {
+  const history = await ledger.getHistory(entityId, fieldName);
 
-    # Get full chain
-    entries = ledger.get_by_upload_id(upload_id)
-
-    return ProvenanceChain(
-        canonical_id=canonical_id,
-        entries=entries,
-        lineage_summary=f"""
-        Canonical {canonical_id} was:
-        1. Uploaded from {entries[0].data['file_name']}
-        2. Parsed by {entries[2].data['parser_id']} v{entries[2].data['parser_version']}
-        3. Normalized on {entries[4].timestamp}
-        """
-    )
+  return {
+    entity_id: entityId,
+    field_name: fieldName,
+    total_changes: history.length,
+    changes: history.map(e => ({
+      from: e.old_value,
+      to: e.new_value,
+      when_recorded: e.transaction_time,
+      when_effective: e.valid_time,
+      by: e.user_id,
+      reason: e.reason
+    }))
+  };
+}
 ```
 
-### 3. Error Forensics
+### Pattern 3: User Activity Report
 
-```python
-def find_failed_uploads(since: ISO8601) -> List[str]:
-    # Find all parse.failed or normalize.failed events
-    failed_parses = ledger.get_by_event_type("parse.failed")
-    failed_normalizes = ledger.get_by_event_type("normalize.failed")
+```typescript
+async function getUserActivityReport(
+  userId: string,
+  startDate: string,
+  endDate: string
+): Promise<ActivityReport> {
+  const events = await ledger.getEventsByTransactionTime(
+    startDate,
+    endDate,
+    { user_ids: [userId] }
+  );
 
-    return [e.upload_id for e in (failed_parses + failed_normalizes) if e.timestamp > since]
-```
+  const byEventType = events.reduce((acc, e) => {
+    acc[e.event_type] = (acc[e.event_type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
-### 4. User Actions Audit
+  const byEntityType = events.reduce((acc, e) => {
+    acc[e.entity_type] = (acc[e.entity_type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
-```python
-def get_user_actions(user_id: str, start: ISO8601, end: ISO8601) -> List[ProvenanceEntry]:
-    entries = ledger.get_by_time_range(start, end)
-    return [e for e in entries if e.actor.type == "user" and e.actor.id == user_id]
-```
-
----
-
-## Storage Backend
-
-### Option 1: Append-Only Log File
-
-```python
-class FileProvenanceLedger(ProvenanceLedger):
-    def __init__(self, log_path: str):
-        self.log_path = log_path
-
-    def append(self, entry: ProvenanceEntry) -> EntryID:
-        # Generate entry_id
-        entry.entry_id = self._generate_entry_id()
-
-        # Serialize
-        line = json.dumps(entry.to_dict()) + "\n"
-
-        # Atomic append (O_APPEND flag ensures atomicity)
-        with open(self.log_path, 'a') as f:
-            f.write(line)
-
-        return entry.entry_id
-
-    def get_by_upload_id(self, upload_id: str) -> List[ProvenanceEntry]:
-        # Sequential scan (optimize with index in production)
-        entries = []
-        with open(self.log_path, 'r') as f:
-            for line in f:
-                entry = ProvenanceEntry.from_json(line)
-                if entry.upload_id == upload_id:
-                    entries.append(entry)
-        return entries
-```
-
-**Pros:**
-- Simple, crash-resistant (append-only)
-- Easy to backup (just copy file)
-
-**Cons:**
-- Slow queries (need to scan entire file)
-
-**Optimization:** Build index on upload_id, event_type, timestamp
-
----
-
-### Option 2: Database (PostgreSQL)
-
-```sql
-CREATE TABLE provenance_ledger (
-    entry_id TEXT PRIMARY KEY,
-    timestamp TIMESTAMPTZ NOT NULL,
-    upload_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,
-    actor_type TEXT NOT NULL,
-    actor_id TEXT NOT NULL,
-    data JSONB NOT NULL,
-    previous_entry_id TEXT REFERENCES provenance_ledger(entry_id),
-    signature TEXT
-);
-
-CREATE INDEX idx_upload_id ON provenance_ledger(upload_id);
-CREATE INDEX idx_event_type ON provenance_ledger(event_type);
-CREATE INDEX idx_timestamp ON provenance_ledger(timestamp);
-```
-
-**Insert:**
-```python
-def append(self, entry: ProvenanceEntry) -> EntryID:
-    entry.entry_id = self._generate_entry_id()
-
-    self.db.execute("""
-        INSERT INTO provenance_ledger (entry_id, timestamp, upload_id, event_type, actor_type, actor_id, data, previous_entry_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """, (entry.entry_id, entry.timestamp, entry.upload_id, entry.event_type, entry.actor.type, entry.actor.id, json.dumps(entry.data), entry.previous_entry_id))
-
-    return entry.entry_id
-```
-
-**Query:**
-```python
-def get_by_upload_id(self, upload_id: str) -> List[ProvenanceEntry]:
-    rows = self.db.execute("""
-        SELECT * FROM provenance_ledger WHERE upload_id = %s ORDER BY timestamp
-    """, (upload_id,))
-
-    return [ProvenanceEntry.from_row(r) for r in rows]
+  return {
+    user_id: userId,
+    period: { start: startDate, end: endDate },
+    total_changes: events.length,
+    by_event_type: byEventType,
+    by_entity_type: byEntityType,
+    most_edited_entities: findMostEditedEntities(events)
+  };
+}
 ```
 
 ---
 
-## Cryptographic Integrity (Optional)
+## Edge Cases
 
-### Signed Entries
+### Edge Case 1: Simultaneous Events for Same Entity
 
-```python
-def append_signed(self, entry: ProvenanceEntry, private_key: Key) -> EntryID:
-    # Serialize entry data
-    payload = json.dumps({
-        "timestamp": entry.timestamp,
-        "upload_id": entry.upload_id,
-        "event_type": entry.event_type,
-        "data": entry.data
-    }, sort_keys=True)
+**Scenario**: Two events for same entity recorded at exactly the same transaction_time.
 
-    # Sign with private key
-    entry.signature = sign(payload, private_key)
+**Handling**: Use `sequence_number` for deterministic ordering:
 
-    return self.append(entry)
+```typescript
+// Events with same transaction_time are ordered by sequence_number
+const history = await ledger.getHistory("txn_001");
 
-def verify_signature(self, entry: ProvenanceEntry, public_key: Key) -> bool:
-    payload = json.dumps({
-        "timestamp": entry.timestamp,
-        "upload_id": entry.upload_id,
-        "event_type": entry.event_type,
-        "data": entry.data
-    }, sort_keys=True)
-
-    return verify_signature(payload, entry.signature, public_key)
+// Even if transaction_time is identical, sequence_number guarantees order
+history.sort((a, b) => a.sequence_number - b.sequence_number);
 ```
 
-**Use case:** Regulatory compliance (prove entries not tampered)
+**Database Guarantee**: `sequence_number` is UNIQUE and auto-incrementing, ensuring total order.
 
 ---
 
-## Multi-Domain Applicability
+### Edge Case 2: Future Valid Time
 
-This primitive constructs verifiable truth about **event history and causality** - a universal concept across ALL domains:
+**Scenario**: Event recorded today but effective in the future (scheduled change).
 
-**Finance Domain:**
-- Track transaction corrections, categorization changes
-- Audit who flagged transactions for review
-- Prove compliance (GDPR: "show me all changes to my data")
+**Handling**: Allowed - valid_time can be in the future:
 
-**Healthcare Domain:**
-- Medical record updates (HIPAA compliance)
-- Lab result corrections (who, when, why)
-- Prescription history (dosage changes)
-- Patient consent audit trail
+```typescript
+// Schedule price change for next month
+await ledger.append({
+  entity_id: "prod_001",
+  entity_type: "product",
+  event_type: "scheduled_price_change",
+  field_name: "price",
+  old_value: 29.99,
+  new_value: 24.99,
+  transaction_time: "2025-01-20T10:00:00Z", // Recorded today
+  valid_time: "2025-02-01T00:00:00Z",       // Effective next month
+  user_id: "pricing_manager",
+  reason: "February sale - scheduled price drop"
+});
+```
 
-**Legal Domain:**
-- Document chain of custody
-- Contract version history
-- Evidence handling audit trail
-- Discovery process tracking
-
-**Research/Academic Domain:**
-- Experimental procedure lineage
-- Data transformation audit trail
-- Peer review history
-
-**Manufacturing Domain:**
-- Product component traceability
-- Quality control decision history
-- Recall investigation trails
-
-**Supply Chain Domain:**
-- Package movement history
-- Temperature/condition monitoring
-- Custody transfers
-
-**Generic Systems:**
-- ETL pipeline lineage
-- ML model training provenance (data → features → model)
-- Report generation audit (who ran report, with what filters)
-- Any system requiring "who did what, when, and why"
+**Query Impact**: Current state queries should filter `valid_time <= NOW()` to exclude future events.
 
 ---
 
-## Extension Points
+### Edge Case 3: Out-of-Order Transaction Times
 
-### 1. Bitemporal Model (Future)
+**Scenario**: Events inserted with non-monotonic transaction_times (e.g., backfilling historical data).
 
-```python
-interface BitemporalProvenanceEntry(ProvenanceEntry):
-    valid_from: ISO8601  # When fact became true in real world
-    valid_to: ISO8601    # When fact ceased to be true
-    system_time: ISO8601  # When we learned about it
+**Handling**: Allowed, but use `sequence_number` for actual insertion order:
+
+```typescript
+// Backfill: insert event from 2024 today
+await ledger.append({
+  entity_id: "txn_001",
+  entity_type: "transaction",
+  event_type: "created",
+  field_name: "merchant",
+  old_value: null,
+  new_value: "Walmart",
+  transaction_time: "2024-12-01T10:00:00Z", // Past transaction time
+  valid_time: "2024-12-01T10:00:00Z",
+  user_id: "import_script",
+  reason: "Backfilled from legacy system"
+});
+
+// Query by transaction_time: gets events from 2024
+// Query by sequence_number: shows this was inserted recently
 ```
 
-**Use case:** "What did we believe was true on 2024-01-15, based on data available at that time?"
+**Best Practice**: Set `transaction_time = NOW()` unless explicitly backfilling.
 
 ---
 
-### 2. Event Sourcing Integration
+### Edge Case 4: Null vs. Undefined Values
 
-```python
-class EventSourcedProvenanceLedger(ProvenanceLedger):
-    def append(self, entry: ProvenanceEntry) -> EntryID:
-        # Publish to event stream (Kafka, Redis Streams)
-        self.event_stream.publish(entry.event_type, entry.to_dict())
+**Scenario**: How to represent "no value" vs. "unknown value"?
 
-        # Also persist
-        return super().append(entry)
+**Handling**:
+- `null`: Explicit absence of value (e.g., field was empty)
+- `undefined`: Not applicable (use null in JSONB)
+
+```typescript
+// Field was explicitly empty
+await ledger.append({
+  entity_id: "txn_001",
+  field_name: "memo",
+  old_value: null,      // Was empty
+  new_value: "Lunch",   // Now has value
+  ...
+});
+
+// Field being deleted
+await ledger.append({
+  entity_id: "txn_001",
+  field_name: "memo",
+  old_value: "Lunch",
+  new_value: null,      // Cleared to empty
+  event_type: "cleared",
+  ...
+});
 ```
-
-**Use case:** Real-time monitoring, webhooks, downstream consumers
 
 ---
 
-### 3. Redaction for PII
+### Edge Case 5: Very Large Field Values
 
-```python
-def append_with_redaction(self, entry: ProvenanceEntry, pii_fields: List[str]) -> EntryID:
-    # Redact sensitive fields
-    redacted_entry = entry.copy()
-    for field in pii_fields:
-        if field in redacted_entry.data:
-            redacted_entry.data[field] = "[REDACTED]"
+**Scenario**: Field value exceeds reasonable size (e.g., 10MB JSON document).
 
-    return self.append(redacted_entry)
+**Handling**: Store reference instead of value:
 
-def get_unredacted(self, entry_id: EntryID, requester: User) -> ProvenanceEntry:
-    # Only authorized users see PII
-    if not requester.has_permission("view_pii"):
-        return self.get(entry_id)  # Returns redacted version
-
-    return self.get_raw(entry_id)  # Returns original
+```typescript
+// Instead of storing huge JSON directly
+await ledger.append({
+  entity_id: "doc_001",
+  field_name: "content",
+  old_value: { type: "reference", url: "s3://bucket/old-content.json" },
+  new_value: { type: "reference", url: "s3://bucket/new-content.json" },
+  ...
+});
 ```
+
+**Limit**: Consider limiting `old_value`/`new_value` JSONB to 1MB per record.
+
+---
+
+### Edge Case 6: Hash Chain Break on First Record
+
+**Scenario**: First record has no previous hash.
+
+**Handling**: Use genesis hash (all zeros):
+
+```typescript
+const GENESIS_HASH = '0'.repeat(64); // 64 zeros
+
+// First record in ledger
+await ledger.append({
+  entity_id: "txn_001",
+  entity_type: "transaction",
+  event_type: "created",
+  field_name: "merchant",
+  old_value: null,
+  new_value: "Walmart",
+  valid_time: "2025-01-01T00:00:00Z",
+  user_id: "system",
+  // previous_hash will be GENESIS_HASH
+});
+```
+
+---
+
+### Edge Case 7: Retroactive Deletion
+
+**Scenario**: Entity should be marked deleted retroactively.
+
+**Handling**: Use `event_type: "deleted"` with past `valid_time`:
+
+```typescript
+// Discover transaction should have been deleted on Jan 15
+await ledger.append({
+  entity_id: "txn_001",
+  entity_type: "transaction",
+  event_type: "deleted",
+  field_name: "_status", // Special field for entity status
+  old_value: "active",
+  new_value: "deleted",
+  transaction_time: "2025-01-20T10:00:00Z", // Recorded today
+  valid_time: "2025-01-15T10:00:00Z",       // Effective retroactively
+  user_id: "user_jane_doe",
+  reason: "Transaction was duplicate, retroactively deleted"
+});
+```
+
+**Query Impact**: Queries at `valid_time >= 2025-01-15` should exclude this entity.
 
 ---
 
 ## Performance Characteristics
 
-| Operation | Time Complexity | Notes |
-|-----------|-----------------|-------|
-| `append()` | O(1) | Single write |
-| `get_by_upload_id()` | O(n) | Scan entire ledger (optimize with index) |
-| `get_by_time_range()` | O(n) | Scan entire ledger |
-| `verify_chain()` | O(k) | k = entries for upload_id |
+### Latency Targets
 
-**Optimization:**
-- Index on `upload_id` → O(1) lookup
-- Index on `timestamp` → Range queries in O(log n)
+| Operation | Input Size | Target Latency (p95) | Notes |
+|-----------|-----------|---------------------|-------|
+| `append()` | 1 record | < 10ms | Single INSERT |
+| `getHistory()` | 1 entity | < 50ms | Indexed by entity_id |
+| `getHistory()` | 1 entity, 1 field | < 20ms | Indexed by entity_id + field_name |
+| `verifyIntegrity()` | 1 record | < 30ms | Fetch + hash calculation |
+| `getEventsByTransactionTime()` | 1 day | < 100ms | Indexed range query |
+| `getEventsByValidTime()` | 1 day | < 100ms | Indexed range query |
+| `export()` | 10,000 records | < 5s | Bulk query + serialization |
+| `count()` | Any filters | < 100ms | COUNT query with indexes |
+
+### Throughput
+
+- **Writes**: 1,000-5,000 appends/sec (single node)
+- **Reads**: 10,000-50,000 queries/sec (with indexes)
+
+### Scalability
+
+| Total Records | Query Performance | Notes |
+|--------------|------------------|-------|
+| < 1M | Excellent (< 50ms) | All queries fast |
+| 1M - 10M | Good (< 100ms) | Indexed queries fast |
+| 10M - 100M | Moderate (< 500ms) | Consider partitioning |
+| > 100M | Slower (< 2s) | Partition by time range |
+
+### Index Strategy
+
+```sql
+-- B-tree indexes for exact matches
+CREATE INDEX idx_provenance_entity_id ON provenance_ledger(entity_id);
+CREATE INDEX idx_provenance_entity_type ON provenance_ledger(entity_type);
+
+-- B-tree indexes for time range queries (DESC for recent-first queries)
+CREATE INDEX idx_provenance_transaction_time ON provenance_ledger(transaction_time DESC);
+CREATE INDEX idx_provenance_valid_time ON provenance_ledger(valid_time DESC);
+
+-- GiST index for bitemporal range queries
+CREATE INDEX idx_provenance_bitemporal ON provenance_ledger
+  USING GIST (
+    tstzrange(transaction_time, transaction_time + INTERVAL '1 microsecond'),
+    tstzrange(valid_time, valid_time + INTERVAL '1 microsecond')
+  );
+```
+
+### Optimization Tips
+
+**1. Partition by Time Range**
+
+For very large ledgers (>100M records), partition by transaction_time:
+
+```sql
+CREATE TABLE provenance_ledger_2025_01 PARTITION OF provenance_ledger
+  FOR VALUES FROM ('2025-01-01') TO ('2025-02-01');
+
+CREATE TABLE provenance_ledger_2025_02 PARTITION OF provenance_ledger
+  FOR VALUES FROM ('2025-02-01') TO ('2025-03-01');
+```
+
+**2. Batch Appends**
+
+```typescript
+// Bad: N individual inserts
+for (const record of records) {
+  await ledger.append(record); // N round trips
+}
+
+// Good: Batch insert (if ledger supports it)
+await ledger.appendBatch(records); // 1 round trip
+```
+
+**3. Limit History Queries**
+
+```typescript
+// Bad: Fetch all history (could be millions of events)
+const history = await ledger.getHistory(entityId);
+
+// Good: Limit to recent history
+const recentHistory = await ledger.getHistory(entityId, undefined, { limit: 100 });
+```
 
 ---
 
-## Testing Strategy
+## Implementation Notes
 
-### Unit Tests
+### PostgreSQL Implementation
 
-```python
-def test_append_only():
-    ledger = ProvenanceLedger()
+```typescript
+import { Pool } from 'pg';
+import crypto from 'crypto';
 
-    entry_id = ledger.append(ProvenanceEntry(...))
+export class PostgresProvenanceLedger implements ProvenanceLedger {
+  constructor(private pool: Pool) {}
 
-    # Ensure no update/delete methods exist
-    assert not hasattr(ledger, 'update')
-    assert not hasattr(ledger, 'delete')
+  async append(record: BitemporalRecord): Promise<void> {
+    // Validate
+    this.validate(record);
 
-def test_chain_validation():
-    ledger = ProvenanceLedger()
+    // Generate ID and timestamps
+    const record_id = this.generateId();
+    const transaction_time = record.transaction_time || new Date().toISOString();
+    const created_at = transaction_time;
 
-    entry1 = ledger.append(ProvenanceEntry(upload_id="UL_123", previous_entry_id=None))
-    entry2 = ledger.append(ProvenanceEntry(upload_id="UL_123", previous_entry_id=entry1))
+    // Get previous hash
+    const previousHash = await this.getLatestHash();
 
-    assert ledger.verify_chain("UL_123") == True
+    // Calculate hash
+    const hash = this.calculateHash(record, previousHash);
 
-def test_broken_chain_detection():
-    ledger = ProvenanceLedger()
+    // Insert
+    const query = `
+      INSERT INTO provenance_ledger (
+        record_id, entity_id, entity_type, event_type, field_name,
+        old_value, new_value, transaction_time, valid_time,
+        user_id, reason, source_system, correlation_id,
+        hash, previous_hash, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    `;
 
-    entry1 = ledger.append(ProvenanceEntry(upload_id="UL_123", previous_entry_id=None))
-    # Simulate tampering: entry2 points to non-existent previous
-    entry2 = ledger.append(ProvenanceEntry(upload_id="UL_123", previous_entry_id="FAKE_ID"))
+    const values = [
+      record_id,
+      record.entity_id,
+      record.entity_type,
+      record.event_type,
+      record.field_name,
+      JSON.stringify(record.old_value),
+      JSON.stringify(record.new_value),
+      transaction_time,
+      record.valid_time,
+      record.user_id,
+      record.reason || null,
+      record.source_system || null,
+      record.correlation_id || null,
+      hash,
+      previousHash,
+      created_at
+    ];
 
-    with pytest.raises(ChainBrokenError):
-        ledger.verify_chain("UL_123")
+    await this.pool.query(query, values);
+  }
+
+  async getHistory(
+    entityId: string,
+    fieldName?: string
+  ): Promise<BitemporalRecord[]> {
+    let query = `
+      SELECT * FROM provenance_ledger
+      WHERE entity_id = $1
+    `;
+    const values: any[] = [entityId];
+
+    if (fieldName) {
+      query += ` AND field_name = $2`;
+      values.push(fieldName);
+    }
+
+    query += ` ORDER BY transaction_time ASC, sequence_number ASC`;
+
+    const result = await this.pool.query(query, values);
+    return result.rows.map(row => this.rowToRecord(row));
+  }
+
+  async verifyIntegrity(recordId: string): Promise<boolean> {
+    // Fetch record
+    const record = await this.getByRecordId(recordId);
+    if (!record) return false;
+
+    // Fetch previous record
+    const prevQuery = `
+      SELECT * FROM provenance_ledger
+      WHERE sequence_number = $1
+    `;
+    const prevResult = await this.pool.query(prevQuery, [record.sequence_number - 1]);
+
+    if (record.sequence_number > 1 && prevResult.rows.length === 0) {
+      return false; // Missing previous record
+    }
+
+    const prevRecord = prevResult.rows[0];
+
+    // Verify hash chain
+    if (record.sequence_number > 1 && record.previous_hash !== prevRecord.hash) {
+      return false; // Chain broken
+    }
+
+    // Verify record hash
+    const expectedHash = this.calculateHash(record, record.previous_hash);
+    return record.hash === expectedHash;
+  }
+
+  async export(
+    filters: ProvenanceQueryFilters,
+    format: 'json' | 'csv'
+  ): Promise<string> {
+    const records = await this.query(filters);
+
+    if (format === 'json') {
+      return JSON.stringify(records, null, 2);
+    } else {
+      return this.toCsv(records);
+    }
+  }
+
+  private calculateHash(record: BitemporalRecord, previousHash: string): string {
+    const data = [
+      record.entity_id,
+      record.entity_type,
+      record.event_type,
+      record.field_name,
+      JSON.stringify(record.old_value),
+      JSON.stringify(record.new_value),
+      record.transaction_time,
+      record.valid_time,
+      record.user_id,
+      record.reason || '',
+      previousHash
+    ].join('|');
+
+    const hash = crypto.createHash('sha256');
+    hash.update(data);
+    return hash.digest('hex');
+  }
+
+  private async getLatestHash(): Promise<string> {
+    const query = `
+      SELECT hash FROM provenance_ledger
+      ORDER BY sequence_number DESC
+      LIMIT 1
+    `;
+    const result = await this.pool.query(query);
+
+    if (result.rows.length === 0) {
+      return '0'.repeat(64); // Genesis hash
+    }
+
+    return result.rows[0].hash;
+  }
+
+  private generateId(): string {
+    return `prov_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private validate(record: BitemporalRecord): void {
+    if (!record.entity_id) throw new Error('entity_id is required');
+    if (!record.entity_type) throw new Error('entity_type is required');
+    if (!record.event_type) throw new Error('event_type is required');
+    if (!record.field_name) throw new Error('field_name is required');
+    if (!record.valid_time) throw new Error('valid_time is required');
+    if (!record.user_id) throw new Error('user_id is required');
+  }
+
+  private rowToRecord(row: any): BitemporalRecord {
+    return {
+      record_id: row.record_id,
+      sequence_number: parseInt(row.sequence_number, 10),
+      entity_id: row.entity_id,
+      entity_type: row.entity_type,
+      event_type: row.event_type,
+      field_name: row.field_name,
+      old_value: JSON.parse(row.old_value),
+      new_value: JSON.parse(row.new_value),
+      transaction_time: row.transaction_time,
+      valid_time: row.valid_time,
+      user_id: row.user_id,
+      reason: row.reason,
+      source_system: row.source_system,
+      correlation_id: row.correlation_id,
+      hash: row.hash,
+      previous_hash: row.previous_hash,
+      created_at: row.created_at
+    };
+  }
+
+  private toCsv(records: BitemporalRecord[]): string {
+    const headers = [
+      'record_id', 'sequence_number', 'entity_id', 'entity_type', 'event_type',
+      'field_name', 'old_value', 'new_value', 'transaction_time', 'valid_time',
+      'user_id', 'reason', 'hash', 'previous_hash'
+    ];
+
+    const rows = records.map(r => [
+      r.record_id,
+      r.sequence_number,
+      r.entity_id,
+      r.entity_type,
+      r.event_type,
+      r.field_name,
+      JSON.stringify(r.old_value),
+      JSON.stringify(r.new_value),
+      r.transaction_time,
+      r.valid_time,
+      r.user_id,
+      r.reason || '',
+      r.hash,
+      r.previous_hash
+    ]);
+
+    return [headers, ...rows].map(row => row.join(',')).join('\n');
+  }
+}
 ```
 
 ---
@@ -562,76 +1870,257 @@ def test_broken_chain_detection():
 
 ### 1. Immutability Enforcement
 
-```python
-# DB-level: Use INSERT-only permissions
-GRANT INSERT ON provenance_ledger TO app_user;
-REVOKE UPDATE, DELETE ON provenance_ledger FROM app_user;
-
-# Application-level: No update/delete methods in interface
+**Database Level**:
+```sql
+REVOKE UPDATE, DELETE ON provenance_ledger FROM application_user;
 ```
 
-### 2. Access Control
+**Application Level**: No update/delete methods in interface.
 
-```python
-def get_by_upload_id(self, upload_id: str, requester: User) -> List[ProvenanceEntry]:
-    # Check if user can view this upload
-    if not acl.can_view(upload_id, requester):
-        raise PermissionDeniedError()
+### 2. Hash Chain Verification
 
-    return self._get_by_upload_id(upload_id)
+Run periodic integrity checks:
+
+```typescript
+// Daily cron job
+async function dailyIntegrityCheck() {
+  const report = await detectTampering(1, await getMaxSequenceNumber());
+
+  if (!report.is_valid) {
+    await alertSecurityTeam(report);
+  }
+}
 ```
 
-### 3. Audit Logging
+### 3. Access Control
 
-```python
-def append(self, entry: ProvenanceEntry) -> EntryID:
-    entry_id = self._append(entry)
+Restrict who can append events:
 
-    # Log who appended what
-    audit_log.write({
-        "action": "provenance.append",
-        "entry_id": entry_id,
-        "caller": get_current_user()
-    })
+```typescript
+async function appendWithAuth(
+  record: BitemporalRecord,
+  currentUser: User
+): Promise<void> {
+  // Verify user has permission to modify this entity type
+  if (!currentUser.canModify(record.entity_type)) {
+    throw new Error('Unauthorized');
+  }
 
-    return entry_id
+  // Set user_id to authenticated user (prevent spoofing)
+  record.user_id = currentUser.id;
+
+  await ledger.append(record);
+}
+```
+
+### 4. Sensitive Data
+
+For PII/PHI, consider encryption:
+
+```typescript
+await ledger.append({
+  entity_id: "patient_001",
+  field_name: "ssn",
+  old_value: encrypt("111-11-1111"),
+  new_value: encrypt("222-22-2222"),
+  ...
+});
 ```
 
 ---
 
-## Observability
+## Integration Patterns
 
-### Metrics
+### Pattern 1: Automatic Event Logging
 
-```python
-provenance_entries_total{event_type="upload.created"} 1234
-provenance_append_latency_seconds{quantile="0.95"} 0.002
-provenance_chain_verifications_total{status="success"} 500
-provenance_chain_verifications_total{status="broken"} 0
+```typescript
+class EntityService {
+  async updateEntity(
+    entityId: string,
+    updates: Record<string, any>,
+    userId: string
+  ): Promise<void> {
+    const entity = await this.getEntity(entityId);
+
+    // Apply updates
+    await this.entityStore.update(entityId, updates);
+
+    // Log to provenance ledger
+    for (const [field, newValue] of Object.entries(updates)) {
+      await ledger.append({
+        entity_id: entityId,
+        entity_type: entity.type,
+        event_type: 'updated',
+        field_name: field,
+        old_value: entity[field],
+        new_value: newValue,
+        valid_time: new Date().toISOString(),
+        user_id: userId,
+        reason: 'User update'
+      });
+    }
+  }
+}
 ```
 
-### Logs
+### Pattern 2: Event Sourcing
 
-```json
-{
-  "timestamp": "2025-10-22T14:35:00Z",
-  "level": "INFO",
-  "operation": "append",
-  "entry_id": "PE_20251022143500_001",
-  "event_type": "upload.created",
-  "upload_id": "UL_abc123"
+```typescript
+class EventSourcedEntity {
+  async replay(entityId: string): Promise<Entity> {
+    const history = await ledger.getHistory(entityId);
+
+    const entity: any = { id: entityId };
+
+    for (const event of history) {
+      if (event.event_type === 'created' || event.event_type === 'updated') {
+        entity[event.field_name] = event.new_value;
+      } else if (event.event_type === 'deleted') {
+        entity._deleted = true;
+      }
+    }
+
+    return entity;
+  }
 }
+```
+
+---
+
+## Multi-Domain Examples
+
+(Already covered in "Multi-Domain Applicability" section above with 7 domains)
+
+---
+
+## Testing Strategy
+
+### Unit Tests
+
+```typescript
+describe('ProvenanceLedger', () => {
+  let ledger: ProvenanceLedger;
+
+  beforeEach(async () => {
+    ledger = new PostgresProvenanceLedger(pool);
+    await cleanDatabase();
+  });
+
+  describe('append()', () => {
+    it('should append event with generated ID', async () => {
+      await ledger.append({
+        entity_id: 'txn_001',
+        entity_type: 'transaction',
+        event_type: 'created',
+        field_name: 'merchant',
+        old_value: null,
+        new_value: 'Walmart',
+        valid_time: '2025-01-15T10:00:00Z',
+        user_id: 'user_jane'
+      });
+
+      const history = await ledger.getHistory('txn_001');
+      expect(history).toHaveLength(1);
+      expect(history[0].entity_id).toBe('txn_001');
+      expect(history[0].new_value).toBe('Walmart');
+    });
+
+    it('should maintain hash chain', async () => {
+      await ledger.append({
+        entity_id: 'txn_001',
+        entity_type: 'transaction',
+        event_type: 'created',
+        field_name: 'merchant',
+        old_value: null,
+        new_value: 'Walmart',
+        valid_time: '2025-01-15T10:00:00Z',
+        user_id: 'user_jane'
+      });
+
+      await ledger.append({
+        entity_id: 'txn_001',
+        entity_type: 'transaction',
+        event_type: 'updated',
+        field_name: 'merchant',
+        old_value: 'Walmart',
+        new_value: 'Walmart Supercenter',
+        valid_time: '2025-01-15T10:00:00Z',
+        user_id: 'user_jane'
+      });
+
+      const history = await ledger.getHistory('txn_001');
+      expect(history[1].previous_hash).toBe(history[0].hash);
+    });
+  });
+
+  describe('verifyIntegrity()', () => {
+    it('should verify valid record', async () => {
+      await ledger.append({
+        entity_id: 'txn_001',
+        entity_type: 'transaction',
+        event_type: 'created',
+        field_name: 'merchant',
+        old_value: null,
+        new_value: 'Walmart',
+        valid_time: '2025-01-15T10:00:00Z',
+        user_id: 'user_jane'
+      });
+
+      const history = await ledger.getHistory('txn_001');
+      const isValid = await ledger.verifyIntegrity(history[0].record_id);
+
+      expect(isValid).toBe(true);
+    });
+  });
+});
+```
+
+---
+
+## Migration Guide
+
+### From No Provenance System
+
+```typescript
+// Before: Update without history
+await entityStore.update('txn_001', { merchant: 'Amazon.com' });
+
+// After: Update with provenance
+const entity = await entityStore.getById('txn_001');
+
+await ledger.append({
+  entity_id: 'txn_001',
+  entity_type: 'transaction',
+  event_type: 'updated',
+  field_name: 'merchant',
+  old_value: entity.merchant,
+  new_value: 'Amazon.com',
+  valid_time: new Date().toISOString(),
+  user_id: currentUserId,
+  reason: 'User correction'
+});
+
+await entityStore.update('txn_001', { merchant: 'Amazon.com' });
 ```
 
 ---
 
 ## Related Primitives
 
-- `UploadRecord`: Reads ProvenanceLedger to show timeline
-- `StorageEngine`: ProvenanceLedger records which StorageRef was used
-- `CanonicalStore`: Queries ProvenanceLedger for lineage info
+- **BitemporalQuery**: Query provenance ledger with temporal filters
+- **TimelineReconstructor**: Reconstruct entity state at any point in time
+- **RetroactiveCorrector**: Handle retroactive corrections with validation
+- **AuditLog**: System-level audit trail (complements provenance ledger)
 
 ---
 
-**Last Updated**: 2025-10-22
-**Maturity**: Spec complete, ready for implementation
+## References
+
+- [Objective Layer Architecture](../architecture/objective-layer.md)
+- [Provenance Ledger Vertical 5.1](../verticals/provenance-ledger.md)
+- [Bitemporal Data Management](https://en.wikipedia.org/wiki/Temporal_database)
+- [Event Sourcing Pattern](https://martinfowler.com/eaaDev/EventSourcing.html)
+
+---
+
+**End of ProvenanceLedger OL Primitive Specification**

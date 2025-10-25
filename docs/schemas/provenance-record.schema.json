@@ -1,0 +1,405 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://personal-os.dev/schemas/provenance-record.schema.json",
+  "title": "Provenance Record",
+  "description": "Schema for bitemporal provenance records. Each record tracks a single field change with two independent timestamps: transaction time (when we recorded it) and valid time (when it was actually true). Supports retroactive corrections, audit trails, and 'as of' queries.",
+  "type": "object",
+  "required": [
+    "provenance_id",
+    "entity_id",
+    "entity_type",
+    "field_name",
+    "transaction_time",
+    "valid_time_start",
+    "value",
+    "changed_by"
+  ],
+  "properties": {
+    "provenance_id": {
+      "type": "string",
+      "description": "Unique identifier for this provenance record (UUID or prefixed ID like 'prov_abc123')",
+      "pattern": "^(prov_[a-z0-9]{6,}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$",
+      "examples": ["prov_abc123", "750e8400-e29b-41d4-a716-446655440000"]
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "ID of the entity whose field changed",
+      "minLength": 1,
+      "examples": ["txn_xyz789", "patient_456", "case_2025cv1234"]
+    },
+    "entity_type": {
+      "type": "string",
+      "description": "Type of entity (used for multi-tenancy and query filtering)",
+      "enum": [
+        "transaction",
+        "patient_record",
+        "case",
+        "publication",
+        "product",
+        "subscription",
+        "policy",
+        "claim"
+      ],
+      "examples": ["transaction", "patient_record", "case"]
+    },
+    "field_name": {
+      "type": "string",
+      "description": "Name of the field that changed",
+      "minLength": 1,
+      "pattern": "^[a-z_][a-z0-9_]*$",
+      "examples": ["merchant", "diagnosis_code", "case_number", "amount"]
+    },
+    "transaction_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When we recorded this change in the system (system time, immutable, monotonically increasing). ISO 8601 timestamp.",
+      "examples": ["2025-10-24T10:00:00Z", "2025-10-24T14:30:15.123Z"]
+    },
+    "valid_time_start": {
+      "type": "string",
+      "format": "date",
+      "description": "When this value became true in the real world (can be past, present, or future). Date only (no time component).",
+      "examples": ["2025-01-20", "2025-10-24", "2025-11-01"]
+    },
+    "valid_time_end": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "When this value ceased to be true (null = still true/ongoing). Date only (no time component).",
+      "examples": ["2025-02-15", null]
+    },
+    "value": {
+      "description": "New value after this change. Type depends on field schema (string, number, date, etc.). May be redacted for PII fields.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "object" },
+        { "type": "array" },
+        { "type": "null" }
+      ],
+      "examples": [
+        "Amazon Marketplace",
+        "E11.65",
+        1234.56,
+        "Business Expenses",
+        "[REDACTED]"
+      ]
+    },
+    "previous_value": {
+      "description": "Value before this change (null for first extraction). Type must match 'value' type. May be redacted for PII fields.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "object" },
+        { "type": "array" },
+        { "type": "null" }
+      ],
+      "examples": [
+        "AMZN MKTP US*AB123",
+        "E11.9",
+        123.45,
+        null,
+        "[REDACTED]"
+      ]
+    },
+    "changed_by": {
+      "type": "string",
+      "description": "User ID or system identifier that performed the change",
+      "minLength": 1,
+      "examples": [
+        "user_123",
+        "nurse_789",
+        "parser_pdf_v2",
+        "normalization_rule_merchant",
+        "accounting_system_api"
+      ]
+    },
+    "action": {
+      "type": "string",
+      "description": "Type of change that occurred",
+      "enum": [
+        "extracted",
+        "override",
+        "revert",
+        "delete",
+        "rule_applied",
+        "ai_suggested",
+        "bulk_update"
+      ],
+      "examples": ["extracted", "override", "revert"]
+    },
+    "reason": {
+      "type": "string",
+      "description": "Optional explanation for the change (required for manual overrides, recommended for all changes)",
+      "maxLength": 1000,
+      "examples": [
+        "Retroactive correction from bank reconciliation",
+        "Patient lab results revealed chronic kidney disease",
+        "Extracted from PDF page 3",
+        "Applied normalization rule: merchant_amazon"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "description": "System or process that performed the action",
+      "examples": [
+        "manual_correction",
+        "parser_pdf_v2",
+        "normalization_rule",
+        "accounting_system_api",
+        "retroactive_corrector"
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Optional: Confidence score for this value (0.0-1.0). Used for extraction and AI suggestions.",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "examples": [0.95, 0.85, 1.0]
+    },
+    "signature": {
+      "type": "string",
+      "description": "SHA-256 hash of record for tamper detection (cryptographic integrity verification). Hash of: provenance_id + entity_id + transaction_time + value",
+      "pattern": "^[a-f0-9]{64}$",
+      "examples": ["5d41402abc4b2a76b9719d911017c592ae9f8e7a9a0f3e4c6b5d8f2a1e9c3d7b"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional: Extensible metadata for domain-specific attributes",
+      "properties": {
+        "pii_redacted": {
+          "type": "boolean",
+          "description": "Flag indicating if previous_value or value was redacted for PII protection"
+        },
+        "compliance_tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Compliance requirements this record satisfies (HIPAA, SOX, GDPR, etc.)"
+        },
+        "batch_id": {
+          "type": "string",
+          "description": "For bulk operations: ID of the batch this change belongs to"
+        },
+        "approval_required": {
+          "type": "boolean",
+          "description": "Flag indicating if this change requires approval workflow"
+        },
+        "approved_by": {
+          "type": "string",
+          "description": "User ID of approver (if change was approved)"
+        },
+        "approved_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When change was approved (if applicable)"
+        },
+        "impact_analysis": {
+          "type": "object",
+          "description": "Analysis of downstream effects of this change",
+          "properties": {
+            "affected_entities": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "IDs of entities affected by this change"
+            },
+            "affected_calculations": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Names of calculations/aggregations affected"
+            }
+          }
+        }
+      },
+      "additionalProperties": true,
+      "examples": [
+        {
+          "compliance_tags": ["HIPAA", "patient_data"],
+          "pii_redacted": false
+        },
+        {
+          "batch_id": "batch_20251024_001",
+          "batch_size": 50
+        }
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Database record creation timestamp (usually same as transaction_time)",
+      "examples": ["2025-10-24T10:00:00Z"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "$comment": "Example 1: Finance - Retroactive merchant correction",
+      "provenance_id": "prov_001",
+      "entity_id": "txn_xyz789",
+      "entity_type": "transaction",
+      "field_name": "merchant",
+      "transaction_time": "2025-10-24T10:00:00Z",
+      "valid_time_start": "2025-01-20",
+      "valid_time_end": null,
+      "value": "Amazon Marketplace",
+      "previous_value": "AMZN MKTP US*AB123",
+      "changed_by": "user_123",
+      "action": "override",
+      "reason": "Retroactive correction from bank reconciliation",
+      "source": "manual_correction",
+      "confidence": 1.0,
+      "signature": "5d41402abc4b2a76b9719d911017c592ae9f8e7a9a0f3e4c6b5d8f2a1e9c3d7b",
+      "metadata": {
+        "compliance_tags": ["SOX", "financial_audit"]
+      }
+    },
+    {
+      "$comment": "Example 2: Healthcare - Diagnosis code updated retroactively",
+      "provenance_id": "prov_002",
+      "entity_id": "patient_456",
+      "entity_type": "patient_record",
+      "field_name": "diagnosis_code",
+      "transaction_time": "2025-03-05T11:00:00Z",
+      "valid_time_start": "2025-01-10",
+      "valid_time_end": null,
+      "value": "E11.65",
+      "previous_value": "E11.9",
+      "changed_by": "nurse_789",
+      "action": "override",
+      "reason": "Lab results revealed chronic kidney disease - retroactive to diagnosis date",
+      "source": "manual_correction",
+      "confidence": 0.95,
+      "signature": "6e52d02bdc4a2c76c8819e922027d593bf9f9e8b1b1f4e5d7c6e9f3b2f0d4e8c",
+      "metadata": {
+        "compliance_tags": ["HIPAA", "patient_data"],
+        "pii_redacted": false,
+        "approved_by": "doctor_123",
+        "approved_at": "2025-03-05T15:30:00Z"
+      }
+    },
+    {
+      "$comment": "Example 3: Legal - Case filing date corrected",
+      "provenance_id": "prov_003",
+      "entity_id": "case_2025cv1234",
+      "entity_type": "case",
+      "field_name": "filing_date",
+      "transaction_time": "2025-10-24T14:00:00Z",
+      "valid_time_start": "2025-01-15",
+      "valid_time_end": null,
+      "value": "2025-01-15",
+      "previous_value": "2025-01-20",
+      "changed_by": "legal_assistant_456",
+      "action": "override",
+      "reason": "Corrected to match court records - clerk entered wrong date",
+      "source": "manual_correction",
+      "confidence": 1.0,
+      "signature": "7f63e03cde5b3d87d9920f033138e694c0g0f9d2c2g5f6e8d7f0g4c3g1e5f9d",
+      "metadata": {
+        "compliance_tags": ["court_filing"],
+        "impact_analysis": {
+          "affected_entities": ["hearing_001", "motion_002"],
+          "affected_calculations": ["statute_of_limitations"]
+        }
+      }
+    },
+    {
+      "$comment": "Example 4: E-commerce - Future price increase (scheduled)",
+      "provenance_id": "prov_004",
+      "entity_id": "prod_42",
+      "entity_type": "product",
+      "field_name": "price",
+      "transaction_time": "2025-10-20T09:00:00Z",
+      "valid_time_start": "2025-11-01",
+      "valid_time_end": null,
+      "value": 29.99,
+      "previous_value": 24.99,
+      "changed_by": "catalog_manager_789",
+      "action": "override",
+      "reason": "Scheduled price increase for holiday season",
+      "source": "manual_correction",
+      "confidence": 1.0,
+      "signature": "8g74f04def6c4e98e0a31g144249f7a5d1h1g0e3d3h6g7f9e8g1h5d4h2f6g0e",
+      "metadata": {
+        "approval_required": true,
+        "approved_by": "pricing_director_456",
+        "approved_at": "2025-10-20T14:00:00Z"
+      }
+    },
+    {
+      "$comment": "Example 5: SaaS - Plan change effective next billing cycle",
+      "provenance_id": "prov_005",
+      "entity_id": "sub_789",
+      "entity_type": "subscription",
+      "field_name": "plan",
+      "transaction_time": "2025-10-15T10:00:00Z",
+      "valid_time_start": "2025-11-01",
+      "valid_time_end": null,
+      "value": "enterprise",
+      "previous_value": "professional",
+      "changed_by": "customer_upgrade_flow",
+      "action": "override",
+      "reason": "Customer upgraded to enterprise plan - effective next billing cycle",
+      "source": "customer_portal",
+      "confidence": 1.0,
+      "signature": "9h85g05efg7d5f09f1b42h255350g8b6e2i2h1f4e4i7h8g0f9h2i6e5i3g7h1f",
+      "metadata": {
+        "compliance_tags": ["SOX", "revenue_recognition"],
+        "impact_analysis": {
+          "affected_calculations": ["mrr", "arr", "revenue_forecast"]
+        }
+      }
+    },
+    {
+      "$comment": "Example 6: Research - Publication year corrected",
+      "provenance_id": "prov_006",
+      "entity_id": "pub_nature_2024_123",
+      "entity_type": "publication",
+      "field_name": "publication_year",
+      "transaction_time": "2025-10-24T16:00:00Z",
+      "valid_time_start": "2024-12-15",
+      "valid_time_end": null,
+      "value": 2024,
+      "previous_value": 2025,
+      "changed_by": "researcher_101",
+      "action": "override",
+      "reason": "Verified with journal - online publication was Dec 2024, not 2025",
+      "source": "manual_correction",
+      "confidence": 1.0,
+      "signature": "0i96h06fgh8e6g10g2c53i366461h9c7f3j3i2g5f5j8i9h1g0i3j7f6j4h8i2g",
+      "metadata": {
+        "compliance_tags": ["NIH_reporting"],
+        "impact_analysis": {
+          "affected_calculations": ["annual_publications_2024"]
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "BitemporalQueryResult": {
+      "type": "object",
+      "description": "Result of a bitemporal query showing value at specific (TT, VT) coordinates",
+      "properties": {
+        "field_name": { "type": "string" },
+        "value": {},
+        "transaction_time": { "type": "string", "format": "date-time" },
+        "valid_time": { "type": "string", "format": "date" },
+        "provenance_id": { "type": "string" }
+      }
+    }
+  },
+  "notes": [
+    "This schema enforces bitemporal tracking: Every change has TWO independent timestamps (transaction time + valid time).",
+    "Transaction time is ALWAYS system-generated (NOW at time of record creation) and NEVER modified (immutability).",
+    "Valid time CAN be retroactive (past), current (today), or future (scheduled change).",
+    "Database should enforce: UNIQUE(entity_id, field_name, transaction_time) to prevent duplicate records.",
+    "Database should enforce: IMMUTABILITY via REVOKE UPDATE/DELETE permissions on provenance_ledger table.",
+    "The 'signature' field enables tamper detection: Verify hash on query to detect unauthorized modifications.",
+    "For HIPAA/GDPR compliance, configure PII field redaction (store '[REDACTED]' in value/previous_value).",
+    "Valid time ranges: valid_time_start and valid_time_end define when value was true. NULL end = ongoing/current.",
+    "For retroactive corrections, valid_time_start < transaction_time (we learned about it later).",
+    "For scheduled changes, valid_time_start > transaction_time (we know about it now, effective later).",
+    "Index recommendations: (entity_id, field_name, transaction_time DESC), (transaction_time), (valid_time_start, valid_time_end).",
+    "Partition recommendations: Partition table by transaction_time (monthly partitions) for query performance.",
+    "This schema is OUTPUT of ProvenanceLedger.append() and INPUT to BitemporalQuery methods."
+  ]
+}
