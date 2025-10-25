@@ -459,14 +459,36 @@
 
 ### **4.2 Forecast**
 **Status:** ✅ Complete
-**Full Name:** Forecast
-**Spec:** TBD
+**Full Name:** Forecast (Income/Expense Projections & Goal Tracking)
+**Spec:** [docs/verticals/4.2-forecast.md](docs/verticals/4.2-forecast.md)
 
-**Expected:**
-- Income/expense projections
-- Cash runway calculation
-- Goal tracking (monthly income targets)
-- Burn rate analysis
+**Primitives Delivered:**
+- ProjectionEngine (OL) - Forecasting algorithms (Holt-Winters, linear regression, moving average, ARIMA)
+- GoalStore (OL) - CRUD for financial goals with progress tracking and milestone alerts
+- BurnRateCalculator (OL) - Calculate burn rate, cash runway, zero date prediction
+- ForecastCache (OL) - Cache projections with 24h TTL and smart invalidation
+- ForecastChart (IL) - Interactive line/area chart with confidence intervals and algorithm comparison
+- GoalProgressCard (IL) - Goal display with progress bar, on-track status, time remaining
+- GoalConfigDialog (IL) - Modal for creating/editing goals with templates and live preview
+
+**Schemas:** forecast-projection.schema.json, goal-config.schema.json, burn-rate-analysis.schema.json
+**ADRs:** 0021 (projection algorithm strategy), 0022 (goal tracking persistence), 0023 (forecast caching strategy)
+**UX Flow:** [4.2-forecast-experience.md](docs/ux-flows/4.2-forecast-experience.md)
+
+**Delivered:**
+- Income/expense projections (90-365 days ahead)
+- Multiple forecasting algorithms (Holt-Winters, linear regression, moving average, ARIMA, Prophet)
+- Algorithm comparison and accuracy metrics
+- Confidence intervals (80%, 90%, 95%)
+- Financial goal tracking (savings, income, expense reduction, debt payoff)
+- Progress monitoring with milestone alerts (25%, 50%, 75%, 100%)
+- Burn rate calculation (simple, weighted, exponential moving average)
+- Cash runway projection (months until $0 balance)
+- Zero date prediction with trend analysis
+- Scenario analysis ("What if" modeling)
+- Goal templates (emergency fund, vacation, debt payoff, custom)
+- Recurring contribution tracking with auto-transfer
+- Multi-domain applicability (Finance → cash flow, Healthcare → budget forecasts, Legal → retainer runway, Research → grant runway, E-commerce → revenue projections, SaaS → MRR forecasting)
 
 ---
 
@@ -562,13 +584,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 16 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1 |
-| 📝 Pending | 7 | 4.2-4.3, 5.1-5.5 |
+| ✅ Complete | 17 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2 |
+| 📝 Pending | 6 | 4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 70% (16/23)
+**Completion:** 74% (17/23)
 
-**Next up:** 4.2 Forecast (income/expense projections, cash runway)
+**Next up:** 4.3 Corrections Flow (manual overrides, audit trail)
 
 ---
 

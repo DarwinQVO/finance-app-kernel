@@ -1,0 +1,296 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/forecast-projection.schema.json",
+  "title": "Forecast Projection",
+  "description": "Forecast projection output from ProjectionEngine. Contains historical data, projected values, confidence intervals, and algorithm metadata. Used to generate financial forecasts for balances, income, expenses, burn rate, and runway analysis.",
+  "type": "object",
+  "required": [
+    "projection_id",
+    "user_id",
+    "metric_type",
+    "algorithm",
+    "historical_data",
+    "projected_data",
+    "confidence_level",
+    "forecast_horizon_days",
+    "generated_at"
+  ],
+  "properties": {
+    "projection_id": {
+      "type": "string",
+      "pattern": "^proj_[a-z0-9_]+$",
+      "description": "Unique projection ID. Primary key for projections table. Pattern: proj_{metric}_{timestamp}. Examples: proj_balance_20251024, proj_expenses_abc123, proj_burn_xyz789"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "User ID who owns this projection. Foreign key to users table. Used to filter projections by user and apply user-specific settings."
+    },
+    "metric_type": {
+      "type": "string",
+      "enum": ["balance", "income", "expenses", "burn_rate", "runway"],
+      "description": "Type of financial metric being projected. balance=account balance over time, income=revenue/income forecast, expenses=spending forecast, burn_rate=monthly cash burn, runway=months until cash exhaustion"
+    },
+    "algorithm": {
+      "type": "string",
+      "enum": ["linear_regression", "moving_average", "exponential_smoothing", "holt_winters", "arima", "prophet"],
+      "description": "Forecasting algorithm used. linear_regression=simple trend line, moving_average=average of recent values, exponential_smoothing=weighted recent values, holt_winters=seasonal decomposition, arima=autoregressive integrated moving average, prophet=Facebook's time series model"
+    },
+    "historical_data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of historical data point. ISO 8601 date format (YYYY-MM-DD). Must be in chronological order."
+          },
+          "value": {
+            "type": "number",
+            "multipleOf": 0.01,
+            "description": "Actual value for this date. For balance=account balance, income=total income, expenses=total spending, burn_rate=monthly burn, runway=months remaining. Can be negative for debt/losses."
+          }
+        },
+        "required": ["date", "value"],
+        "additionalProperties": false
+      },
+      "minItems": 2,
+      "description": "Historical time series data used for training the forecast model. Minimum 2 data points required. More data points improve accuracy. Recommended: 30+ points for monthly data, 90+ for daily data."
+    },
+    "projected_data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of projected data point. ISO 8601 date format (YYYY-MM-DD). Must be after last historical date."
+          },
+          "value": {
+            "type": "number",
+            "multipleOf": 0.01,
+            "description": "Projected value for this date. Point estimate from forecast model. Can be negative for projected deficits or negative balances."
+          },
+          "confidence_lower": {
+            "type": "number",
+            "multipleOf": 0.01,
+            "description": "Lower bound of confidence interval. Value at bottom of confidence band. Example: if confidence_level=0.95, this is the 2.5th percentile."
+          },
+          "confidence_upper": {
+            "type": "number",
+            "multipleOf": 0.01,
+            "description": "Upper bound of confidence interval. Value at top of confidence band. Example: if confidence_level=0.95, this is the 97.5th percentile."
+          }
+        },
+        "required": ["date", "value", "confidence_lower", "confidence_upper"],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "description": "Projected time series data with confidence intervals. Each point includes point estimate and confidence bounds. Used for visualization and decision-making."
+    },
+    "confidence_level": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "multipleOf": 0.01,
+      "description": "Confidence level for prediction intervals. 0.95 = 95% confidence (most common), 0.80 = 80% confidence (wider intervals), 0.99 = 99% confidence (narrowest intervals). Default: 0.95"
+    },
+    "forecast_horizon_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 730,
+      "description": "Number of days to project into the future. Minimum 1 day, maximum 730 days (2 years). Longer horizons increase uncertainty. Recommended: 90 days for operational planning, 365 days for strategic planning."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this projection was generated. ISO 8601 format. Used to determine if projection needs refresh (e.g., regenerate after 24 hours or when new transactions added)."
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "properties": {
+        "seasonality_detected": {
+          "type": "boolean",
+          "description": "Whether seasonal patterns were detected in historical data. true=seasonal component included in model (e.g., monthly rent, quarterly taxes), false=no seasonality"
+        },
+        "trend_direction": {
+          "type": "string",
+          "enum": ["increasing", "decreasing", "stable"],
+          "description": "Direction of detected trend. increasing=upward trend (growing balance/income or rising expenses), decreasing=downward trend, stable=no significant trend"
+        },
+        "variance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Variance of historical data. Measures volatility. Higher variance = less predictable, wider confidence intervals. Used to assess forecast reliability."
+        },
+        "r_squared": {
+          "type": ["number", "null"],
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "R-squared goodness of fit for regression models. 0.0 = poor fit, 1.0 = perfect fit. NULL for non-regression algorithms. Values > 0.70 indicate good predictive power."
+        }
+      },
+      "description": "Statistical metadata about the forecast model. Includes seasonality detection, trend analysis, variance, and goodness of fit metrics. Used for model quality assessment.",
+      "additionalProperties": true
+    },
+    "warnings": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string",
+        "enum": ["insufficient_data", "high_variance", "outliers_detected", "low_confidence", "extrapolation_risk", "missing_values"]
+      },
+      "uniqueItems": true,
+      "description": "Warnings about forecast quality. insufficient_data=fewer than recommended data points, high_variance=volatile data reduces reliability, outliers_detected=extreme values may distort forecast, low_confidence=model fit is poor, extrapolation_risk=forecast horizon exceeds safe range, missing_values=gaps in historical data. NULL or empty array if no warnings."
+    },
+    "baseline_scenario": {
+      "type": ["string", "null"],
+      "enum": ["optimistic", "realistic", "pessimistic", null],
+      "description": "Scenario assumption for this projection. optimistic=best case (higher income, lower expenses), realistic=most likely case (based on historical trends), pessimistic=worst case (lower income, higher expenses). NULL for single-scenario projections."
+    },
+    "sensitivity_analysis": {
+      "type": ["object", "null"],
+      "properties": {
+        "income_variance_pct": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Percentage variance applied to income projection. +20 = 20% increase, -20 = 20% decrease. Used for scenario analysis."
+        },
+        "expense_variance_pct": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Percentage variance applied to expense projection. +20 = 20% increase, -20 = 20% decrease. Used for scenario analysis."
+        }
+      },
+      "description": "Sensitivity analysis parameters. Shows how projection changes with different income/expense assumptions. NULL if not performed.",
+      "additionalProperties": false
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when this projection was last updated. NULL if never updated. ISO 8601 format. Updates when user modifies parameters or when scheduled refresh occurs."
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "projection_id": "proj_balance_20251024",
+      "user_id": "user_startup_abc",
+      "metric_type": "balance",
+      "algorithm": "linear_regression",
+      "historical_data": [
+        {"date": "2025-07-01", "value": 75000.00},
+        {"date": "2025-08-01", "value": 68000.00},
+        {"date": "2025-09-01", "value": 61500.00},
+        {"date": "2025-10-01", "value": 54200.00}
+      ],
+      "projected_data": [
+        {"date": "2025-11-01", "value": 47300.00, "confidence_lower": 43500.00, "confidence_upper": 51100.00},
+        {"date": "2025-12-01", "value": 40100.00, "confidence_lower": 35200.00, "confidence_upper": 45000.00},
+        {"date": "2026-01-01", "value": 33000.00, "confidence_lower": 27100.00, "confidence_upper": 38900.00}
+      ],
+      "confidence_level": 0.95,
+      "forecast_horizon_days": 90,
+      "generated_at": "2025-10-24T08:30:00Z",
+      "metadata": {
+        "seasonality_detected": false,
+        "trend_direction": "decreasing",
+        "variance": 12500000.00,
+        "r_squared": 0.97
+      },
+      "warnings": null,
+      "baseline_scenario": "realistic",
+      "sensitivity_analysis": null,
+      "updated_at": null
+    },
+    {
+      "projection_id": "proj_expenses_holt_winters",
+      "user_id": "user_enterprise_xyz",
+      "metric_type": "expenses",
+      "algorithm": "holt_winters",
+      "historical_data": [
+        {"date": "2025-04-01", "value": 28000.00},
+        {"date": "2025-05-01", "value": 26500.00},
+        {"date": "2025-06-01", "value": 29200.00},
+        {"date": "2025-07-01", "value": 27800.00},
+        {"date": "2025-08-01", "value": 30100.00},
+        {"date": "2025-09-01", "value": 28900.00},
+        {"date": "2025-10-01", "value": 31500.00}
+      ],
+      "projected_data": [
+        {"date": "2025-11-01", "value": 29700.00, "confidence_lower": 26500.00, "confidence_upper": 32900.00},
+        {"date": "2025-12-01", "value": 32100.00, "confidence_lower": 28300.00, "confidence_upper": 35900.00},
+        {"date": "2026-01-01", "value": 30200.00, "confidence_lower": 26100.00, "confidence_upper": 34300.00},
+        {"date": "2026-02-01", "value": 28800.00, "confidence_lower": 24400.00, "confidence_upper": 33200.00},
+        {"date": "2026-03-01", "value": 31400.00, "confidence_lower": 26600.00, "confidence_upper": 36200.00},
+        {"date": "2026-04-01", "value": 29900.00, "confidence_lower": 24800.00, "confidence_upper": 35000.00}
+      ],
+      "confidence_level": 0.80,
+      "forecast_horizon_days": 180,
+      "generated_at": "2025-10-24T14:15:00Z",
+      "metadata": {
+        "seasonality_detected": true,
+        "trend_direction": "increasing",
+        "variance": 2840000.00,
+        "r_squared": null
+      },
+      "warnings": ["high_variance"],
+      "baseline_scenario": "pessimistic",
+      "sensitivity_analysis": {
+        "income_variance_pct": 0,
+        "expense_variance_pct": 15
+      },
+      "updated_at": "2025-10-24T16:00:00Z"
+    },
+    {
+      "projection_id": "proj_burn_exponential_smooth",
+      "user_id": "user_grant_funded_research",
+      "metric_type": "burn_rate",
+      "algorithm": "exponential_smoothing",
+      "historical_data": [
+        {"date": "2025-01-01", "value": 12000.00},
+        {"date": "2025-02-01", "value": 11800.00},
+        {"date": "2025-03-01", "value": 11200.00},
+        {"date": "2025-04-01", "value": 10900.00},
+        {"date": "2025-05-01", "value": 10500.00},
+        {"date": "2025-06-01", "value": 10100.00},
+        {"date": "2025-07-01", "value": 9800.00},
+        {"date": "2025-08-01", "value": 9400.00},
+        {"date": "2025-09-01", "value": 9100.00},
+        {"date": "2025-10-01", "value": 8700.00}
+      ],
+      "projected_data": [
+        {"date": "2025-11-01", "value": 8400.00, "confidence_lower": 7900.00, "confidence_upper": 8900.00},
+        {"date": "2025-12-01", "value": 8100.00, "confidence_lower": 7500.00, "confidence_upper": 8700.00},
+        {"date": "2026-01-01", "value": 7800.00, "confidence_lower": 7100.00, "confidence_upper": 8500.00},
+        {"date": "2026-02-01", "value": 7500.00, "confidence_lower": 6700.00, "confidence_upper": 8300.00},
+        {"date": "2026-03-01", "value": 7200.00, "confidence_lower": 6300.00, "confidence_upper": 8100.00},
+        {"date": "2026-04-01", "value": 6900.00, "confidence_lower": 5900.00, "confidence_upper": 7900.00},
+        {"date": "2026-05-01", "value": 6600.00, "confidence_lower": 5500.00, "confidence_upper": 7700.00},
+        {"date": "2026-06-01", "value": 6300.00, "confidence_lower": 5100.00, "confidence_upper": 7500.00},
+        {"date": "2026-07-01", "value": 6000.00, "confidence_lower": 4700.00, "confidence_upper": 7300.00},
+        {"date": "2026-08-01", "value": 5700.00, "confidence_lower": 4300.00, "confidence_upper": 7100.00},
+        {"date": "2026-09-01", "value": 5400.00, "confidence_lower": 3900.00, "confidence_upper": 6900.00},
+        {"date": "2026-10-01", "value": 5100.00, "confidence_lower": 3500.00, "confidence_upper": 6700.00}
+      ],
+      "confidence_level": 0.90,
+      "forecast_horizon_days": 365,
+      "generated_at": "2025-10-24T10:00:00Z",
+      "metadata": {
+        "seasonality_detected": false,
+        "trend_direction": "decreasing",
+        "variance": 1250000.00,
+        "r_squared": null
+      },
+      "warnings": ["extrapolation_risk"],
+      "baseline_scenario": "optimistic",
+      "sensitivity_analysis": {
+        "income_variance_pct": 10,
+        "expense_variance_pct": -15
+      },
+      "updated_at": null
+    }
+  ]
+}

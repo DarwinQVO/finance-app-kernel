@@ -1,0 +1,277 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/goal-config.schema.json",
+  "title": "Goal Configuration",
+  "description": "Financial goal configuration. Defines target, deadline, frequency, and alert preferences. Used to track savings goals, income targets, expense reduction, debt payoff, and net worth milestones with progress monitoring and notifications.",
+  "type": "object",
+  "required": [
+    "goal_id",
+    "user_id",
+    "name",
+    "goal_type",
+    "target_amount",
+    "deadline",
+    "frequency",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "goal_id": {
+      "type": "string",
+      "pattern": "^goal_[a-z0-9_]+$",
+      "description": "Unique goal ID. Primary key for goals table. Pattern: goal_{type}_{random}. Examples: goal_savings_001, goal_income_abc123, goal_debt_xyz789"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "User ID who owns this goal. Foreign key to users table. Used to filter goals by user and enforce user-specific permissions."
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 1,
+      "description": "User-friendly goal name. Required, non-empty. Examples: 'Emergency Fund', 'Q4 Revenue Target', 'Pay Off Credit Card', 'House Down Payment', 'Vacation Fund'"
+    },
+    "goal_type": {
+      "type": "string",
+      "enum": ["savings", "income", "expense_reduction", "debt_payoff", "net_worth"],
+      "description": "Type of financial goal. savings=accumulate money in account, income=achieve revenue/earnings target, expense_reduction=reduce spending in category, debt_payoff=eliminate debt balance, net_worth=reach total assets - liabilities target"
+    },
+    "target_amount": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "minimum": 0.01,
+      "description": "Target amount for goal completion. Must be positive. For savings=target balance, income=target revenue, expense_reduction=maximum allowed spending, debt_payoff=debt to eliminate, net_worth=target net worth. Currency assumed from user settings."
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date",
+      "description": "Target completion date for goal. ISO 8601 date format (YYYY-MM-DD). Used to calculate time remaining and required monthly/weekly contribution. Can be in past for overdue goals."
+    },
+    "frequency": {
+      "type": "string",
+      "enum": ["one_time", "daily", "weekly", "monthly", "quarterly", "yearly"],
+      "description": "Goal frequency/recurrence. one_time=single deadline (e.g., save $10k by Dec 2025), daily=daily target (e.g., earn $500/day), weekly=weekly target, monthly=monthly target (most common for income/savings), quarterly=quarterly target, yearly=annual target"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "completed", "archived", "overdue"],
+      "description": "Current goal status. active=in progress toward deadline, completed=target reached, archived=user canceled or paused goal, overdue=deadline passed without reaching target. Status updated automatically by system."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when goal was created. ISO 8601 format. Immutable. Used for goal age calculations and analytics."
+    },
+    "description": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Optional detailed description of goal. NULL or empty for simple goals. Examples: 'Save 6 months of expenses for emergencies', 'Increase consulting revenue to $8k/month', 'Eliminate $25k credit card debt from 2023 overspending'. Supports markdown formatting."
+    },
+    "current_value": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "description": "Current progress toward goal. Auto-calculated from linked accounts/transactions or manually updated. For savings=current balance, income=month-to-date revenue, expense_reduction=month-to-date spending, debt_payoff=remaining debt, net_worth=current net worth. Default: 0"
+    },
+    "start_value": {
+      "type": ["number", "null"],
+      "multipleOf": 0.01,
+      "description": "Starting value when goal was created. NULL if goal starts from zero. For debt_payoff=initial debt amount, net_worth=net worth at goal start. Used to calculate total progress (current - start) / (target - start)."
+    },
+    "category": {
+      "type": ["string", "null"],
+      "maxLength": 50,
+      "description": "Goal category for organization. NULL for uncategorized. Examples: 'Short-term', 'Long-term', 'Emergency', 'Retirement', 'Business', 'Personal', 'Family'. User-defined, not enforced by system."
+    },
+    "tags": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string",
+        "maxLength": 30
+      },
+      "maxItems": 10,
+      "uniqueItems": true,
+      "description": "Optional tags for goal classification. NULL or empty for untagged goals. Examples: ['high-priority', 'tax-deductible', 'joint'], ['Q4-2025', 'sales-team'], ['medical', 'insurance']. Used for filtering and reporting."
+    },
+    "alert_thresholds": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "number",
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "multipleOf": 0.01
+      },
+      "uniqueItems": true,
+      "description": "Progress percentage thresholds for alerts. Values between 0.0 and 1.0. NULL for no alerts. Common values: [0.25, 0.50, 0.75, 1.0] = alerts at 25%, 50%, 75%, 100% progress. System triggers notification when progress crosses each threshold."
+    },
+    "notification_channels": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string",
+        "enum": ["in_app", "email", "sms", "push"]
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Notification delivery channels for goal alerts. NULL for no notifications. in_app=notification panel, email=user's email, sms=text message, push=mobile push. Multiple channels allowed. Only used if alert_thresholds is set."
+    },
+    "recurring_contribution": {
+      "type": ["object", "null"],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "multipleOf": 0.01,
+          "minimum": 0.01,
+          "description": "Contribution amount per period. Must be positive. For savings=deposit amount, debt_payoff=payment amount. Currency from user settings."
+        },
+        "frequency": {
+          "type": "string",
+          "enum": ["daily", "weekly", "bi_weekly", "monthly", "quarterly"],
+          "description": "Contribution frequency. daily=every day, weekly=once per week, bi_weekly=every 2 weeks (26 payments/year), monthly=once per month, quarterly=every 3 months"
+        },
+        "auto_transfer": {
+          "type": "boolean",
+          "description": "Whether to enable automatic transfers. true=system automatically moves funds from source account to goal account, false=manual contributions tracked only. Requires linked bank account."
+        },
+        "source_account_id": {
+          "type": ["string", "null"],
+          "description": "Source account for auto transfers. NULL if auto_transfer=false. Foreign key to accounts table. Funds withdrawn from this account for automatic contributions."
+        }
+      },
+      "required": ["amount", "frequency", "auto_transfer"],
+      "description": "Recurring contribution settings. NULL for one-time goals or goals without regular contributions. Used to calculate projected completion date and track expected vs. actual contributions.",
+      "additionalProperties": false
+    },
+    "linked_accounts": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "description": "Account IDs linked to this goal. NULL for manually tracked goals. For savings=savings account IDs, debt_payoff=credit card/loan account IDs. System auto-updates current_value from linked account balances."
+    },
+    "completion_date": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when goal was completed. NULL for incomplete goals. ISO 8601 format. Set automatically when current_value >= target_amount. Immutable once set."
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when goal was last modified. NULL if never modified. ISO 8601 format. Updates when user edits settings or when current_value changes."
+    },
+    "priority": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Goal priority for display ordering. 1=lowest priority, 10=highest priority. NULL for default priority (5). Used to sort goals in UI when multiple active goals exist."
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "description": "Additional metadata for advanced use cases. Examples: integration IDs for external financial planners, linked investment accounts, beneficiary information for estate planning, grant tracking for nonprofits, milestone dates for project-based goals",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "goal_id": "goal_savings_emergency_001",
+      "user_id": "user_personal_abc123",
+      "name": "Emergency Fund - 6 Months Expenses",
+      "goal_type": "savings",
+      "target_amount": 18000.00,
+      "deadline": "2026-06-30",
+      "frequency": "one_time",
+      "status": "active",
+      "created_at": "2025-01-01T00:00:00Z",
+      "description": "Build emergency fund covering 6 months of essential expenses ($3,000/month). High priority financial safety net for job loss, medical emergencies, or major unexpected expenses.",
+      "current_value": 7200.00,
+      "start_value": 0.00,
+      "category": "Emergency",
+      "tags": ["high-priority", "savings", "safety-net"],
+      "alert_thresholds": [0.25, 0.50, 0.75, 1.0],
+      "notification_channels": ["in_app", "email"],
+      "recurring_contribution": {
+        "amount": 600.00,
+        "frequency": "monthly",
+        "auto_transfer": true,
+        "source_account_id": "acct_checking_primary"
+      },
+      "linked_accounts": ["acct_savings_emergency"],
+      "completion_date": null,
+      "updated_at": "2025-10-24T08:00:00Z",
+      "priority": 10,
+      "metadata": {
+        "monthly_expenses": 3000.00,
+        "months_coverage": 6,
+        "milestone_dates": {
+          "25_pct": "2025-04-15",
+          "50_pct": "2025-07-20"
+        }
+      }
+    },
+    {
+      "goal_id": "goal_income_consulting_q4",
+      "user_id": "user_freelancer_xyz789",
+      "name": "Q4 Consulting Revenue - $24k",
+      "goal_type": "income",
+      "target_amount": 24000.00,
+      "deadline": "2025-12-31",
+      "frequency": "monthly",
+      "status": "active",
+      "created_at": "2025-10-01T00:00:00Z",
+      "description": "Achieve $8,000/month average consulting revenue for Q4 2025 (Oct, Nov, Dec). Focus on 2-3 enterprise clients with retainer agreements. Target: 3 clients × $2,500/month + project work.",
+      "current_value": 8500.00,
+      "start_value": null,
+      "category": "Business",
+      "tags": ["Q4-2025", "consulting", "revenue"],
+      "alert_thresholds": [0.33, 0.67, 1.0],
+      "notification_channels": ["in_app", "email", "push"],
+      "recurring_contribution": null,
+      "linked_accounts": ["acct_business_checking"],
+      "completion_date": null,
+      "updated_at": "2025-10-24T18:30:00Z",
+      "priority": 9,
+      "metadata": {
+        "monthly_target": 8000.00,
+        "clients_targeted": ["Client A", "Client B", "Client C"],
+        "avg_hourly_rate": 150.00,
+        "min_hours_per_month": 53.33
+      }
+    },
+    {
+      "goal_id": "goal_debt_payoff_cc_002",
+      "user_id": "user_recovery_def456",
+      "name": "Eliminate Credit Card Debt",
+      "goal_type": "debt_payoff",
+      "target_amount": 0.00,
+      "deadline": "2027-10-31",
+      "frequency": "monthly",
+      "status": "active",
+      "created_at": "2025-10-15T00:00:00Z",
+      "description": "Pay off $25,000 credit card debt from 2023-2024 overspending. Current balance: $25,000 @ 18.99% APR. Aggressive payoff plan with bi-weekly payments to save on interest. Projected total interest: $4,200 if paid over 24 months.",
+      "current_value": 25000.00,
+      "start_value": 25000.00,
+      "category": "Debt",
+      "tags": ["high-priority", "debt-payoff", "credit-card"],
+      "alert_thresholds": [0.25, 0.50, 0.75, 1.0],
+      "notification_channels": ["in_app", "email", "sms"],
+      "recurring_contribution": {
+        "amount": 550.00,
+        "frequency": "bi_weekly",
+        "auto_transfer": true,
+        "source_account_id": "acct_checking_primary"
+      },
+      "linked_accounts": ["acct_cc_visa_001"],
+      "completion_date": null,
+      "updated_at": "2025-10-24T12:00:00Z",
+      "priority": 10,
+      "metadata": {
+        "apr": 18.99,
+        "minimum_payment": 500.00,
+        "actual_payment": 1100.00,
+        "months_to_payoff": 24,
+        "total_interest_projected": 4200.00,
+        "interest_saved_vs_minimum": 8300.00
+      }
+    }
+  ]
+}

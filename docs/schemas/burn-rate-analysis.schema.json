@@ -1,0 +1,365 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/burn-rate-analysis.schema.json",
+  "title": "Burn Rate Analysis",
+  "description": "Burn rate analysis output. Contains burn rate calculation, cash runway, trend analysis, and financial health metrics. Used for startups, grant-funded projects, and personal finance to monitor cash depletion rate and predict zero balance date.",
+  "type": "object",
+  "required": [
+    "analysis_id",
+    "user_id",
+    "current_balance",
+    "burn_rate_monthly",
+    "calculation_method",
+    "analysis_period_months",
+    "runway_months",
+    "generated_at"
+  ],
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "pattern": "^burn_[a-z0-9_]+$",
+      "description": "Unique burn rate analysis ID. Primary key for burn_rate_analyses table. Pattern: burn_{timestamp}_{random}. Examples: burn_20251024_001, burn_abc123, burn_startup_xyz"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "User ID who owns this analysis. Foreign key to users table. Used to filter analyses by user and apply user-specific account filters."
+    },
+    "current_balance": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "description": "Current total cash balance across all tracked accounts. Sum of checking, savings, and investment accounts minus credit card/loan balances if included. Can be negative for net debt position. Currency from user settings."
+    },
+    "burn_rate_monthly": {
+      "type": "number",
+      "multipleOf": 0.01,
+      "description": "Monthly burn rate (expenses - income). Positive = net outflow (burning cash), negative = net inflow (accumulating cash). For startups: operating expenses - revenue. For personal finance: spending - income. Can be negative for profitable/positive cash flow situations."
+    },
+    "calculation_method": {
+      "type": "string",
+      "enum": ["simple", "weighted", "exponential_moving_average"],
+      "description": "Method used to calculate burn rate. simple=average of (expenses - income) over period, weighted=recent months weighted more heavily, exponential_moving_average=EMA smoothing for volatile data. Recommended: simple for stable finances, weighted for changing conditions, EMA for high volatility."
+    },
+    "analysis_period_months": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 36,
+      "description": "Number of historical months analyzed. Minimum 1 month, maximum 36 months (3 years). Longer periods smooth out seasonality but may miss recent trends. Recommended: 3 months for startups, 6 months for personal finance, 12 months for seasonal businesses."
+    },
+    "runway_months": {
+      "type": ["number", "null"],
+      "multipleOf": 0.01,
+      "minimum": 0,
+      "description": "Cash runway in months until balance reaches zero. Calculated as current_balance / burn_rate_monthly. NULL if burn_rate_monthly <= 0 (positive cash flow = infinite runway). Examples: 5.5 = 5.5 months until cash out, null = profitable/growing balance."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this analysis was generated. ISO 8601 format. Used to determine if analysis needs refresh (e.g., regenerate daily or when new transactions added)."
+    },
+    "trend": {
+      "type": ["string", "null"],
+      "enum": ["increasing", "decreasing", "stable", "volatile", null],
+      "description": "Burn rate trend over analysis period. increasing=burn rate rising (worse, cash depleting faster), decreasing=burn rate falling (better, moving toward profitability), stable=consistent burn rate, volatile=erratic burn rate (unpredictable). NULL if insufficient data for trend analysis (< 3 months)."
+    },
+    "zero_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Predicted date when balance reaches zero. ISO 8601 date format (YYYY-MM-DD). NULL if burn_rate_monthly <= 0 (positive cash flow) or if current_balance <= 0 (already at/below zero). Calculated as today + runway_months. Critical metric for fundraising/budgeting deadlines."
+    },
+    "variance_percentage": {
+      "type": ["number", "null"],
+      "multipleOf": 0.01,
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Variance of monthly burn rate as percentage. Measures consistency. 0 = perfectly consistent, 100 = extremely volatile. NULL if analysis_period_months < 2. High variance (> 30%) indicates unpredictable spending/income. Used to assess forecast reliability."
+    },
+    "monthly_breakdown": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "format": "date",
+            "description": "Month start date. ISO 8601 format (YYYY-MM-01). First day of month."
+          },
+          "income": {
+            "type": "number",
+            "multipleOf": 0.01,
+            "minimum": 0,
+            "description": "Total income for this month. Sum of all positive transactions (revenue, salary, investment income, transfers in)."
+          },
+          "expenses": {
+            "type": "number",
+            "multipleOf": 0.01,
+            "minimum": 0,
+            "description": "Total expenses for this month. Sum of all negative transactions (operating costs, purchases, loan payments, transfers out)."
+          },
+          "net": {
+            "type": "number",
+            "multipleOf": 0.01,
+            "description": "Net cash flow for this month (income - expenses). Positive = surplus, negative = deficit."
+          },
+          "burn_rate": {
+            "type": "number",
+            "multipleOf": 0.01,
+            "description": "Burn rate for this month. Negative net = burn, positive net = accumulation. Same as -net for clarity."
+          }
+        },
+        "required": ["month", "income", "expenses", "net", "burn_rate"],
+        "additionalProperties": false
+      },
+      "description": "Month-by-month breakdown of income, expenses, and burn rate. NULL if detailed breakdown not requested. Used for detailed analysis and identifying spending spikes. Array sorted chronologically (oldest to newest)."
+    },
+    "comparison_previous_period": {
+      "type": ["object", "null"],
+      "properties": {
+        "burn_rate_change_pct": {
+          "type": "number",
+          "multipleOf": 0.01,
+          "description": "Percentage change in burn rate vs. previous period. Positive = burn rate increased (worse), negative = burn rate decreased (better). Example: 25.0 = burn rate is 25% higher than previous period, -15.0 = burn rate is 15% lower."
+        },
+        "trend_direction": {
+          "type": "string",
+          "enum": ["improving", "worsening", "stable"],
+          "description": "Direction of change vs. previous period. improving=burn rate decreasing or revenue increasing, worsening=burn rate increasing or revenue decreasing, stable=no significant change (< 5% change)."
+        }
+      },
+      "required": ["burn_rate_change_pct", "trend_direction"],
+      "description": "Comparison to previous analysis period. NULL if no previous period data available (first analysis). Used to track progress toward profitability or identify deteriorating financial health.",
+      "additionalProperties": false
+    },
+    "recommendations": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string",
+        "enum": ["reduce_expenses", "increase_income", "on_track", "seek_funding", "extend_runway", "cut_discretionary", "diversify_revenue", "critical_action_needed"]
+      },
+      "uniqueItems": true,
+      "description": "Automated recommendations based on analysis. reduce_expenses=burn rate too high, increase_income=revenue insufficient, on_track=healthy financial position, seek_funding=runway < 6 months for startup, extend_runway=take action to preserve cash, cut_discretionary=eliminate non-essential spending, diversify_revenue=reduce dependency on single income source, critical_action_needed=runway < 3 months. NULL or empty if no specific recommendations."
+    },
+    "runway_scenarios": {
+      "type": ["object", "null"],
+      "properties": {
+        "optimistic_months": {
+          "type": ["number", "null"],
+          "multipleOf": 0.01,
+          "minimum": 0,
+          "description": "Runway under optimistic scenario (e.g., 20% expense reduction or 20% revenue increase). NULL if burn_rate_monthly <= 0 in optimistic case."
+        },
+        "pessimistic_months": {
+          "type": ["number", "null"],
+          "multipleOf": 0.01,
+          "minimum": 0,
+          "description": "Runway under pessimistic scenario (e.g., 20% expense increase or 20% revenue decrease). NULL if burn_rate_monthly <= 0 in pessimistic case (unlikely)."
+        },
+        "assumptions": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Description of scenario assumptions. Example: 'Optimistic: 20% expense reduction, Pessimistic: 20% revenue decrease'"
+        }
+      },
+      "description": "Scenario analysis showing runway under different conditions. NULL if scenario analysis not performed. Used for contingency planning and sensitivity analysis.",
+      "additionalProperties": false
+    },
+    "category_breakdown": {
+      "type": ["object", "null"],
+      "properties": {
+        "top_expense_categories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string",
+                "maxLength": 50,
+                "description": "Expense category name. Examples: 'Salaries', 'Rent', 'Marketing', 'Software', 'Groceries'"
+              },
+              "amount": {
+                "type": "number",
+                "multipleOf": 0.01,
+                "minimum": 0,
+                "description": "Average monthly spending in this category over analysis period."
+              },
+              "percentage": {
+                "type": "number",
+                "multipleOf": 0.01,
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Percentage of total expenses. Used to identify cost reduction opportunities."
+              }
+            },
+            "required": ["category", "amount", "percentage"]
+          },
+          "maxItems": 10,
+          "description": "Top expense categories by spending. Sorted by amount descending. Limited to top 10 for clarity."
+        }
+      },
+      "description": "Breakdown of expenses by category. NULL if category data not available or not requested. Used to identify where cash is being spent and potential areas for reduction.",
+      "additionalProperties": false
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when this analysis was last updated. NULL if never updated. ISO 8601 format. Updates when scheduled refresh occurs or when user modifies account filters."
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "description": "Additional metadata for advanced use cases. Examples: linked grant tracking for nonprofits, investor reporting IDs for startups, department-level burn rate for enterprises, healthcare claims processing for medical practices",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "analysis_id": "burn_startup_20251024",
+      "user_id": "user_startup_saas_abc",
+      "current_balance": 120000.00,
+      "burn_rate_monthly": 15000.00,
+      "calculation_method": "simple",
+      "analysis_period_months": 6,
+      "runway_months": 8.0,
+      "generated_at": "2025-10-24T09:00:00Z",
+      "trend": "increasing",
+      "zero_date": "2026-06-24",
+      "variance_percentage": 18.5,
+      "monthly_breakdown": [
+        {"month": "2025-04-01", "income": 5000.00, "expenses": 18000.00, "net": -13000.00, "burn_rate": 13000.00},
+        {"month": "2025-05-01", "income": 6000.00, "expenses": 19500.00, "net": -13500.00, "burn_rate": 13500.00},
+        {"month": "2025-06-01", "income": 5500.00, "expenses": 20000.00, "net": -14500.00, "burn_rate": 14500.00},
+        {"month": "2025-07-01", "income": 7000.00, "expenses": 21500.00, "net": -14500.00, "burn_rate": 14500.00},
+        {"month": "2025-08-01", "income": 8000.00, "expenses": 24000.00, "net": -16000.00, "burn_rate": 16000.00},
+        {"month": "2025-09-01", "income": 9000.00, "expenses": 26000.00, "net": -17000.00, "burn_rate": 17000.00}
+      ],
+      "comparison_previous_period": {
+        "burn_rate_change_pct": 23.1,
+        "trend_direction": "worsening"
+      },
+      "recommendations": ["reduce_expenses", "increase_income", "seek_funding"],
+      "runway_scenarios": {
+        "optimistic_months": 10.0,
+        "pessimistic_months": 6.0,
+        "assumptions": "Optimistic: 20% expense reduction. Pessimistic: Revenue growth stalls, expenses increase 10%."
+      },
+      "category_breakdown": {
+        "top_expense_categories": [
+          {"category": "Salaries", "amount": 12000.00, "percentage": 52.17},
+          {"category": "Cloud Infrastructure", "amount": 4500.00, "percentage": 19.57},
+          {"category": "Marketing", "amount": 3000.00, "percentage": 13.04},
+          {"category": "Office Rent", "amount": 2000.00, "percentage": 8.70},
+          {"category": "Software Subscriptions", "amount": 1500.00, "percentage": 6.52}
+        ]
+      },
+      "updated_at": null,
+      "metadata": {
+        "company_stage": "seed",
+        "employees": 5,
+        "last_funding_round": "2024-06-01",
+        "funding_amount": 500000.00,
+        "next_milestone": "Series A at $50k MRR"
+      }
+    },
+    {
+      "analysis_id": "burn_personal_finance_xyz",
+      "user_id": "user_freelancer_personal_xyz",
+      "current_balance": 28000.00,
+      "burn_rate_monthly": 4200.00,
+      "calculation_method": "weighted",
+      "analysis_period_months": 3,
+      "runway_months": 6.67,
+      "generated_at": "2025-10-24T14:30:00Z",
+      "trend": "stable",
+      "zero_date": "2026-05-14",
+      "variance_percentage": 12.3,
+      "monthly_breakdown": [
+        {"month": "2025-07-01", "income": 6500.00, "expenses": 10500.00, "net": -4000.00, "burn_rate": 4000.00},
+        {"month": "2025-08-01", "income": 7000.00, "expenses": 11200.00, "net": -4200.00, "burn_rate": 4200.00},
+        {"month": "2025-09-01", "income": 6800.00, "expenses": 11200.00, "net": -4400.00, "burn_rate": 4400.00}
+      ],
+      "comparison_previous_period": {
+        "burn_rate_change_pct": 5.0,
+        "trend_direction": "worsening"
+      },
+      "recommendations": ["reduce_expenses", "increase_income", "cut_discretionary"],
+      "runway_scenarios": {
+        "optimistic_months": 9.33,
+        "pessimistic_months": 5.0,
+        "assumptions": "Optimistic: Increase income by $1,000/month. Pessimistic: Expenses increase by $500/month."
+      },
+      "category_breakdown": {
+        "top_expense_categories": [
+          {"category": "Rent", "amount": 2500.00, "percentage": 22.32},
+          {"category": "Groceries", "amount": 800.00, "percentage": 7.14},
+          {"category": "Transportation", "amount": 600.00, "percentage": 5.36},
+          {"category": "Utilities", "amount": 350.00, "percentage": 3.13},
+          {"category": "Dining", "amount": 500.00, "percentage": 4.46},
+          {"category": "Entertainment", "amount": 300.00, "percentage": 2.68},
+          {"category": "Insurance", "amount": 450.00, "percentage": 4.02},
+          {"category": "Debt Payments", "amount": 1200.00, "percentage": 10.71}
+        ]
+      },
+      "updated_at": "2025-10-24T16:00:00Z",
+      "metadata": {
+        "income_type": "freelance",
+        "income_volatility": "moderate",
+        "emergency_fund_target": 18000.00,
+        "current_emergency_fund": 5000.00
+      }
+    },
+    {
+      "analysis_id": "burn_grant_research_def",
+      "user_id": "user_nonprofit_research_def",
+      "current_balance": 185000.00,
+      "burn_rate_monthly": 12500.00,
+      "calculation_method": "exponential_moving_average",
+      "analysis_period_months": 12,
+      "runway_months": 14.8,
+      "generated_at": "2025-10-24T11:00:00Z",
+      "trend": "decreasing",
+      "zero_date": "2027-01-09",
+      "variance_percentage": 8.7,
+      "monthly_breakdown": [
+        {"month": "2024-10-01", "income": 0.00, "expenses": 15000.00, "net": -15000.00, "burn_rate": 15000.00},
+        {"month": "2024-11-01", "income": 0.00, "expenses": 14500.00, "net": -14500.00, "burn_rate": 14500.00},
+        {"month": "2024-12-01", "income": 0.00, "expenses": 14000.00, "net": -14000.00, "burn_rate": 14000.00},
+        {"month": "2025-01-01", "income": 0.00, "expenses": 13800.00, "net": -13800.00, "burn_rate": 13800.00},
+        {"month": "2025-02-01", "income": 0.00, "expenses": 13500.00, "net": -13500.00, "burn_rate": 13500.00},
+        {"month": "2025-03-01", "income": 0.00, "expenses": 13200.00, "net": -13200.00, "burn_rate": 13200.00},
+        {"month": "2025-04-01", "income": 0.00, "expenses": 13000.00, "net": -13000.00, "burn_rate": 13000.00},
+        {"month": "2025-05-01", "income": 0.00, "expenses": 12800.00, "net": -12800.00, "burn_rate": 12800.00},
+        {"month": "2025-06-01", "income": 0.00, "expenses": 12500.00, "net": -12500.00, "burn_rate": 12500.00},
+        {"month": "2025-07-01", "income": 0.00, "expenses": 12200.00, "net": -12200.00, "burn_rate": 12200.00},
+        {"month": "2025-08-01", "income": 0.00, "expenses": 12000.00, "net": -12000.00, "burn_rate": 12000.00},
+        {"month": "2025-09-01", "income": 0.00, "expenses": 11800.00, "net": -11800.00, "burn_rate": 11800.00}
+      ],
+      "comparison_previous_period": {
+        "burn_rate_change_pct": -16.7,
+        "trend_direction": "improving"
+      },
+      "recommendations": ["on_track"],
+      "runway_scenarios": {
+        "optimistic_months": 18.5,
+        "pessimistic_months": 12.3,
+        "assumptions": "Optimistic: Further 15% expense reduction through efficiency. Pessimistic: Expenses increase 10% due to inflation."
+      },
+      "category_breakdown": {
+        "top_expense_categories": [
+          {"category": "Researcher Salaries", "amount": 8000.00, "percentage": 64.00},
+          {"category": "Lab Supplies", "amount": 2000.00, "percentage": 16.00},
+          {"category": "Equipment Rental", "amount": 1200.00, "percentage": 9.60},
+          {"category": "Publications", "amount": 800.00, "percentage": 6.40},
+          {"category": "Travel", "amount": 500.00, "percentage": 4.00}
+        ]
+      },
+      "updated_at": null,
+      "metadata": {
+        "grant_id": "NSF-2024-001234",
+        "grant_start_date": "2024-01-01",
+        "grant_end_date": "2026-12-31",
+        "total_grant_amount": 500000.00,
+        "principal_investigator": "Dr. Jane Smith",
+        "research_area": "Climate Change Mitigation"
+      }
+    }
+  ]
+}

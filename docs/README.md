@@ -31,6 +31,7 @@
 
 ### Group 4: Derivatives & Insights
 - **[4.1 Reminders](verticals/4.1-reminders.md)** ✅ Complete - Alert rules, notification delivery, snooze/dismiss, persistence, multi-channel dispatch
+- **[4.2 Forecast](verticals/4.2-forecast.md)** ✅ Complete - Income/expense projections, goal tracking, burn rate, cash runway, scenario analysis
 
 ---
 
@@ -134,6 +135,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[NotificationDispatcher](primitives/ol/NotificationDispatcher.md)** - Multi-channel notification delivery (in-app, email, SMS, push) with retry logic
 - **[ReminderStore](primitives/ol/ReminderStore.md)** - CRUD for alert rules, notification history, snooze state, delivery receipts
 
+**Vertical 4.2 (Forecast):**
+- **[ProjectionEngine](primitives/ol/ProjectionEngine.md)** - Forecasting algorithms (Holt-Winters, linear regression, moving average, ARIMA, Prophet) with accuracy metrics
+- **[GoalStore](primitives/ol/GoalStore.md)** - CRUD for financial goals with progress tracking, milestone alerts, and recurring contributions
+- **[BurnRateCalculator](primitives/ol/BurnRateCalculator.md)** - Calculate burn rate (simple, weighted, EMA), cash runway, zero date prediction
+- **[ForecastCache](primitives/ol/ForecastCache.md)** - Cache projections with 24h TTL, smart invalidation on data changes
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -173,6 +180,9 @@ Reusable UI components:
 - **[ReminderBell](primitives/il/ReminderBell.md)** - Bell icon with badge counter, dropdown for recent notifications, unread indicator
 - **[NotificationPanel](primitives/il/NotificationPanel.md)** - Full notification center with filtering, mark as read, snooze/dismiss actions
 - **[ReminderConfigDialog](primitives/il/ReminderConfigDialog.md)** - Create/edit alert rules with condition builder, channel selection, scheduling
+- **[ForecastChart](primitives/il/ForecastChart.md)** - Interactive line/area/bar chart for historical data + projections with confidence intervals, algorithm comparison
+- **[GoalProgressCard](primitives/il/GoalProgressCard.md)** - Goal display with progress bar, on-track status, time/amount remaining, milestone tracking
+- **[GoalConfigDialog](primitives/il/GoalConfigDialog.md)** - Modal for creating/editing goals with templates, tabbed interface (Basic/Advanced/Preview), live preview
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -250,6 +260,11 @@ Executable contracts extracted from vertical specifications:
 - **[notification-event.schema.json](schemas/notification-event.schema.json)** - Notification event record (type, payload, delivery status, timestamp, read state)
 - **[alert-condition.schema.json](schemas/alert-condition.schema.json)** - Alert condition definition (field, operator, threshold, pattern, anomaly detection parameters)
 
+**Vertical 4.2 (Forecast):**
+- **[forecast-projection.schema.json](schemas/forecast-projection.schema.json)** - Projection result with historical data, forecasted values, confidence intervals, algorithm metadata
+- **[goal-config.schema.json](schemas/goal-config.schema.json)** - Goal configuration (target amount, deadline, category, recurring contributions, milestones)
+- **[burn-rate-analysis.schema.json](schemas/burn-rate-analysis.schema.json)** - Burn rate calculation result (daily/weekly/monthly rates, runway months, zero date prediction)
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -283,6 +298,9 @@ Key architectural decisions with rationale:
 - **[ADR-0018: Notification Delivery Strategy](adr/0018-notification-delivery-strategy.md)** - Multi-channel dispatch with priority queue, retry logic, and delivery receipts
 - **[ADR-0019: Alert Rule Engine Architecture](adr/0019-alert-rule-engine-architecture.md)** - Event-driven evaluation with scheduled polling, threshold-based triggers, and condition composition
 - **[ADR-0020: Reminder Snooze & Persistence Strategy](adr/0020-reminder-snooze-persistence.md)** - User-specific snooze state with exponential backoff and cross-device synchronization
+- **[ADR-0021: Projection Algorithm Strategy](adr/0021-projection-algorithm-strategy.md)** - Multi-algorithm ensemble with accuracy tracking, algorithm selection based on data characteristics
+- **[ADR-0022: Goal Tracking Persistence Strategy](adr/0022-goal-tracking-persistence.md)** - Milestone-based tracking with auto-progression, recurring contribution handling, achievement notifications
+- **[ADR-0023: Forecast Caching Strategy](adr/0023-forecast-caching-strategy.md)** - 24-hour projection cache with smart invalidation on transaction changes, pre-warming for common queries
 
 ---
 
@@ -306,6 +324,7 @@ User experience specifications with wireframes and journeys:
 - **[3.8 Cluster Rules Experience](ux-flows/3.8-cluster-rules-experience.md)** - Create normalization rule, view clusters, test rule pattern, manual cluster adjustments, bulk apply rules
 - **[3.9 Reconciliation Strategies Experience](ux-flows/3.9-reconciliation-strategies-experience.md)** - Auto-matched items, review suggested matches, manual match creation, reject false positives, split transaction matching, adjust thresholds
 - **[4.1 Reminders Experience](ux-flows/4.1-reminders-experience.md)** - Create alert rules, receive notifications, snooze/dismiss, configure channels, view notification history, test conditions
+- **[4.2 Forecast Experience](ux-flows/4.2-forecast-experience.md)** - View projections, compare algorithms, create goals, track progress, analyze burn rate, run scenarios
 
 ---
 
@@ -329,7 +348,8 @@ User experience specifications with wireframes and journeys:
 | | 3.8 Cluster Rules | ✅ Complete |
 | | 3.9 Reconciliation Strategies | ✅ Complete |
 | **4. Derivatives** | 4.1 Reminders | ✅ Complete |
-| | 4.2-4.3 | 📝 Pending |
+| | 4.2 Forecast | ✅ Complete |
+| | 4.3 Corrections Flow | 📝 Pending |
 | **5. Governance** | 5.1-5.5 | 📝 Pending |
 
 ---

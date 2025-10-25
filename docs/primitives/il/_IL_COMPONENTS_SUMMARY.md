@@ -2,7 +2,7 @@
 
 **Status**: Specification complete
 **Last Updated**: 2025-10-24
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 4.2
 
 ---
 
@@ -2271,6 +2271,62 @@ Dropdown open:
 
 ---
 
-**Component Count**: 40 components across 16 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1)
+### Vertical 4.2 (Forecast)
+
+#### 41. ForecastChart ✅
+**Full spec**: [ForecastChart.md](ForecastChart.md)
+
+**Props**: `data`, `algorithm`, `confidenceLevel`, `chartType`, `onHover`, `onZoom`
+**States**: loading | rendering | empty | error
+**Reusable across**: Finance projections, Healthcare budget forecasts, Legal revenue projections, Research grant runway, E-commerce revenue forecasting
+
+**Purpose**: Interactive line/area/bar chart for displaying historical data + forecasted projections with confidence intervals. Supports multiple algorithms and comparison mode.
+
+**Reusability Examples:**
+- **Finance**: Cash balance projection, income/expense forecasts, investment returns
+- **Healthcare**: Patient volume forecasting, department budget projections, equipment costs
+- **Legal**: Case volume projections, billable hours trends, retainer runway
+- **Research**: Grant funding trajectory, publication rate forecasting, student enrollment
+- **E-commerce**: Revenue projections, inventory forecasting, customer acquisition trends
+
+---
+
+#### 42. GoalProgressCard ✅
+**Full spec**: [GoalProgressCard.md](GoalProgressCard.md)
+
+**Props**: `goal`, `currentValue`, `onEdit`, `onDelete`, `showDetails`
+**States**: active | completed | overdue | archived
+**Reusable across**: Finance savings goals, Healthcare budget targets, Legal billable hours goals, Research grant milestones, E-commerce revenue targets
+
+**Purpose**: Display individual goal with progress bar, status indicators (on-track/behind/overdue), time/amount remaining, and milestone tracking.
+
+**Reusability Examples:**
+- **Finance**: Emergency fund ($10k goal), debt payoff ($25k credit card), retirement savings
+- **Healthcare**: Annual budget compliance ($500k), patient satisfaction score (95% target)
+- **Legal**: Billable hours target (2,000 hours/year), new client acquisition (50 clients)
+- **Research**: Publication goals (12 papers/year), grant spending milestones ($100k/quarter)
+- **E-commerce**: Monthly revenue target ($1M/month), customer retention (95% rate)
+
+---
+
+#### 43. GoalConfigDialog ✅
+**Full spec**: [GoalConfigDialog.md](GoalConfigDialog.md)
+
+**Props**: `mode`, `initialGoal`, `templates`, `onSave`, `onCancel`
+**States**: idle | validating | saving | error
+**Reusable across**: Finance goal creation, Healthcare budget planning, Legal target setting, Research milestone tracking, E-commerce KPI management
+
+**Purpose**: Modal dialog for creating/editing goals with preset templates, tabbed interface (Basic/Advanced/Preview), real-time validation, smart suggestions, and live preview.
+
+**Reusability Examples:**
+- **Finance**: Create savings goal (emergency fund template), debt payoff (credit card template), income target
+- **Healthcare**: Set department budget goal, equipment replacement fund, staffing cost target
+- **Legal**: Configure billable hours goal, new client acquisition target, case closure rate
+- **Research**: Set publication milestone, grant spending pacing, student graduation rate
+- **E-commerce**: Create revenue goal, inventory turnover target, customer lifetime value objective
+
+---
+
+**Component Count**: 43 components across 17 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1-4.2)
 
 **Last Updated**: 2025-10-24
