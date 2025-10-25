@@ -1,0 +1,228 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/reconciliation-config.schema.json",
+  "title": "ReconciliationConfig",
+  "description": "User's reconciliation configuration (thresholds, tolerances, feature weights, blocking strategy, performance settings). Controls auto-link vs suggest vs manual decisions, field matching tolerances, and performance optimization.",
+  "type": "object",
+  "required": [
+    "user_id",
+    "thresholds",
+    "tolerances",
+    "weights",
+    "blocking"
+  ],
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "User identifier (foreign key to users table)"
+    },
+    "thresholds": {
+      "type": "object",
+      "description": "Confidence thresholds for match decisions",
+      "required": ["auto_link", "auto_suggest", "manual"],
+      "properties": {
+        "auto_link": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Auto-accept threshold (e.g., 0.95 = 95%). Matches with confidence >= this threshold are auto-accepted without user review. Typical: 0.95 for strict, 0.90 for relaxed."
+        },
+        "auto_suggest": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Suggestion threshold (e.g., 0.70 = 70%). Matches with confidence >= this threshold but < auto_link are shown to user for review. Typical: 0.70 for strict, 0.60 for relaxed."
+        },
+        "manual": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Manual match threshold (e.g., 0.50 = 50%). Matches with confidence >= this threshold but < auto_suggest can be manually created. Matches < this threshold are rejected. Typical: 0.50 for strict, 0.40 for relaxed."
+        }
+      },
+      "additionalProperties": false
+    },
+    "tolerances": {
+      "type": "object",
+      "description": "Field matching tolerances (how much difference is allowed)",
+      "properties": {
+        "amount_percent": {
+          "type": ["number", "null"],
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Amount percentage tolerance (e.g., 0.05 = 5%). Amounts within ±X% are considered matching. NULL = no tolerance. Typical: 0.05 for strict (5%), 0.10 for relaxed (10%)."
+        },
+        "amount_fixed": {
+          "type": ["number", "null"],
+          "minimum": 0.0,
+          "description": "Fixed amount tolerance (e.g., 0.01 = $0.01). Amounts within ±X are considered matching. NULL = no tolerance. Typical: 0.01 for rounding errors, 1.00 for informal matching."
+        },
+        "date_days": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Date tolerance in days (e.g., 3 = ±3 days). Dates within ±X days are considered matching. NULL = exact match required. Typical: 3 for strict, 7 for relaxed, 0 for exact."
+        }
+      },
+      "additionalProperties": false
+    },
+    "weights": {
+      "type": "object",
+      "description": "Feature weights for similarity calculation (must sum to 1.0)",
+      "required": ["amount", "date"],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Weight for amount matching (e.g., 0.50 = 50%). Typical: 0.40-0.60 for finance, 0.30 for informal."
+        },
+        "date": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Weight for date matching (e.g., 0.30 = 30%). Typical: 0.20-0.40 for finance, 0.10 for informal."
+        },
+        "counterparty": {
+          "type": ["number", "null"],
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Weight for counterparty matching (e.g., 0.15 = 15%). NULL if counterparty not used. Typical: 0.10-0.20 for finance."
+        },
+        "description": {
+          "type": ["number", "null"],
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Weight for description/text matching (e.g., 0.05 = 5%). NULL if description not used. Typical: 0.05-0.15."
+        },
+        "reference": {
+          "type": ["number", "null"],
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Weight for reference/ID matching (e.g., 0.10 = 10%). NULL if reference not used. Typical: 0.10-0.20 for structured data."
+        }
+      },
+      "additionalProperties": false
+    },
+    "blocking": {
+      "type": "object",
+      "description": "Blocking strategy for candidate generation (reduces comparisons)",
+      "required": ["enabled", "fields"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable blocking for performance. true=use blocking keys, false=compare all pairs (slow for large datasets)."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["date", "amount_bucket", "first_char", "counterparty", "reference"]
+          },
+          "uniqueItems": true,
+          "description": "Fields to use for blocking. date=group by date, amount_bucket=group by amount range, first_char=group by first character of description, counterparty=group by counterparty, reference=group by reference ID. Multiple fields create composite blocking key."
+        }
+      },
+      "additionalProperties": false
+    },
+    "performance": {
+      "type": ["object", "null"],
+      "description": "Optional performance tuning",
+      "properties": {
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "Batch size for processing (default: 1000). Smaller = lower memory, larger = faster."
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 600000,
+          "description": "Max time for reconciliation run in milliseconds (default: 60000 = 1 minute). Prevents runaway processes."
+        },
+        "parallel_workers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Number of parallel workers (default: 4). More workers = faster but more CPU."
+        }
+      },
+      "additionalProperties": false
+    },
+    "created_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when config was created (ISO 8601 UTC)"
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when config was last updated (ISO 8601 UTC)"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "user_id": "user_darwin",
+      "thresholds": {
+        "auto_link": 0.95,
+        "auto_suggest": 0.70,
+        "manual": 0.50
+      },
+      "tolerances": {
+        "amount_percent": 0.05,
+        "amount_fixed": 0.01,
+        "date_days": 3
+      },
+      "weights": {
+        "amount": 0.50,
+        "date": 0.30,
+        "counterparty": 0.15,
+        "description": 0.05
+      },
+      "blocking": {
+        "enabled": true,
+        "fields": ["date", "amount_bucket"]
+      },
+      "performance": {
+        "batch_size": 1000,
+        "timeout_ms": 60000,
+        "parallel_workers": 4
+      },
+      "created_at": "2024-10-01T10:00:00Z",
+      "updated_at": "2024-10-15T14:30:00Z"
+    },
+    {
+      "user_id": "user_alice",
+      "thresholds": {
+        "auto_link": 0.90,
+        "auto_suggest": 0.60,
+        "manual": 0.40
+      },
+      "tolerances": {
+        "amount_percent": 0.10,
+        "amount_fixed": 1.00,
+        "date_days": 7
+      },
+      "weights": {
+        "amount": 0.40,
+        "date": 0.20,
+        "counterparty": 0.20,
+        "description": 0.15,
+        "reference": 0.05
+      },
+      "blocking": {
+        "enabled": true,
+        "fields": ["date", "counterparty"]
+      },
+      "performance": {
+        "batch_size": 500,
+        "timeout_ms": 120000,
+        "parallel_workers": 8
+      },
+      "created_at": "2024-09-15T08:00:00Z",
+      "updated_at": "2024-10-20T16:00:00Z"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 **Status**: Specification complete
 **Last Updated**: 2025-10-24
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9
 
 ---
 
@@ -1980,5 +1980,155 @@ All components accept `className` and respect CSS variables:
 - Research: Create citation parsing rules
 - E-commerce: Create product category mapping rules
 - Any domain: Pattern-based rule creation with validation
+
+---
+
+### Vertical 3.9 (Reconciliation Strategies)
+
+#### 35. ReconciliationDashboard ✅
+**Full spec**: [ReconciliationDashboard.md](ReconciliationDashboard.md)
+
+**Props**: `unmatchedItems[]`, `suggestedMatches[]`, `matchedItems[]`, `config`, `onAcceptMatch`, `onRejectMatch`, `onManualMatch`, `onConfigChange`
+**States**: idle | loading | reconciling | reviewing | error
+**Reusable across**: Finance bank reconciliation, Healthcare claim matching, Legal case reconciliation, Research citation deduplication
+
+**Purpose**: Comprehensive reconciliation UI with three-column layout showing unmatched items, suggested matches, and confirmed matches with progress tracking and bulk operations.
+
+**Visual (Three-Column Layout)**:
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Reconciliation Dashboard                     [Settings] [Export]   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐                  │
+│  │ Unmatched   │ │ Suggested   │ │ Matched     │                  │
+│  │ Items       │ │ Matches     │ │ Items       │                  │
+│  │ (45)        │ │ (12)        │ │ (128)       │                  │
+│  ├─────────────┤ ├─────────────┤ ├─────────────┤                  │
+│  │             │ │             │ │             │                  │
+│  │ 📄 Bank     │ │ ✨ 95%      │ │ ✅ Conf.    │                  │
+│  │ $125.00     │ │ Bank↔Inv    │ │ $1,250.00   │                  │
+│  │ 2024-11-01  │ │ $125.00     │ │ 2024-10-28  │                  │
+│  │             │ │ [Review]    │ │             │                  │
+│  │             │ │             │ │             │                  │
+│  │ 📄 Invoice  │ │ ⚡ 82%      │ │ ✅ Conf.    │                  │
+│  │ $450.00     │ │ Inv↔Bank    │ │ $89.50      │                  │
+│  │ 2024-10-30  │ │ $450.00     │ │ 2024-10-25  │                  │
+│  │             │ │ [Review]    │ │             │                  │
+│  └─────────────┘ └─────────────┘ └─────────────┘                  │
+│                                                                     │
+│  Progress: 73% complete (128/173 items matched)                    │
+│  [Refresh] [Accept All High Confidence] [Manual Match]             │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Bank-Invoice reconciliation, credit card vs bank matching
+- Healthcare: Claim-Payment matching across insurance systems
+- Legal: Court filing reconciliation (PACER vs state courts)
+- Research: Citation deduplication (DOI, arXiv, PubMed)
+- E-commerce: Order-Shipment-Payment matching
+- Logistics: Shipment-Customs-Delivery tracking
+
+---
+
+#### 36. MatchReviewDialog ✅
+**Full spec**: [MatchReviewDialog.md](MatchReviewDialog.md)
+
+**Props**: `matchCandidate`, `onAccept`, `onReject`, `onCancel`, `showFeatureScores`
+**States**: idle | comparing | accepting | rejecting | error
+**Reusable across**: Finance invoice matching, Healthcare claim review, Legal case matching, Research citation review
+
+**Purpose**: Modal dialog for reviewing suggested matches with side-by-side comparison, confidence breakdown by feature, and accept/reject actions.
+
+**Visual (Side-by-Side Comparison)**:
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  Review Match Suggestion                                      [X]  │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Overall Confidence: 92% ⚡                                        │
+│  Decision: Auto-suggest (review recommended)                      │
+│                                                                    │
+│  ┌──────────────────────┐  ┌──────────────────────┐              │
+│  │ Bank Transaction     │  │ Invoice              │              │
+│  ├──────────────────────┤  ├──────────────────────┤              │
+│  │ Amount: $1,250.00    │  │ Amount: $1,250.00    │ ✓ 100%      │
+│  │ Date: 2024-10-28     │  │ Date: 2024-10-30     │ ⚠ 93%       │
+│  │ From: Apple Inc      │  │ To: APPLE COM BILL   │ ⚡ 88%       │
+│  │ Desc: Invoice #4567  │  │ Desc: Monthly subs   │ △ 75%       │
+│  └──────────────────────┘  └──────────────────────┘              │
+│                                                                    │
+│  Feature Breakdown:                                                │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━ Amount (40%): 100% ━━━━━━━━━━━━━━━━━━ │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━ Date (30%): 93%   ━━━━━━━━━━━━━━━━━━ │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━ Party (20%): 88%  ━━━━━━━━━━━━━━━━━━ │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━ Desc (10%): 75%   ━━━━━━━━━━━━━━━━━━ │
+│                                                                    │
+│  Notes:                                                            │
+│  [                                                              ]  │
+│                                                                    │
+│  [Reject]                    [Accept Match]                       │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Review invoice-bank transaction matches
+- Healthcare: Review claim-payment matches
+- Legal: Review case filing matches
+- Research: Review citation duplicate candidates
+- E-commerce: Review order-shipment matches
+- Any domain: Confidence-based match review pattern
+
+---
+
+#### 37. ManualMatchDialog ✅
+**Full spec**: [ManualMatchDialog.md](ManualMatchDialog.md)
+
+**Props**: `sourceItem`, `availableTargets[]`, `onMatch`, `onCancel`, `allowMultiSelect`
+**States**: idle | searching | selecting | confirming | error
+**Reusable across**: Finance payment allocation, E-commerce order matching, Healthcare claim linking, Legal case association
+
+**Purpose**: Modal dialog for manually creating matches when auto-detection fails, supporting one-to-one and one-to-many cardinality with search and validation.
+
+**Visual (Manual Match Creation)**:
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  Create Manual Match                                          [X]  │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Source Item:                                                      │
+│  Bank Transaction: $450.00 | 2024-10-30 | "OpenAI Subscription"   │
+│                                                                    │
+│  Match To:                                                         │
+│  [Search invoices...                                        ] 🔍  │
+│                                                                    │
+│  Available Items (23):                                             │
+│  ┌──────────────────────────────────────────────────────────────┐ │
+│  │ □ Invoice #4567 | $250.00 | 2024-10-28 | OpenAI API usage   │ │
+│  │ □ Invoice #4568 | $200.00 | 2024-10-29 | OpenAI Plus plan   │ │
+│  │ □ Invoice #4570 | $125.00 | 2024-10-15 | OpenAI tokens      │ │
+│  │ □ Invoice #4571 | $89.00  | 2024-10-20 | Other vendor       │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+│                                                                    │
+│  Selected: 2 items | Total: $450.00 ✓                             │
+│                                                                    │
+│  Cardinality: ● One-to-Many (split payment)                       │
+│               ○ One-to-One                                         │
+│                                                                    │
+│  Notes:                                                            │
+│  [Split payment across two OpenAI invoices                     ]  │
+│                                                                    │
+│  [Cancel]                              [Create Match]             │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Reusability**:
+- Finance: Manually allocate payment to multiple invoices
+- Healthcare: Link claim to multiple payment records
+- Legal: Associate case filing with multiple dockets
+- Research: Manually deduplicate citation records
+- E-commerce: Match order to multiple shipments
+- Any domain: Manual association with cardinality support
 
 ---

@@ -27,6 +27,7 @@
 - **[3.6 Unit](verticals/3.6-unit.md)** ✅ Complete - Multi-currency normalization, exchange rate caching, date/timezone handling, locale-aware formatting
 - **[3.7 Parser Registry](verticals/3.7-parser-registry.md)** ✅ Complete - Parser discovery, capability tracking, versioning, auto-selection
 - **[3.8 Cluster Rules](verticals/3.8-cluster-rules.md)** ✅ Complete - Merchant name normalization, fuzzy matching, transaction clustering, rule engine
+- **[3.9 Reconciliation Strategies](verticals/3.9-reconciliation-strategies.md)** ✅ Complete - Multi-source matching, confidence scoring, one-to-many reconciliation, blocking optimization
 
 ---
 
@@ -118,6 +119,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[NormalizationRuleStore](primitives/ol/NormalizationRuleStore.md)** - CRUD operations for user-defined normalization rules with precedence
 - **[FuzzyMatcher](primitives/ol/FuzzyMatcher.md)** - Text similarity calculation with multiple algorithms (Levenshtein, Jaro-Winkler, Soundex, Metaphone)
 
+**Vertical 3.9 (Reconciliation Strategies):**
+- **[ReconciliationEngine](primitives/ol/ReconciliationEngine.md)** - Core orchestrator with blocking strategies, find_candidates(), bulk_reconcile(), multi-cardinality support
+- **[MatchScorer](primitives/ol/MatchScorer.md)** - Weighted similarity scoring (40% amount, 30% date, 20% counterparty, 10% description) with fuzzy matching
+- **[ThresholdManager](primitives/ol/ThresholdManager.md)** - Decision rule engine, threshold management (auto-link ≥0.95, suggest 0.70-0.94, manual 0.50-0.69)
+- **[ReconciliationStore](primitives/ol/ReconciliationStore.md)** - CRUD for reconciliation results with audit trail, orphaned item handling, cascading deletes
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -151,6 +158,9 @@ Reusable UI components:
 - **[MerchantRulesManager](primitives/il/MerchantRulesManager.md)** - Full CRUD UI for managing normalization rules with priority
 - **[ClusterViewer](primitives/il/ClusterViewer.md)** - Display transaction clusters with expand/collapse and manual adjustments
 - **[RuleEditorDialog](primitives/il/RuleEditorDialog.md)** - Create/edit rule dialog with pattern testing and preview
+- **[ReconciliationDashboard](primitives/il/ReconciliationDashboard.md)** - Three-column UI showing unmatched items, suggested matches, matched items with progress tracking
+- **[MatchReviewDialog](primitives/il/MatchReviewDialog.md)** - Side-by-side comparison dialog with confidence breakdown, accept/reject actions
+- **[ManualMatchDialog](primitives/il/ManualMatchDialog.md)** - Manual match creation with search, multi-select for one-to-many, amount validation
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -218,6 +228,11 @@ Executable contracts extracted from vertical specifications:
 - **[merchant-cluster.schema.json](schemas/merchant-cluster.schema.json)** - Transaction cluster entity with normalized name, member transactions, confidence
 - **[rule-execution-log.schema.json](schemas/rule-execution-log.schema.json)** - Rule execution log with match details and performance metrics
 
+**Vertical 3.9 (Reconciliation Strategies):**
+- **[reconciliation-result.schema.json](schemas/reconciliation-result.schema.json)** - Reconciliation result with matched pairs, confidence, method (auto|manual), cardinality (one-to-one|one-to-many|many-to-one)
+- **[match-candidate.schema.json](schemas/match-candidate.schema.json)** - Match candidate with similarity scores, feature breakdown (amount, date, counterparty, description), decision
+- **[reconciliation-config.schema.json](schemas/reconciliation-config.schema.json)** - Configuration for thresholds, tolerances, weights, blocking parameters, performance settings
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -250,6 +265,7 @@ User experience specifications with wireframes and journeys:
 - **[3.6 Unit Experience](ux-flows/3.6-unit-experience.md)** - Set base currency, view dual currencies, refresh stale rates, manual rate override, timezone change
 - **[3.7 Parser Registry Experience](ux-flows/3.7-parser-registry-experience.md)** - Auto-detected parser, manual override, view capabilities, deprecated parser warning, register new parser
 - **[3.8 Cluster Rules Experience](ux-flows/3.8-cluster-rules-experience.md)** - Create normalization rule, view clusters, test rule pattern, manual cluster adjustments, bulk apply rules
+- **[3.9 Reconciliation Strategies Experience](ux-flows/3.9-reconciliation-strategies-experience.md)** - Auto-matched items, review suggested matches, manual match creation, reject false positives, split transaction matching, adjust thresholds
 
 ---
 
@@ -271,7 +287,7 @@ User experience specifications with wireframes and journeys:
 | | 3.6 Unit | ✅ Complete |
 | | 3.7 Parser Registry | ✅ Complete |
 | | 3.8 Cluster Rules | ✅ Complete |
-| | 3.9 | 📝 Pending |
+| | 3.9 Reconciliation Strategies | ✅ Complete |
 | **4. Derivatives** | 4.1-4.3 | 📝 Pending |
 | **5. Governance** | 5.1-5.5 | 📝 Pending |
 

@@ -380,14 +380,32 @@
 
 ### **3.9 Reconciliation Strategies**
 **Status:** ✅ Complete
-**Full Name:** Reconciliation Strategies
-**Spec:** TBD
+**Full Name:** Reconciliation Strategies (Multi-Source Transaction Matching)
+**Additions:** + fuzzy matching, confidence scoring, one-to-many matching
+**Spec:** [docs/verticals/3.9-reconciliation-strategies.md](docs/verticals/3.9-reconciliation-strategies.md)
 
-**Expected:**
-- Fuzzy matching algorithms (amount ±$1, date ±2 days)
-- Confidence scoring
-- Auto-suggest vs auto-link thresholds
-- **NOTE:** This may also cover transfer reconciliation aspects
+**Primitives Delivered:**
+- ReconciliationEngine (OL) - Core orchestrator with blocking strategies, find_candidates(), bulk_reconcile(), multi-cardinality support
+- MatchScorer (OL) - Weighted similarity scoring (40% amount, 30% date, 20% counterparty, 10% description) with fuzzy matching
+- ThresholdManager (OL) - Decision rule engine, threshold management (auto-link ≥0.95, suggest 0.70-0.94, manual 0.50-0.69)
+- ReconciliationStore (OL) - CRUD for reconciliation results with audit trail, orphaned item handling, cascading deletes
+- ReconciliationDashboard (IL) - Three-column UI showing unmatched items, suggested matches, matched items with progress tracking
+- MatchReviewDialog (IL) - Side-by-side comparison dialog with confidence breakdown, accept/reject actions
+- ManualMatchDialog (IL) - Manual match creation with search, multi-select for one-to-many, amount validation
+
+**Schemas:** reconciliation-result.schema.json, match-candidate.schema.json, reconciliation-config.schema.json
+**UX Flow:** [3.9-reconciliation-strategies-experience.md](docs/ux-flows/3.9-reconciliation-strategies-experience.md)
+
+**Delivered:**
+- Fuzzy matching algorithms (amount tolerance ±5%, date tolerance ±7 days, counterparty name similarity)
+- Multi-feature similarity scoring with weighted combination (customizable weights)
+- Confidence-based decision thresholds (auto-link, auto-suggest, manual, no-match)
+- Multi-cardinality matching (one-to-one, one-to-many for split payments, many-to-one for consolidated invoices)
+- Blocking strategy optimization (O(n²) → O(n×m) for large datasets, <2s for 10K×10K comparisons)
+- Manual override and audit trail (who matched, when, method used)
+- Batch processing (>200 items/second)
+- Edge cases: Exact duplicates, split payments, date mismatches beyond tolerance, fees/FX adjustments, counterparty name variations
+- Multi-domain applicability (Finance → bank-invoice reconciliation, Healthcare → claim-payment matching, Legal → court filing reconciliation, Research → citation deduplication, E-commerce → order-shipment-payment matching, Logistics → shipment-customs-delivery tracking)
 
 ---
 
@@ -511,13 +529,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 14 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8 |
-| 📝 Pending | 9 | 3.9, 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 15 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9 |
+| 📝 Pending | 8 | 4.1-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 61% (14/23)
+**Completion:** 65% (15/23)
 
-**Next up:** 3.9 Reconciliation Strategies (fuzzy matching, confidence scoring)
+**Next up:** 4.1 Reminders (alerts, notifications, missing payments)
 
 ---
 

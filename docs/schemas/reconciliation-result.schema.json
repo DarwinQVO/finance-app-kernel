@@ -1,0 +1,276 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/reconciliation-result.schema.json",
+  "title": "ReconciliationResult",
+  "description": "Confirmed reconciliation match between items from two sources. Supports one-to-one, one-to-many, many-to-one, and many-to-many cardinalities. Includes confidence scoring, feature-level scores, match method (auto/manual/assisted), and audit trail.",
+  "type": "object",
+  "required": [
+    "match_id",
+    "user_id",
+    "source_1_items",
+    "source_2_items",
+    "cardinality",
+    "confidence",
+    "match_method",
+    "feature_scores",
+    "matched_at",
+    "is_active"
+  ],
+  "properties": {
+    "match_id": {
+      "type": "string",
+      "pattern": "^match_[a-z0-9_]+$",
+      "description": "Unique match identifier. Format: 'match_{uuid}'. Example: 'match_abc123'"
+    },
+    "user_id": {
+      "type": "string",
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "Owner of both sources. Foreign key to users table."
+    },
+    "source_1_items": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "List of item IDs from source 1. For one-to-one and one-to-many: single item. For many-to-one and many-to-many: multiple items."
+    },
+    "source_2_items": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "List of item IDs from source 2. For one-to-one and many-to-one: single item. For one-to-many and many-to-many: multiple items."
+    },
+    "cardinality": {
+      "type": "string",
+      "enum": ["one_to_one", "one_to_many", "many_to_one", "many_to_many"],
+      "description": "Match cardinality. one_to_one=single item matched to single item, one_to_many=single item matched to multiple items (split payment), many_to_one=multiple items matched to single item (batch payment), many_to_many=multiple items matched to multiple items (complex allocation)"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Overall match confidence score (0.0 to 1.0). ≥0.95=auto-link, 0.70-0.94=suggest, 0.50-0.69=manual, <0.50=no match. NULL for purely manual matches without scoring."
+    },
+    "match_method": {
+      "type": "string",
+      "enum": ["auto", "manual", "assisted"],
+      "description": "How match was created. 'auto'=auto-detected by system (ReconciliationEngine), 'manual'=user-created without system suggestion, 'assisted'=user accepted system suggestion"
+    },
+    "feature_scores": {
+      "type": "object",
+      "description": "Individual feature confidence scores. Each feature contributes to overall confidence. Common features: amount_score, date_score, description_score, counterparty_score, reference_score",
+      "patternProperties": {
+        "^[a-z_]+_score$": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "match_details": {
+      "type": ["object", "null"],
+      "description": "Optional match context: thresholds used, tolerances applied, blocking key, amount/date differences, etc.",
+      "properties": {
+        "blocking_key": {
+          "type": "string",
+          "description": "Blocking key used for candidate generation (e.g., '2024-10-15_1234.56')"
+        },
+        "thresholds": {
+          "type": "object",
+          "properties": {
+            "auto_link": {"type": "number", "minimum": 0, "maximum": 1},
+            "auto_suggest": {"type": "number", "minimum": 0, "maximum": 1},
+            "manual": {"type": "number", "minimum": 0, "maximum": 1}
+          }
+        },
+        "tolerances": {
+          "type": "object",
+          "properties": {
+            "amount_diff": {"type": "number", "description": "Absolute amount difference"},
+            "amount_percent": {"type": "number", "description": "Percentage amount tolerance"},
+            "date_diff_days": {"type": "integer", "description": "Date difference in days"}
+          }
+        },
+        "matched_features": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Features that matched (e.g., ['amount', 'date'])"
+        },
+        "mismatched_features": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Features that didn't match (e.g., ['description'])"
+        }
+      },
+      "additionalProperties": true
+    },
+    "matched_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when match was created"
+    },
+    "matched_by": {
+      "type": ["string", "null"],
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "User ID for manual/assisted matches. NULL for auto matches. Foreign key to users table."
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "maxLength": 1000,
+      "description": "Optional notes explaining match. Required for manual matches. Examples: 'Employer rounds to nearest $5', 'Split deposit for two clients'"
+    },
+    "is_active": {
+      "type": "boolean",
+      "description": "Match status. true=active, false=unmatched/deleted (soft delete)"
+    },
+    "unmatched_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when match was unmatched. NULL if active."
+    },
+    "unmatched_by": {
+      "type": ["string", "null"],
+      "pattern": "^user_[a-z0-9_]+$",
+      "description": "User ID who unmatched. NULL if active. Foreign key to users table."
+    },
+    "unmatch_reason": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Reason for unmatch. NULL if active. Example: 'Incorrect match - different transaction'"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "match_id": "match_001",
+      "user_id": "user_darwin",
+      "source_1_items": ["bank_txn_001"],
+      "source_2_items": ["ledger_entry_001"],
+      "cardinality": "one_to_one",
+      "confidence": 1.0,
+      "match_method": "auto",
+      "feature_scores": {
+        "amount_score": 1.0,
+        "date_score": 1.0,
+        "description_score": 0.95
+      },
+      "match_details": {
+        "blocking_key": "2024-10-15_1234.56",
+        "thresholds": {
+          "auto_link": 0.95,
+          "auto_suggest": 0.70,
+          "manual": 0.50
+        },
+        "tolerances": {
+          "amount_diff": 0.0,
+          "date_diff_days": 0
+        },
+        "matched_features": ["amount", "date", "description"]
+      },
+      "matched_at": "2024-10-15T14:30:00Z",
+      "matched_by": null,
+      "notes": null,
+      "is_active": true,
+      "unmatched_at": null,
+      "unmatched_by": null,
+      "unmatch_reason": null
+    },
+    {
+      "match_id": "match_002",
+      "user_id": "user_darwin",
+      "source_1_items": ["bank_txn_002"],
+      "source_2_items": ["ledger_entry_002", "ledger_entry_003"],
+      "cardinality": "one_to_many",
+      "confidence": 0.92,
+      "match_method": "auto",
+      "feature_scores": {
+        "amount_score": 1.0,
+        "date_score": 1.0,
+        "description_score": 0.75
+      },
+      "match_details": {
+        "blocking_key": "2024-10-20_5000.00",
+        "thresholds": {
+          "auto_link": 0.95,
+          "auto_suggest": 0.70,
+          "manual": 0.50
+        },
+        "tolerances": {
+          "amount_diff": 0.0,
+          "date_diff_days": 0
+        },
+        "matched_features": ["amount", "date"],
+        "mismatched_features": ["description"]
+      },
+      "matched_at": "2024-10-20T16:45:00Z",
+      "matched_by": null,
+      "notes": "Split deposit: $3,000 + $2,000 = $5,000",
+      "is_active": true,
+      "unmatched_at": null,
+      "unmatched_by": null,
+      "unmatch_reason": null
+    },
+    {
+      "match_id": "match_003",
+      "user_id": "user_darwin",
+      "source_1_items": ["bank_txn_003"],
+      "source_2_items": ["ledger_entry_004"],
+      "cardinality": "one_to_one",
+      "confidence": 0.75,
+      "match_method": "manual",
+      "feature_scores": {
+        "amount_score": 0.85,
+        "date_score": 0.90,
+        "description_score": 0.50
+      },
+      "match_details": {
+        "thresholds": {
+          "auto_link": 0.95,
+          "auto_suggest": 0.70,
+          "manual": 0.50
+        },
+        "tolerances": {
+          "amount_diff": 2.68,
+          "date_diff_days": 1
+        },
+        "matched_features": [],
+        "mismatched_features": ["amount", "date", "description"]
+      },
+      "matched_at": "2024-10-21T10:30:00Z",
+      "matched_by": "user_darwin",
+      "notes": "Employer rounds reimbursements to nearest $5",
+      "is_active": true,
+      "unmatched_at": null,
+      "unmatched_by": null,
+      "unmatch_reason": null
+    },
+    {
+      "match_id": "match_004",
+      "user_id": "user_darwin",
+      "source_1_items": ["bank_txn_004"],
+      "source_2_items": ["ledger_entry_005"],
+      "cardinality": "one_to_one",
+      "confidence": 0.98,
+      "match_method": "auto",
+      "feature_scores": {
+        "amount_score": 1.0,
+        "date_score": 1.0,
+        "description_score": 0.95
+      },
+      "match_details": {
+        "blocking_key": "2024-10-22_567.89"
+      },
+      "matched_at": "2024-10-22T14:00:00Z",
+      "matched_by": null,
+      "notes": null,
+      "is_active": false,
+      "unmatched_at": "2024-10-23T09:15:00Z",
+      "unmatched_by": "user_darwin",
+      "unmatch_reason": "Incorrect match - different transaction"
+    }
+  ]
+}
