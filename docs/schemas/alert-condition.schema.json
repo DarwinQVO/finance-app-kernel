@@ -1,0 +1,226 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/alert-condition.schema.json",
+  "title": "Alert Condition",
+  "description": "Condition definition for alert rules. Defines threshold/pattern/schedule/anomaly criteria for triggering alerts. Embedded in reminder-config.schema.json as 'condition' property. Used across domains: finance (balance thresholds, payment patterns), healthcare (claim status changes, appointment reminders), legal (filing deadlines, case updates), research (citation milestones, dataset updates), e-commerce (inventory thresholds, order delays).",
+  "type": "object",
+  "required": [
+    "condition_type",
+    "operator",
+    "value"
+  ],
+  "properties": {
+    "condition_type": {
+      "type": "string",
+      "enum": ["threshold", "pattern", "schedule", "anomaly"],
+      "description": "Type of condition logic. threshold=numeric comparison (balance < $500), pattern=regex/series match (recurring payment missing), schedule=time-based trigger (daily/weekly/monthly), anomaly=statistical deviation (expense > 3× average). Determines which optional fields are required."
+    },
+    "operator": {
+      "type": "string",
+      "enum": ["less_than", "greater_than", "equals", "not_equals", "contains", "matches_pattern"],
+      "description": "Comparison operator for condition evaluation. less_than/greater_than=numeric comparison, equals/not_equals=exact match, contains=substring search, matches_pattern=regex/series ID match. Must be compatible with condition_type: threshold uses less_than/greater_than, pattern uses matches_pattern, etc."
+    },
+    "value": {
+      "description": "Primary comparison value. Type varies by condition_type: number for threshold (500.00), string for pattern ('series_rent_monthly'), object for complex conditions ({recurrence: 'monthly', day: 1}). This is the main criterion against which actual values are compared."
+    },
+    "threshold_amount": {
+      "type": ["number", "null"],
+      "multipleOf": 0.01,
+      "minimum": 0,
+      "description": "Threshold amount for low_balance or budget_exceeded rules. Alert triggers when balance < threshold_amount (low_balance) or spending > threshold_amount (budget_exceeded). NULL for other condition types. Examples: 500.00 = alert when balance falls below $500, 1000.00 = alert when spending exceeds $1,000. Also used in healthcare for claim amount thresholds, legal for billable hour budgets, research for grant balance alerts, e-commerce for inventory reorder points."
+    },
+    "comparison_period_days": {
+      "type": ["integer", "null"],
+      "minimum": 7,
+      "maximum": 365,
+      "description": "Historical lookback period for anomaly detection. Compares current value to average/median over comparison_period_days. NULL for non-anomaly conditions. Examples: 30 = compare to 30-day average, 90 = compare to 90-day average. Used in: finance (expense anomalies), healthcare (claim volume spikes), legal (billable hours variance), research (download rate anomalies), e-commerce (sales velocity changes). Default: 30"
+    },
+    "variance_multiplier": {
+      "type": ["number", "null"],
+      "multipleOf": 0.1,
+      "minimum": 1.0,
+      "maximum": 10.0,
+      "description": "Variance multiplier for anomaly detection. Alert triggers when value > average × variance_multiplier or value < average / variance_multiplier. NULL for non-anomaly conditions. Examples: 3.0 = alert when 3× average, 5.0 = alert when 5× average. Used across domains: finance (large expenses), healthcare (claim count spikes), legal (hours billed anomalies), research (citation surges), e-commerce (inventory depletions). Default: 3.0"
+    },
+    "series_id": {
+      "type": ["string", "null"],
+      "pattern": "^series_[a-z0-9_]+$",
+      "description": "Series ID for pattern matching in missing_payment rules. References recurring transaction series. Alert triggers when expected transaction from series not detected within date_tolerance_days. NULL for non-pattern conditions. Examples: 'series_rent_monthly', 'series_salary_biweekly', 'series_insurance_quarterly'. Also applicable to: healthcare (recurring copay series), legal (retainer payment series), research (subscription renewal series), e-commerce (subscription orders)."
+    },
+    "date_tolerance_days": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 30,
+      "description": "Date tolerance window for missing_payment pattern matching. Alert triggers if expected transaction not detected within ±date_tolerance_days of expected date. NULL for non-pattern conditions. Examples: 3 = alert if payment not detected within ±3 days of expected date, 7 = ±7 days tolerance. Used in: finance (bill payments), healthcare (medication refill reminders), legal (court filing deadlines with grace periods), research (publication submission deadlines), e-commerce (subscription renewals). Default: 3"
+    },
+    "recurrence_pattern": {
+      "type": ["string", "null"],
+      "enum": ["daily", "weekly", "biweekly", "monthly", "quarterly", "annually", null],
+      "description": "Recurrence pattern for schedule-based conditions. Defines frequency of scheduled alerts. NULL for non-schedule conditions. Examples: 'daily' = trigger every day at scheduled time, 'monthly' = trigger on same day each month. Used across domains: finance (monthly budget review reminders), healthcare (medication schedules), legal (recurring filing deadlines), research (weekly progress check-ins), e-commerce (monthly inventory audits)."
+    },
+    "schedule_time": {
+      "type": ["string", "null"],
+      "pattern": "^([0-1][0-9]|2[0-3]):[0-5][0-9]$",
+      "description": "Time of day for schedule-based alerts (24-hour format HH:MM). NULL for non-schedule conditions. Examples: '09:00' = 9:00 AM, '17:30' = 5:30 PM. Timezone determined by user's account settings. Used in: finance (daily balance checks), healthcare (medication reminders), legal (end-of-day deadline warnings), research (daily digest emails), e-commerce (nightly inventory sync alerts)."
+    },
+    "schedule_day_of_month": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "maximum": 31,
+      "description": "Day of month for monthly/quarterly/annually scheduled alerts. NULL for non-schedule or non-monthly conditions. Examples: 1 = 1st of month, 15 = 15th of month, 31 = last day of month (adjusted for months with <31 days). Used in: finance (monthly rent due reminders), healthcare (monthly prescription refill), legal (monthly status report deadlines), research (monthly grant reporting), e-commerce (monthly sales reports)."
+    },
+    "schedule_day_of_week": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 6,
+      "description": "Day of week for weekly/biweekly scheduled alerts. 0=Sunday, 1=Monday, ..., 6=Saturday. NULL for non-schedule or non-weekly conditions. Examples: 1 = every Monday, 5 = every Friday. Used in: finance (weekly spending review), healthcare (weekly therapy appointments), legal (weekly team meetings), research (weekly lab meetings), e-commerce (weekly inventory reconciliation)."
+    },
+    "budget_category": {
+      "type": ["string", "null"],
+      "maxLength": 100,
+      "description": "Budget category for budget_exceeded rules. Alert triggers when spending in this category exceeds budget_amount. NULL for other condition types. Examples: 'Groceries', 'Dining', 'Entertainment', 'Healthcare', 'Legal Fees', 'Research Equipment', 'Marketing'. Supports hierarchical categories with '/' separator: 'Healthcare/Prescriptions', 'Legal/Court Fees'."
+    },
+    "budget_amount": {
+      "type": ["number", "null"],
+      "multipleOf": 0.01,
+      "minimum": 0,
+      "description": "Budget limit for budget_exceeded rules. Alert triggers when spending > budget_amount. NULL for other condition types. Examples: 500.00 = alert when monthly spending exceeds $500, 10000.00 = alert when annual spending exceeds $10,000. Also used in: healthcare (insurance deductible tracking), legal (case budget limits), research (grant spending caps), e-commerce (advertising spend budgets)."
+    },
+    "budget_period": {
+      "type": ["string", "null"],
+      "enum": ["daily", "weekly", "monthly", "quarterly", "annually", null],
+      "description": "Budget period for budget_exceeded rules. Defines timeframe for budget_amount. NULL for other condition types. Examples: 'monthly' = $500/month budget, 'annually' = $6,000/year budget. Budget resets at start of each period."
+    },
+    "account_filter": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string",
+        "pattern": "^acct_[a-z0-9_]+$"
+      },
+      "uniqueItems": true,
+      "description": "Optional account ID filter for condition evaluation. Alert only triggers for transactions in specified accounts. NULL = apply to all user accounts. Examples: ['acct_checking_001'] = only alert for checking account, ['acct_credit_001', 'acct_credit_002'] = alert for either credit card. Used across domains: finance (per-account alerts), healthcare (per-insurance-plan alerts), legal (per-case alerts), research (per-project alerts), e-commerce (per-store alerts)."
+    },
+    "merchant_filter": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "uniqueItems": true,
+      "description": "Optional merchant name filter for condition evaluation. Alert only triggers for transactions with specified merchants. NULL = apply to all merchants. Examples: ['Amazon', 'Walmart'] = only alert for Amazon/Walmart purchases. Supports partial matching and wildcards. Used in: finance (merchant-specific spending alerts), healthcare (provider-specific claim alerts), research (vendor-specific purchase alerts), e-commerce (supplier-specific order alerts)."
+    },
+    "category_filter": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string",
+        "maxLength": 100
+      },
+      "uniqueItems": true,
+      "description": "Optional category filter for condition evaluation. Alert only triggers for transactions in specified categories. NULL = apply to all categories. Examples: ['Groceries', 'Dining'] = only alert for food spending. Supports hierarchical categories. Used in: finance (category budgets), healthcare (service type alerts), legal (expense category limits), research (grant category tracking), e-commerce (product category inventory)."
+    },
+    "currency_filter": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]{3}$"
+      },
+      "uniqueItems": true,
+      "description": "Optional currency filter for condition evaluation. Alert only triggers for transactions in specified currencies. NULL = apply to all currencies. Examples: ['USD'] = only USD transactions, ['USD', 'EUR'] = USD or EUR. ISO 4217 codes. Used in: multi-currency finance apps, international healthcare claims, cross-border legal billing, international research collaborations, global e-commerce."
+    },
+    "custom_sql_query": {
+      "type": ["string", "null"],
+      "maxLength": 2000,
+      "description": "Advanced: Custom SQL query for complex conditions not supported by standard fields. NULL for standard conditions. Query must return single boolean (true=trigger alert, false=no alert). Use with caution: requires SQL expertise, performance implications. Examples: 'SELECT COUNT(*) > 5 FROM transactions WHERE category = \"Travel\" AND date > NOW() - INTERVAL 7 DAY' = alert if >5 travel transactions in last 7 days. Validated and sandboxed before execution."
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "description": "Additional metadata for advanced use cases. Examples: ML model parameters for anomaly detection, integration IDs for external systems (healthcare claims APIs, legal case management systems, research data repositories, e-commerce inventory APIs), custom thresholds per time of day/week, A/B test variants for notification copy.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "condition_type": "threshold",
+      "operator": "less_than",
+      "value": 500.00,
+      "threshold_amount": 500.00,
+      "comparison_period_days": null,
+      "variance_multiplier": null,
+      "series_id": null,
+      "date_tolerance_days": null,
+      "recurrence_pattern": null,
+      "schedule_time": null,
+      "schedule_day_of_month": null,
+      "schedule_day_of_week": null,
+      "budget_category": null,
+      "budget_amount": null,
+      "budget_period": null,
+      "account_filter": ["acct_checking_001"],
+      "merchant_filter": null,
+      "category_filter": null,
+      "currency_filter": ["USD"],
+      "custom_sql_query": null,
+      "metadata": {
+        "description": "Low balance alert for checking account",
+        "user_friendly_name": "Checking Account Low Balance"
+      }
+    },
+    {
+      "condition_type": "pattern",
+      "operator": "matches_pattern",
+      "value": "series_rent_monthly",
+      "threshold_amount": null,
+      "comparison_period_days": null,
+      "variance_multiplier": null,
+      "series_id": "series_rent_monthly",
+      "date_tolerance_days": 3,
+      "recurrence_pattern": null,
+      "schedule_time": null,
+      "schedule_day_of_month": null,
+      "schedule_day_of_week": null,
+      "budget_category": null,
+      "budget_amount": null,
+      "budget_period": null,
+      "account_filter": null,
+      "merchant_filter": ["ABC Property Management"],
+      "category_filter": ["Housing"],
+      "currency_filter": ["USD"],
+      "custom_sql_query": null,
+      "metadata": {
+        "description": "Missing rent payment detection",
+        "expected_amount": 1200.00,
+        "expected_day_of_month": 1,
+        "landlord_email": "billing@abcproperties.com"
+      }
+    },
+    {
+      "condition_type": "anomaly",
+      "operator": "greater_than",
+      "value": 3.0,
+      "threshold_amount": null,
+      "comparison_period_days": 30,
+      "variance_multiplier": 3.0,
+      "series_id": null,
+      "date_tolerance_days": null,
+      "recurrence_pattern": null,
+      "schedule_time": null,
+      "schedule_day_of_month": null,
+      "schedule_day_of_week": null,
+      "budget_category": null,
+      "budget_amount": null,
+      "budget_period": null,
+      "account_filter": ["acct_credit_001"],
+      "merchant_filter": null,
+      "category_filter": ["Electronics"],
+      "currency_filter": ["USD"],
+      "custom_sql_query": null,
+      "metadata": {
+        "description": "Large expense anomaly detection for electronics",
+        "ml_model": "anomaly_detector_v2.1",
+        "baseline_window_days": 30,
+        "min_transaction_count": 5
+      }
+    }
+  ]
+}

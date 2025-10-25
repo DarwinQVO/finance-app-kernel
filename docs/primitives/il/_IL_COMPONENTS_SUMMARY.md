@@ -2,7 +2,7 @@
 
 **Status**: Specification complete
 **Last Updated**: 2025-10-24
-**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9
+**Verticals covered**: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1
 
 ---
 
@@ -2132,3 +2132,145 @@ All components accept `className` and respect CSS variables:
 - Any domain: Manual association with cardinality support
 
 ---
+
+---
+
+### Vertical 4.1 (Reminders)
+
+#### 38. ReminderBell ✅
+**Full spec**: [ReminderBell.md](ReminderBell.md)
+
+**Props**: `unreadCount`, `notifications[]`, `onOpen`, `onMarkRead`, `onMarkAllRead`
+**States**: idle | open | loading | error
+**Reusable across**: Finance alerts, Healthcare appointment reminders, Legal deadline notifications, Research grant alerts, E-commerce inventory warnings
+
+**Purpose**: Header bell icon with unread badge counter and dropdown panel for recent notifications. Provides real-time visual indicator of pending alerts with quick access to notification center.
+
+**Visual (Bell Icon States)**:
+```
+No notifications:
+🔔
+
+1 unread:
+🔔 (1)
+
+5+ unread:
+🔔 (5+)
+
+Dropdown open:
+┌──────────────────────────────────────┐
+│ Notifications              [Mark All]│
+├──────────────────────────────────────┤
+│ ⚠️ Low balance: $450        2h ago  │
+│ 📅 Payment due: Apple Card  1d ago  │
+│ 💡 Large expense: $5000     Just now│
+└──────────────────────────────────────┘
+   [View All →]
+```
+
+**Reusability Examples:**
+- **Finance**: Payment alerts, low balance warnings, large expense notifications
+- **Healthcare**: Medication refill reminders, appointment alerts, lab results ready
+- **Legal**: Filing deadline warnings, court date reminders, contract expiration
+- **Research**: Grant deadline alerts, ethics review expiration, publication milestones
+- **E-commerce**: Inventory low stock, price drop alerts, order shipped notifications
+
+---
+
+#### 39. NotificationPanel ✅
+**Full spec**: [NotificationPanel.md](NotificationPanel.md)
+
+**Props**: `notifications[]`, `onSnooze`, `onDismiss`, `onAction`, `tabs[]`, `filters`
+**States**: idle | loading | refreshing | empty | error
+**Reusable across**: Finance notification center, Healthcare patient portal, Legal case alerts, Research collaboration notifications, E-commerce merchant dashboard
+
+**Purpose**: Full-featured notification center with tabs (All, Snoozed, Read), filtering, infinite scroll, snooze/dismiss actions, and bulk operations. Provides comprehensive notification management interface.
+
+**Visual (Panel Layout)**:
+```
+┌────────────────────────────────────────────┐
+│ Notifications                          [X] │
+├────────────────────────────────────────────┤
+│ [All (3)] [Snoozed (1)] [Read (12)]       │
+├────────────────────────────────────────────┤
+│ ┌────────────────────────────────────────┐ │
+│ │ 🔴 Missing payment: Rent  2 hours ago │ │
+│ │ Expected $1200 on Oct 1 (2 days late) │ │
+│ │ [View Series] [Snooze ▼] [Dismiss]   │ │
+│ └────────────────────────────────────────┘ │
+│                                            │
+│ ┌────────────────────────────────────────┐ │
+│ │ ⚠️ Low balance: $450     4 hours ago  │ │
+│ │ Chase Checking below $500 threshold    │ │
+│ │ [View Account] [Snooze ▼] [Dismiss]   │ │
+│ └────────────────────────────────────────┘ │
+│                                            │
+│ ↓ Scroll for more (12 total)              │
+│ [Mark All Read]                            │
+└────────────────────────────────────────────┘
+```
+
+**Reusability Examples:**
+- **Finance**: Transaction alerts, balance warnings, payment reminders, budget notifications
+- **Healthcare**: Appointment reminders, medication alerts, test results, insurance updates
+- **Legal**: Deadline alerts, case updates, document filing confirmations, retainer warnings
+- **Research**: Grant deadlines, publication milestones, collaboration invites, dataset updates
+- **E-commerce**: Order updates, inventory alerts, price changes, customer reviews
+
+---
+
+#### 40. ReminderConfigDialog ✅
+**Full spec**: [ReminderConfigDialog.md](ReminderConfigDialog.md)
+
+**Props**: `mode`, `initialConfig`, `onSave`, `onCancel`, `accounts[]`, `series[]`
+**States**: idle | validating | saving | error
+**Reusable across**: Finance alert setup, Healthcare appointment scheduling, Legal deadline tracking, Research milestone reminders, E-commerce inventory management
+
+**Purpose**: Modal dialog for creating and editing alert rules with condition builder, threshold configuration, channel selection (in-app, email, SMS, push), and scheduling options. Enables users to define custom notification triggers.
+
+**Visual (Create/Edit Dialog)**:
+```
+┌──────────────────────────────────────────────────┐
+│ Create Reminder                              [X] │
+├──────────────────────────────────────────────────┤
+│                                                  │
+│ Name (optional)                                  │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ Low balance alert - Checking                 │ │
+│ └──────────────────────────────────────────────┘ │
+│                                                  │
+│ Alert Type *                                     │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ Low Balance                              [v] │ │
+│ └──────────────────────────────────────────────┘ │
+│   Options: Low Balance, Missing Payment,         │
+│            Large Expense, Payment Due,           │
+│            Budget Exceeded                       │
+│                                                  │
+│ Threshold Amount *                               │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ $  500.00                                    │ │
+│ └──────────────────────────────────────────────┘ │
+│                                                  │
+│ Notify me via                                    │
+│ ☑ In-app notification                            │
+│ ☑ Email                                          │
+│ ☐ SMS (optional)                                 │
+│ ☐ Push notification (optional)                   │
+│                                                  │
+│ [ Cancel ]               [ Create Reminder ]    │
+└──────────────────────────────────────────────────┘
+```
+
+**Reusability Examples:**
+- **Finance**: Configure balance alerts ($500 threshold), missing payment detection (rent, subscriptions), large expense warnings (>3× average), payment due reminders (credit cards)
+- **Healthcare**: Set medication refill reminders (30-day prescriptions), appointment alerts (24h notice), insurance expiration warnings (60 days), lab result notifications
+- **Legal**: Create filing deadline alerts (court dates, motions), contract expiration reminders (30/60/90 days), retainer balance warnings (<$500), billable hours tracking
+- **Research**: Configure grant deadline reminders (NSF, NIH), ethics review expiration (IRB renewal), publication milestone alerts (manuscript accepted), funding balance warnings (<10%)
+- **E-commerce**: Set inventory low stock alerts (<10 units), price drop notifications (wishlist items), abandoned cart reminders (24h, 48h, 72h), subscription renewal warnings (7 days)
+
+---
+
+**Component Count**: 40 components across 16 verticals (1.1, 2.1-2.3, 3.1-3.9, 4.1)
+
+**Last Updated**: 2025-10-24

@@ -426,14 +426,34 @@
 
 ### **4.1 Reminders**
 **Status:** ✅ Complete
-**Full Name:** Reminders
-**Spec:** TBD
+**Full Name:** Reminders (Intelligent Alert & Notification System)
+**Spec:** [docs/verticals/4.1-reminders.md](docs/verticals/4.1-reminders.md)
 
-**Expected:**
-- Alert if recurring payment didn't occur
-- Alert if balance below threshold
-- Alert if large expense detected
-- Due date reminders (credit card payments)
+**Primitives Delivered:**
+- ReminderEngine (OL) - Core orchestrator for creating, scheduling, and triggering reminders
+- AlertRuleEvaluator (OL) - Evaluate conditions against system state (balances, transactions, dates)
+- NotificationDispatcher (OL) - Multi-channel delivery (in-app, email, SMS, push) with tracking
+- ReminderStore (OL) - CRUD for reminder configs and notification events with snooze/dismiss tracking
+- ReminderBell (IL) - Header bell icon with unread count badge
+- NotificationPanel (IL) - Slide-in panel with tabs (Unread, Snoozed, All)
+- ReminderConfigDialog (IL) - Modal for creating/editing reminder rules
+
+**Schemas:** reminder-config.schema.json, notification-event.schema.json, alert-condition.schema.json
+**ADRs:** 0018 (notification delivery strategy), 0019 (alert rule engine architecture), 0020 (reminder snooze & persistence)
+**UX Flow:** [4.1-reminders-experience.md](docs/ux-flows/4.1-reminders-experience.md)
+
+**Delivered:**
+- Real-time event-driven alerts (transaction posted, balance updated)
+- Scheduled reminders (cron-based: daily, hourly, custom)
+- Multi-condition alert rules (missing payments, low balance, large expenses, payment due dates, budget exceeded)
+- Multi-channel notification delivery (in-app WebSocket, email, SMS, push)
+- Snooze functionality (1h, 4h, 1d, 2d, 1w, custom) with server persistence
+- Dismiss functionality with audit trail
+- Delivery tracking (sent, delivered, opened, failed) with retry logic
+- Rate limiting and cooldown periods
+- Deduplication (prevent duplicate notifications within 24h)
+- Template rendering for email/SMS with domain-specific content
+- Multi-domain applicability (Finance → payment alerts, Healthcare → medication reminders, Legal → filing deadlines, Research → grant deadlines, E-commerce → inventory alerts)
 
 ---
 
@@ -542,13 +562,13 @@
 
 | Status | Count | Verticals |
 |--------|-------|-----------|
-| ✅ Complete | 15 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9 |
-| 📝 Pending | 8 | 4.1-4.3, 5.1-5.5 |
+| ✅ Complete | 16 | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1 |
+| 📝 Pending | 7 | 4.2-4.3, 5.1-5.5 |
 | **TOTAL** | **23** | |
 
-**Completion:** 65% (15/23)
+**Completion:** 70% (16/23)
 
-**Next up:** 4.1 Reminders (alerts, notifications, missing payments)
+**Next up:** 4.2 Forecast (income/expense projections, cash runway)
 
 ---
 

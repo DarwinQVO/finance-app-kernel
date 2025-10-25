@@ -1,0 +1,227 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/notification-event.schema.json",
+  "title": "Notification Event",
+  "description": "Individual notification instance representing a single alert sent to user via specific channel. Tracks delivery lifecycle from creation through opening/dismissal. Used across domains: finance (low balance alerts), healthcare (claim status updates), legal (case deadline reminders), research (citation updates), e-commerce (order status changes).",
+  "type": "object",
+  "required": [
+    "notification_id",
+    "reminder_id",
+    "user_id",
+    "title",
+    "message",
+    "severity",
+    "delivery_channel",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "notification_id": {
+      "type": "string",
+      "pattern": "^notif_[a-z0-9_]+$",
+      "description": "Unique notification ID. Primary key for notifications table. Pattern: notif_{timestamp}_{random}. Examples: notif_20251020_abc123, notif_20251018_xyz789"
+    },
+    "reminder_id": {
+      "type": "string",
+      "pattern": "^rem_[a-z0-9_]+$",
+      "description": "Reminder ID that triggered this notification. Foreign key to reminders table. Used to group notifications by reminder rule and apply cooldown logic."
+    },
+    "user_id": {
+      "type": "string",
+      "description": "User ID receiving this notification. Foreign key to users table. Used to filter notifications by user and determine delivery preferences."
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Notification title/subject. Short summary shown in notification list, email subject, push notification header. Examples: 'Low Balance Alert', 'Missing Payment Detected', 'Large Expense Detected', 'Healthcare Claim Approved', 'Legal Filing Deadline Tomorrow', 'Research Paper Cited 5 Times', 'Order Shipped'"
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Notification message body. Full description shown when notification expanded. Supports plain text and limited markdown (bold, italic, links). Examples: 'Your Chase Checking balance is $450, below your $500 threshold.', 'Your monthly rent payment of $1,200 was not detected. Expected on Oct 1st (±3 days).', 'Large expense detected: $5,000 purchase at Amazon, 10× your 30-day average of $500.'"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warning", "critical"],
+      "description": "Notification severity level. Determines color, icon, and notification sound/vibration. info=blue/informational (FYI), warning=yellow/attention needed (action recommended), critical=red/urgent (immediate action required)"
+    },
+    "delivery_channel": {
+      "type": "string",
+      "enum": ["in_app", "email", "sms", "push"],
+      "description": "Channel used to deliver this notification. in_app=notification panel in app, email=email sent to user's registered address, sms=text message sent to user's phone, push=push notification sent to mobile device. One notification record per channel (same reminder can create multiple notifications)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "sent", "delivered", "opened", "failed"],
+      "description": "Notification delivery status lifecycle. pending=queued for delivery, sent=handed to delivery provider (email/SMS/push service), delivered=confirmed receipt by provider, opened=user viewed notification, failed=delivery failed (invalid email, SMS error, push token expired)"
+    },
+    "action_url": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "Deep link URL for action button. NULL if no action available. Examples: '/accounts/acct_checking_001' (view account), '/transactions/txn_rent_oct' (view missing payment), '/settings/reminders/rem_large_exp_003' (edit reminder). Use app:// scheme for mobile deep links."
+    },
+    "action_label": {
+      "type": ["string", "null"],
+      "maxLength": 50,
+      "description": "Label for action button. NULL if action_url is NULL. Examples: 'View Account', 'Review Transaction', 'Edit Reminder', 'Pay Now', 'Dismiss', 'Snooze', 'View Details'"
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "description": "Additional context for notification. Structure varies by reminder_id and domain. Finance examples: {transaction_id, account_id, amount, merchant}. Healthcare: {claim_id, provider, service_date}. Legal: {case_id, filing_deadline, court}. Research: {paper_id, citation_count, journal}. E-commerce: {order_id, tracking_number, carrier}.",
+      "additionalProperties": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when notification was created. ISO 8601 format. Immutable. Used for sorting notifications by recency."
+    },
+    "sent_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when notification was sent to delivery provider. NULL if status=pending or failed. ISO 8601 format. Transition: pending → sent"
+    },
+    "delivered_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when delivery provider confirmed receipt. NULL if status=pending, sent, or failed. ISO 8601 format. Transition: sent → delivered. For in_app notifications, delivered_at = created_at (no external delivery)."
+    },
+    "opened_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when user opened/viewed notification. NULL if not yet opened. ISO 8601 format. Transition: delivered → opened. Used to calculate notification engagement rate."
+    },
+    "failed_reason": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Failure reason if status=failed. NULL for other statuses. Examples: 'Invalid email address', 'SMS delivery failed (carrier error)', 'Push token expired', 'User unsubscribed from email notifications', 'Rate limit exceeded (max 10/hour)'"
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "Number of delivery retry attempts. Increments on each retry after failure. Max 5 retries with exponential backoff (1min, 5min, 15min, 1hr, 6hr). Default: 0"
+    },
+    "snoozed_until": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when snoozed notification should reappear. NULL if not snoozed. ISO 8601 format. User can snooze for 1hr, 3hr, 1day, 3days. Notification hidden until snoozed_until."
+    },
+    "dismissed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when user dismissed notification. NULL if not dismissed. ISO 8601 format. Dismissed notifications remain in database for audit but hidden from UI."
+    },
+    "read": {
+      "type": "boolean",
+      "description": "Whether user has read this notification. true if opened_at is not NULL or user marked as read. Used to show unread count badge."
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Notification priority inherited from reminder_id. 1=lowest, 10=highest. Used to sort notifications when multiple unread. Critical severity notifications auto-promoted to priority ≥8."
+    },
+    "expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when notification expires and auto-dismisses. NULL for non-expiring notifications. ISO 8601 format. Examples: payment_due reminders expire after due date, promotional notifications expire after 7 days."
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "notification_id": "notif_20251020_abc123",
+      "reminder_id": "rem_low_bal_001",
+      "user_id": "user_abc123",
+      "title": "Low Balance Alert: Chase Checking",
+      "message": "Your Chase Checking balance is $450.00, which is below your configured threshold of $500.00. Consider transferring funds to avoid overdraft fees.",
+      "severity": "warning",
+      "delivery_channel": "in_app",
+      "status": "opened",
+      "action_url": "/accounts/acct_checking_001",
+      "action_label": "View Account",
+      "metadata": {
+        "account_id": "acct_checking_001",
+        "account_name": "Chase Checking",
+        "current_balance": 450.00,
+        "threshold": 500.00,
+        "currency": "USD"
+      },
+      "created_at": "2025-10-20T14:30:00Z",
+      "sent_at": "2025-10-20T14:30:00Z",
+      "delivered_at": "2025-10-20T14:30:00Z",
+      "opened_at": "2025-10-20T15:45:00Z",
+      "failed_reason": null,
+      "retry_count": 0,
+      "snoozed_until": null,
+      "dismissed_at": null,
+      "read": true,
+      "priority": 8,
+      "expires_at": null
+    },
+    {
+      "notification_id": "notif_20251018_xyz789",
+      "reminder_id": "rem_missing_payment_002",
+      "user_id": "user_xyz789",
+      "title": "Missing Payment: Monthly Rent",
+      "message": "Your monthly rent payment of $1,200.00 to ABC Property Management was not detected. This payment was expected on Oct 1st (±3 days tolerance). Please verify payment was made or mark as paid in the app.",
+      "severity": "critical",
+      "delivery_channel": "email",
+      "status": "delivered",
+      "action_url": "/transactions?series=series_rent_monthly",
+      "action_label": "Review Payment",
+      "metadata": {
+        "series_id": "series_rent_monthly",
+        "expected_amount": 1200.00,
+        "expected_date": "2025-10-01",
+        "tolerance_days": 3,
+        "merchant": "ABC Property Management",
+        "currency": "USD"
+      },
+      "created_at": "2025-10-04T08:00:00Z",
+      "sent_at": "2025-10-04T08:00:15Z",
+      "delivered_at": "2025-10-04T08:01:30Z",
+      "opened_at": null,
+      "failed_reason": null,
+      "retry_count": 0,
+      "snoozed_until": null,
+      "dismissed_at": null,
+      "read": false,
+      "priority": 10,
+      "expires_at": "2025-10-11T23:59:59Z"
+    },
+    {
+      "notification_id": "notif_20251018_def456",
+      "reminder_id": "rem_large_exp_003",
+      "user_id": "user_def456",
+      "title": "Large Expense Detected",
+      "message": "Unusual purchase detected: $5,000.00 at Amazon on Oct 18, 2025. This is 10× your 30-day average of $500.00 for Electronics. If this was not you, please review immediately.",
+      "severity": "info",
+      "delivery_channel": "push",
+      "status": "opened",
+      "action_url": "/transactions/txn_amazon_oct18",
+      "action_label": "View Transaction",
+      "metadata": {
+        "transaction_id": "txn_amazon_oct18",
+        "amount": 5000.00,
+        "merchant": "Amazon",
+        "category": "Electronics",
+        "average_amount": 500.00,
+        "variance_multiplier": 10.0,
+        "comparison_period_days": 30,
+        "currency": "USD"
+      },
+      "created_at": "2025-10-18T18:45:00Z",
+      "sent_at": "2025-10-18T18:45:05Z",
+      "delivered_at": "2025-10-18T18:45:10Z",
+      "opened_at": "2025-10-18T19:30:00Z",
+      "failed_reason": null,
+      "retry_count": 0,
+      "snoozed_until": null,
+      "dismissed_at": "2025-10-18T19:31:00Z",
+      "read": true,
+      "priority": 5,
+      "expires_at": null
+    }
+  ]
+}

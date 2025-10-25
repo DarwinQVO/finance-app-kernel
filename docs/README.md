@@ -29,6 +29,9 @@
 - **[3.8 Cluster Rules](verticals/3.8-cluster-rules.md)** ✅ Complete - Merchant name normalization, fuzzy matching, transaction clustering, rule engine
 - **[3.9 Reconciliation Strategies](verticals/3.9-reconciliation-strategies.md)** ✅ Complete - Multi-source matching, confidence scoring, one-to-many reconciliation, blocking optimization
 
+### Group 4: Derivatives & Insights
+- **[4.1 Reminders](verticals/4.1-reminders.md)** ✅ Complete - Alert rules, notification delivery, snooze/dismiss, persistence, multi-channel dispatch
+
 ---
 
 ## 🧩 Primitives Catalog
@@ -125,6 +128,12 @@ These primitives are domain-agnostic - they construct verifiable truth across AN
 - **[ThresholdManager](primitives/ol/ThresholdManager.md)** - Decision rule engine, threshold management (auto-link ≥0.95, suggest 0.70-0.94, manual 0.50-0.69)
 - **[ReconciliationStore](primitives/ol/ReconciliationStore.md)** - CRUD for reconciliation results with audit trail, orphaned item handling, cascading deletes
 
+**Vertical 4.1 (Reminders):**
+- **[ReminderEngine](primitives/ol/ReminderEngine.md)** - Core orchestrator for alert rule evaluation, scheduling, and notification triggering
+- **[AlertRuleEvaluator](primitives/ol/AlertRuleEvaluator.md)** - Evaluates user-defined conditions against canonical data (thresholds, patterns, anomalies)
+- **[NotificationDispatcher](primitives/ol/NotificationDispatcher.md)** - Multi-channel notification delivery (in-app, email, SMS, push) with retry logic
+- **[ReminderStore](primitives/ol/ReminderStore.md)** - CRUD for alert rules, notification history, snooze state, delivery receipts
+
 ### Interface Layer (IL)
 Reusable UI components:
 
@@ -161,6 +170,9 @@ Reusable UI components:
 - **[ReconciliationDashboard](primitives/il/ReconciliationDashboard.md)** - Three-column UI showing unmatched items, suggested matches, matched items with progress tracking
 - **[MatchReviewDialog](primitives/il/MatchReviewDialog.md)** - Side-by-side comparison dialog with confidence breakdown, accept/reject actions
 - **[ManualMatchDialog](primitives/il/ManualMatchDialog.md)** - Manual match creation with search, multi-select for one-to-many, amount validation
+- **[ReminderBell](primitives/il/ReminderBell.md)** - Bell icon with badge counter, dropdown for recent notifications, unread indicator
+- **[NotificationPanel](primitives/il/NotificationPanel.md)** - Full notification center with filtering, mark as read, snooze/dismiss actions
+- **[ReminderConfigDialog](primitives/il/ReminderConfigDialog.md)** - Create/edit alert rules with condition builder, channel selection, scheduling
 - **[IL Components Summary](primitives/il/_IL_COMPONENTS_SUMMARY.md)** - Catalog of all IL components
 
 ---
@@ -233,6 +245,11 @@ Executable contracts extracted from vertical specifications:
 - **[match-candidate.schema.json](schemas/match-candidate.schema.json)** - Match candidate with similarity scores, feature breakdown (amount, date, counterparty, description), decision
 - **[reconciliation-config.schema.json](schemas/reconciliation-config.schema.json)** - Configuration for thresholds, tolerances, weights, blocking parameters, performance settings
 
+**Vertical 4.1 (Reminders):**
+- **[reminder-config.schema.json](schemas/reminder-config.schema.json)** - Alert rule configuration (conditions, triggers, channels, schedule, snooze settings)
+- **[notification-event.schema.json](schemas/notification-event.schema.json)** - Notification event record (type, payload, delivery status, timestamp, read state)
+- **[alert-condition.schema.json](schemas/alert-condition.schema.json)** - Alert condition definition (field, operator, threshold, pattern, anomaly detection parameters)
+
 ---
 
 ## 🏛️ Architecture Decision Records (ADR)
@@ -262,6 +279,11 @@ Key architectural decisions with rationale:
 - **[ADR-0016: Reconciliation Threshold Strategy](adr/0016-reconciliation-thresholds.md)** - 3-tier thresholds (auto-link ≥0.95, suggest 0.70-0.94, manual 0.50-0.69)
 - **[ADR-0017: Blocking Strategy for Performance](adr/0017-blocking-strategy-performance.md)** - Date ±30d and amount ±20% pre-filtering for 150x speedup
 
+**Group 4: Derivatives & Insights**
+- **[ADR-0018: Notification Delivery Strategy](adr/0018-notification-delivery-strategy.md)** - Multi-channel dispatch with priority queue, retry logic, and delivery receipts
+- **[ADR-0019: Alert Rule Engine Architecture](adr/0019-alert-rule-engine-architecture.md)** - Event-driven evaluation with scheduled polling, threshold-based triggers, and condition composition
+- **[ADR-0020: Reminder Snooze & Persistence Strategy](adr/0020-reminder-snooze-persistence.md)** - User-specific snooze state with exponential backoff and cross-device synchronization
+
 ---
 
 ## 🎨 UX Flows
@@ -283,6 +305,7 @@ User experience specifications with wireframes and journeys:
 - **[3.7 Parser Registry Experience](ux-flows/3.7-parser-registry-experience.md)** - Auto-detected parser, manual override, view capabilities, deprecated parser warning, register new parser
 - **[3.8 Cluster Rules Experience](ux-flows/3.8-cluster-rules-experience.md)** - Create normalization rule, view clusters, test rule pattern, manual cluster adjustments, bulk apply rules
 - **[3.9 Reconciliation Strategies Experience](ux-flows/3.9-reconciliation-strategies-experience.md)** - Auto-matched items, review suggested matches, manual match creation, reject false positives, split transaction matching, adjust thresholds
+- **[4.1 Reminders Experience](ux-flows/4.1-reminders-experience.md)** - Create alert rules, receive notifications, snooze/dismiss, configure channels, view notification history, test conditions
 
 ---
 
@@ -305,7 +328,8 @@ User experience specifications with wireframes and journeys:
 | | 3.7 Parser Registry | ✅ Complete |
 | | 3.8 Cluster Rules | ✅ Complete |
 | | 3.9 Reconciliation Strategies | ✅ Complete |
-| **4. Derivatives** | 4.1-4.3 | 📝 Pending |
+| **4. Derivatives** | 4.1 Reminders | ✅ Complete |
+| | 4.2-4.3 | 📝 Pending |
 | **5. Governance** | 5.1-5.5 | 📝 Pending |
 
 ---

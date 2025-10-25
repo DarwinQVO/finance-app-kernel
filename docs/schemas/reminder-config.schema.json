@@ -1,0 +1,246 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/DarwinQVO/finance-app-kernel/schemas/reminder-config.schema.json",
+  "title": "Reminder Configuration",
+  "description": "Reminder rule configuration defining conditions (low balance, missing payment, large expense) and notification preferences. Used to trigger automated alerts based on user-defined thresholds and patterns.",
+  "type": "object",
+  "required": [
+    "reminder_id",
+    "user_id",
+    "rule_type",
+    "condition",
+    "notification_channels",
+    "enabled",
+    "created_at"
+  ],
+  "properties": {
+    "reminder_id": {
+      "type": "string",
+      "pattern": "^rem_[a-z0-9_]+$",
+      "description": "Unique reminder ID. Primary key for reminders table. Pattern: rem_{type}_{random}. Examples: rem_low_bal_001, rem_missing_payment_abc, rem_large_exp_xyz"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "User ID who owns this reminder. Foreign key to users table. Used to filter reminders by user."
+    },
+    "rule_type": {
+      "type": "string",
+      "enum": ["low_balance", "missing_payment", "large_expense", "payment_due", "budget_exceeded"],
+      "description": "Type of reminder rule. low_balance=balance falls below threshold, missing_payment=expected payment not detected, large_expense=expense exceeds average by multiplier, payment_due=scheduled payment approaching, budget_exceeded=spending exceeds category budget"
+    },
+    "condition": {
+      "type": "object",
+      "description": "Condition definition for triggering this reminder. Structure varies by rule_type. See alert-condition.schema.json for full specification.",
+      "properties": {
+        "condition_type": {
+          "type": "string",
+          "enum": ["threshold", "pattern", "schedule", "anomaly"],
+          "description": "Type of condition. threshold=numeric comparison, pattern=regex/series match, schedule=time-based, anomaly=statistical deviation"
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["less_than", "greater_than", "equals", "not_equals", "contains", "matches_pattern"],
+          "description": "Comparison operator for condition evaluation"
+        },
+        "value": {
+          "description": "Comparison value. Type varies by condition_type: number for threshold, string for pattern, object for complex conditions"
+        },
+        "threshold_amount": {
+          "type": ["number", "null"],
+          "multipleOf": 0.01,
+          "minimum": 0,
+          "description": "Threshold amount for low_balance rule. Alert triggers when balance < threshold_amount. NULL for other rule types. Example: 500.00 = alert when balance falls below $500"
+        },
+        "variance_multiplier": {
+          "type": ["number", "null"],
+          "multipleOf": 0.1,
+          "minimum": 1.0,
+          "description": "Variance multiplier for large_expense rule. Alert triggers when expense > avg * variance_multiplier. NULL for other rule types. Example: 3.0 = alert when expense is 3× average"
+        },
+        "series_id": {
+          "type": ["string", "null"],
+          "pattern": "^series_[a-z0-9_]+$",
+          "description": "Series ID for missing_payment rule. Alert triggers when expected payment from series not detected within tolerance window. NULL for other rule types."
+        },
+        "date_tolerance_days": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 30,
+          "description": "Date tolerance in days for missing_payment rule. Alert triggers if payment not detected within ±date_tolerance_days of expected date. NULL for other rule types. Default: 3"
+        },
+        "comparison_period_days": {
+          "type": ["integer", "null"],
+          "minimum": 7,
+          "maximum": 365,
+          "description": "Historical period for anomaly detection in large_expense rule. Compares current expense to average over comparison_period_days. NULL for other rule types. Default: 30"
+        },
+        "budget_category": {
+          "type": ["string", "null"],
+          "maxLength": 100,
+          "description": "Budget category for budget_exceeded rule. Alert triggers when spending in this category exceeds budget. NULL for other rule types. Examples: 'Groceries', 'Dining', 'Entertainment'"
+        },
+        "budget_amount": {
+          "type": ["number", "null"],
+          "multipleOf": 0.01,
+          "minimum": 0,
+          "description": "Budget amount for budget_exceeded rule. Alert triggers when spending > budget_amount. NULL for other rule types. Example: 500.00 = alert when monthly spending exceeds $500"
+        }
+      },
+      "required": ["condition_type", "operator", "value"],
+      "additionalProperties": false
+    },
+    "notification_channels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["in_app", "email", "sms", "push"]
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Notification delivery channels. in_app=notification panel in app, email=email to user's registered address, sms=text message to user's phone, push=push notification to mobile device. Multiple channels allowed."
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Whether this reminder is active. false=reminder paused (e.g., user disabled or admin suspended)"
+    },
+    "name": {
+      "type": ["string", "null"],
+      "maxLength": 100,
+      "description": "User-friendly name for this reminder. NULL for system-generated reminders. Examples: 'Checking Account Low Balance Alert', 'Rent Payment Missing', 'Unusual Amazon Purchase'"
+    },
+    "cooldown_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 168,
+      "description": "Minimum hours between consecutive notifications for same reminder. Prevents notification spam. Default: 24. Example: 24 = max 1 notification per day for this reminder"
+    },
+    "snooze_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of times user has snoozed this reminder. Increments each time user clicks 'Snooze'. Resets to 0 when reminder is re-enabled. Used for analytics."
+    },
+    "last_triggered_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when this reminder last triggered a notification. NULL if never triggered. ISO 8601 format. Used with cooldown_hours to prevent spam."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this reminder was created. ISO 8601 format. Immutable."
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when this reminder was last modified. NULL if never modified. ISO 8601 format. Updates when user edits configuration."
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Reminder priority for notification ordering. 1=lowest priority, 10=highest priority. Used to sort notifications when multiple alerts triggered simultaneously. Default: 5"
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "description": "Additional metadata for advanced use cases. Examples: integration IDs for external systems (healthcare claims system, legal case management, e-commerce order tracking), custom thresholds per account, ML model version for anomaly detection",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "reminder_id": "rem_low_bal_001",
+      "user_id": "user_abc123",
+      "rule_type": "low_balance",
+      "condition": {
+        "condition_type": "threshold",
+        "operator": "less_than",
+        "value": 500.00,
+        "threshold_amount": 500.00,
+        "variance_multiplier": null,
+        "series_id": null,
+        "date_tolerance_days": null,
+        "comparison_period_days": null,
+        "budget_category": null,
+        "budget_amount": null
+      },
+      "notification_channels": ["email", "in_app"],
+      "enabled": true,
+      "name": "Checking Account Low Balance Alert",
+      "cooldown_hours": 24,
+      "snooze_count": 0,
+      "last_triggered_at": "2025-10-20T14:30:00Z",
+      "created_at": "2025-01-15T09:00:00Z",
+      "updated_at": "2025-10-15T12:00:00Z",
+      "priority": 8,
+      "metadata": {
+        "account_id": "acct_checking_001",
+        "account_name": "Chase Checking",
+        "currency": "USD"
+      }
+    },
+    {
+      "reminder_id": "rem_missing_payment_002",
+      "user_id": "user_xyz789",
+      "rule_type": "missing_payment",
+      "condition": {
+        "condition_type": "pattern",
+        "operator": "matches_pattern",
+        "value": "series_rent_monthly",
+        "threshold_amount": null,
+        "variance_multiplier": null,
+        "series_id": "series_rent_monthly",
+        "date_tolerance_days": 3,
+        "comparison_period_days": null,
+        "budget_category": null,
+        "budget_amount": null
+      },
+      "notification_channels": ["in_app", "email", "sms", "push"],
+      "enabled": true,
+      "name": "Monthly Rent Payment Missing",
+      "cooldown_hours": 48,
+      "snooze_count": 2,
+      "last_triggered_at": null,
+      "created_at": "2025-02-01T10:00:00Z",
+      "updated_at": "2025-09-10T15:30:00Z",
+      "priority": 10,
+      "metadata": {
+        "series_type": "recurring",
+        "expected_amount": 1200.00,
+        "expected_day_of_month": 1,
+        "landlord_name": "ABC Property Management"
+      }
+    },
+    {
+      "reminder_id": "rem_large_exp_003",
+      "user_id": "user_def456",
+      "rule_type": "large_expense",
+      "condition": {
+        "condition_type": "anomaly",
+        "operator": "greater_than",
+        "value": 3.0,
+        "threshold_amount": null,
+        "variance_multiplier": 3.0,
+        "series_id": null,
+        "date_tolerance_days": null,
+        "comparison_period_days": 30,
+        "budget_category": null,
+        "budget_amount": null
+      },
+      "notification_channels": ["in_app"],
+      "enabled": false,
+      "name": null,
+      "cooldown_hours": 24,
+      "snooze_count": 0,
+      "last_triggered_at": "2025-10-18T18:45:00Z",
+      "created_at": "2025-03-10T11:00:00Z",
+      "updated_at": "2025-10-19T09:00:00Z",
+      "priority": 5,
+      "metadata": {
+        "merchant_category": "Electronics",
+        "ml_model_version": "anomaly_detector_v2.1",
+        "baseline_average": 150.00
+      }
+    }
+  ]
+}
