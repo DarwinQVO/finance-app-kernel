@@ -21,8 +21,9 @@
   "properties": {
     "canonical_id": {
       "type": "string",
-      "pattern": "^(can_|CT_)[a-zA-Z0-9_]+$",
-      "description": "Globally unique canonical transaction ID. Format: 'can_{source}_{date}_{seq}' or 'CT_{hash}'. Generated deterministically from upload_id + row_id + normalizer_version."
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Globally unique canonical transaction ID using UUIDv5 (RFC 4122). Generated deterministically: uuid5(NAMESPACE_CANONICAL, f'{upload_id}:{row_id}:{normalizer_version}'). Ensures idempotent re-normalization and global uniqueness. Example: '550e8400-e29b-51d4-a716-446655440000'"
     },
     "upload_id": {
       "type": "string",
@@ -40,8 +41,9 @@
       "description": "Normalized transaction date in ISO 8601 format (UTC). Example: '2025-01-15T00:00:00Z'"
     },
     "amount": {
-      "type": "number",
-      "description": "Normalized amount as signed decimal. Negative = debit/expense, Positive = credit/income. Example: -5.75"
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$",
+      "description": "Normalized amount as decimal string to avoid floating-point precision errors. Negative = debit/expense, Positive = credit/income. Examples: '-5.75', '1234.50', '0.01'. Industry standard (used by Stripe, Plaid) to prevent 0.1 + 0.2 ≠ 0.3 bugs."
     },
     "currency": {
       "type": "string",
@@ -111,8 +113,9 @@
         },
         "duplicate_of": {
           "type": "string",
-          "pattern": "^(can_|CT_)[a-zA-Z0-9_]+$",
-          "description": "Canonical ID of potential duplicate transaction"
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "description": "Canonical ID (UUIDv5) of potential duplicate transaction"
         }
       },
       "additionalProperties": true
@@ -135,11 +138,11 @@
   "additionalProperties": false,
   "examples": [
     {
-      "canonical_id": "CT_abc123xyz",
+      "canonical_id": "550e8400-e29b-51d4-a716-446655440000",
       "upload_id": "UL_abc123",
       "observation_id": "UL_abc123:0",
       "date": "2025-01-15T00:00:00Z",
-      "amount": -5.75,
+      "amount": "-5.75",
       "currency": "USD",
       "description": "Starbucks #1234",
       "merchant": "Starbucks",
@@ -161,11 +164,11 @@
       "rule_set_version": "2024.10"
     },
     {
-      "canonical_id": "CT_def456uvw",
+      "canonical_id": "6ba7b810-9dad-51d1-80b4-00c04fd430c8",
       "upload_id": "UL_def456",
       "observation_id": "UL_def456:15",
       "date": "2025-01-02T00:00:00Z",
-      "amount": -123.45,
+      "amount": "-123.45",
       "currency": "USD",
       "description": "Amazon.com",
       "merchant": "Amazon",
@@ -190,11 +193,11 @@
       "rule_set_version": "2024.10"
     },
     {
-      "canonical_id": "CT_ghi789rst",
+      "canonical_id": "7c9e6679-7425-5a94-85d2-e56b7c3e5e14",
       "upload_id": "UL_ghi789",
       "observation_id": "UL_ghi789:42",
       "date": "2025-02-28T00:00:00Z",
-      "amount": 2500.00,
+      "amount": "2500.00",
       "currency": "USD",
       "description": "Direct Deposit - Payroll",
       "merchant": null,

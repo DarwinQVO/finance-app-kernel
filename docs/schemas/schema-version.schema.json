@@ -163,7 +163,7 @@
         "type": "object",
         "properties": {
           "merchant": { "type": "string", "description": "Merchant name" },
-          "amount": { "type": "number", "minimum": 0 },
+          "amount": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$", "description": "Decimal string to avoid floating-point errors" },
           "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
         },
         "required": ["merchant", "amount", "date"]
@@ -190,7 +190,7 @@
         "type": "object",
         "properties": {
           "merchant": { "type": "string" },
-          "amount": { "type": "number", "minimum": 0 },
+          "amount": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$", "description": "Decimal string to avoid floating-point errors" },
           "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
           "category": { "type": "string", "description": "Transaction category" }
         },
@@ -223,7 +223,7 @@
         "type": "object",
         "properties": {
           "merchant": { "type": "string" },
-          "amount": { "type": "number", "minimum": 0 },
+          "amount": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$", "description": "Decimal string to avoid floating-point errors" },
           "date": { "type": "string", "format": "date-time", "description": "ISO 8601 datetime" },
           "category": { "type": "string" }
         },

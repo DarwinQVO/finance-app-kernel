@@ -13,14 +13,14 @@
         "type": "object",
         "description": "Reference to canonical-transaction.schema.json",
         "properties": {
-          "canonical_id": { "type": "string" },
+          "canonical_id": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", "description": "UUIDv5 canonical transaction ID" },
           "upload_id": { "type": "string" },
           "row_id": { "type": "integer" },
           "transaction_date": { "type": "string", "format": "date" },
           "merchant": { "type": "string" },
-          "amount": { "type": "number" },
+          "amount": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$", "description": "Decimal string to avoid floating-point errors" },
           "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
-          "amount_usd": { "type": "number" },
+          "amount_usd": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$", "description": "USD equivalent as decimal string" },
           "account_id": { "type": "string" },
           "category": { "type": "string" },
           "deductible_usa": { "type": "boolean" },
@@ -67,19 +67,22 @@
       "required": ["income", "expenses", "net", "currency"],
       "properties": {
         "income": {
-          "type": "number",
-          "description": "Sum of positive amounts in result set (all pages, not just current)",
-          "examples": [9000.00]
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]{1,2})?$",
+          "description": "Sum of positive amounts in result set (all pages, not just current). Decimal string to avoid floating-point errors.",
+          "examples": ["9000.00"]
         },
         "expenses": {
-          "type": "number",
-          "description": "Sum of negative amounts (absolute value)",
-          "examples": [8247.00]
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]{1,2})?$",
+          "description": "Sum of negative amounts (absolute value). Decimal string to avoid floating-point errors.",
+          "examples": ["8247.00"]
         },
         "net": {
-          "type": "number",
-          "description": "income - expenses",
-          "examples": [753.00]
+          "type": "string",
+          "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$",
+          "description": "income - expenses. Decimal string to avoid floating-point errors.",
+          "examples": ["753.00"]
         },
         "currency": {
           "type": "string",
@@ -95,8 +98,8 @@
             "date_to": { "type": "string", "format": "date" },
             "account_ids": { "type": "array", "items": { "type": "string" } },
             "category": { "type": "string" },
-            "amount_min": { "type": "number" },
-            "amount_max": { "type": "number" },
+            "amount_min": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$", "description": "Minimum amount filter as decimal string" },
+            "amount_max": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$", "description": "Maximum amount filter as decimal string" },
             "deductible": { "type": "boolean" },
             "search": { "type": "string" }
           },
@@ -109,14 +112,14 @@
     {
       "data": [
         {
-          "canonical_id": "can_bofa_20250426_001",
+          "canonical_id": "550e8400-e29b-51d4-a716-446655440001",
           "upload_id": "upl_abc123",
           "row_id": 1,
           "transaction_date": "2025-04-26",
           "merchant": "Aeromexico",
-          "amount": 4516.00,
+          "amount": "4516.00",
           "currency": "MXN",
-          "amount_usd": 231.78,
+          "amount_usd": "231.78",
           "account_id": "apple_card",
           "category": "Personal > Travel > Flights",
           "deductible_usa": false,
@@ -125,14 +128,14 @@
           "created_at": "2025-04-27T10:30:00Z"
         },
         {
-          "canonical_id": "can_bofa_20250430_002",
+          "canonical_id": "6ba7b810-9dad-51d1-80b4-00c04fd430c9",
           "upload_id": "upl_def456",
           "row_id": 1,
           "transaction_date": "2025-04-30",
           "merchant": "HubSpot Inc",
-          "amount": 5000.00,
+          "amount": "5000.00",
           "currency": "USD",
-          "amount_usd": 5000.00,
+          "amount_usd": "5000.00",
           "account_id": "bofa_debit",
           "category": "Business > Clients > HubSpot",
           "deductible_usa": false,
@@ -149,9 +152,9 @@
         "prev_cursor": null
       },
       "summary": {
-        "income": 9000.00,
-        "expenses": 8247.00,
-        "net": 753.00,
+        "income": "9000.00",
+        "expenses": "8247.00",
+        "net": "753.00",
         "currency": "USD",
         "filters_applied": {
           "date_from": "2025-04-01",

@@ -124,8 +124,9 @@
         "properties": {
           "canonical_id": {
             "type": "string",
-            "pattern": "^CT_[a-zA-Z0-9]+$",
-            "description": "Canonical transaction ID that has warning"
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "description": "UUIDv5 canonical transaction ID that has warning"
           },
           "flag": {
             "type": "string",
@@ -280,25 +281,25 @@
       ],
       "warning_details": [
         {
-          "canonical_id": "CT_xyz789",
+          "canonical_id": "550e8400-e29b-51d4-a716-446655440010",
           "flag": "possible_duplicate",
           "message": "Similar transaction found within 1 day",
           "context": {
-            "duplicate_of": "CT_aaa111",
+            "duplicate_of": "550e8400-e29b-51d4-a716-446655440005",
             "similarity_score": 0.92
           }
         },
         {
-          "canonical_id": "CT_abc456",
+          "canonical_id": "6ba7b810-9dad-51d1-80b4-00c04fd430d1",
           "flag": "large_amount",
           "message": "Amount exceeds $10,000",
           "context": {
-            "amount": 15750.00,
-            "threshold": 10000.00
+            "amount": "15750.00",
+            "threshold": "10000.00"
           }
         },
         {
-          "canonical_id": "CT_def789",
+          "canonical_id": "7c9e6679-7425-5a94-85d2-e56b7c3e5e20",
           "flag": "ambiguous_date",
           "message": "Date format ambiguous (01/02/2024), assumed MM/DD/YYYY",
           "context": {
@@ -343,7 +344,7 @@
       "failure_details": [],
       "warning_details": [
         {
-          "canonical_id": "CT_bbb222",
+          "canonical_id": "8e11f890-3b45-52d4-9716-a5b6c7d8e9f0",
           "flag": "uncategorized",
           "message": "Merchant not in whitelist, category unknown",
           "context": {

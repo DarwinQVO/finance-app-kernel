@@ -90,8 +90,8 @@
         "tolerances": {
           "type": "object",
           "properties": {
-            "amount_diff": {"type": "number", "description": "Absolute amount difference"},
-            "amount_percent": {"type": "number", "description": "Percentage amount tolerance"},
+            "amount_diff": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,2})?$", "description": "Absolute amount difference as decimal string"},
+            "amount_percent": {"type": "number", "description": "Percentage amount tolerance (0-100)"},
             "date_diff_days": {"type": "integer", "description": "Date difference in days"}
           }
         },

@@ -22,6 +22,12 @@
       ],
       "description": "Current state in the pipeline. Only Coordinator can update this field."
     },
+    "version": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Optimistic locking version counter. Incremented on every status update. Used to prevent concurrent modification conflicts (see ADR-0002)."
+    },
     "error_message": {
       "type": ["string", "null"],
       "description": "Human-readable error message if status=error, otherwise null"
@@ -52,18 +58,20 @@
       "description": "Number of CanonicalTransactions created. Present only if status = normalized"
     }
   },
-  "required": ["upload_id", "status", "upload_log_ref"],
+  "required": ["upload_id", "status", "version", "upload_log_ref"],
   "additionalProperties": false,
   "examples": [
     {
       "upload_id": "UL_abc123",
       "status": "queued_for_parse",
+      "version": 0,
       "error_message": null,
       "upload_log_ref": "/logs/uploads/UL_abc123.log"
     },
     {
       "upload_id": "UL_xyz789",
       "status": "normalized",
+      "version": 4,
       "error_message": null,
       "upload_log_ref": "/logs/uploads/UL_xyz789.log",
       "parse_log_ref": "/logs/parse/UL_xyz789.log.json",
@@ -74,6 +82,7 @@
     {
       "upload_id": "UL_err001",
       "status": "error",
+      "version": 2,
       "error_message": "PDF_CORRUPT: Unable to extract text from pages 3-5",
       "upload_log_ref": "/logs/uploads/UL_err001.log",
       "parse_log_ref": "/logs/parse/UL_err001.log.json"

@@ -155,12 +155,137 @@ If a stage fails:
 
 ### 🔴 Risks (Mitigated)
 
-- **Risk**: Race condition if multiple workers update `status`
-  - **Mitigation**: Only **Coordinator** can update `status` (see ADR-0003)
+- **Risk**: Race condition if multiple coordinators update `status` concurrently
+  - **Mitigation #1**: Only **Coordinator** can update `status` (see ADR-0003)
+  - **Mitigation #2**: **Optimistic locking** using `version` field (see below)
   - Workers write data/logs, emit events, but never touch `status`
 
 - **Risk**: "Stuck" states (status never advances)
   - **Mitigation**: Timeout monitoring (if `status=parsing` for >60min → alert)
+
+---
+
+## Optimistic Locking (Concurrency Control)
+
+**Problem**: In distributed deployments with multiple coordinator instances, two coordinators might try to update the same upload's status simultaneously:
+
+```
+Time  Coordinator A              Coordinator B
+----  ------------------------  ------------------------
+T0    Read: status=parsed,       Read: status=parsed,
+      version=1                  version=1
+T1    Transition to normalizing  Transition to normalizing
+T2    Write: status=normalizing  Write: status=normalizing
+      (overwrites B's update!)   (lost update!)
+```
+
+**Solution**: Add `version` field (integer, auto-incremented) to `UploadRecord`:
+
+```sql
+CREATE TABLE upload_records (
+  upload_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 0,  -- Optimistic lock
+  -- ... other fields
+);
+```
+
+### Implementation
+
+**Coordinator transition logic:**
+
+```python
+def transition_status(upload_id: str, from_state: str, to_state: str):
+    """
+    Transition upload status with optimistic locking.
+
+    Raises:
+        ConcurrentModificationError: If another coordinator modified the record
+    """
+    # 1. Read current record with version
+    upload = db.query(UploadRecord).filter_by(upload_id=upload_id).first()
+    current_version = upload.version
+    current_status = upload.status
+
+    # 2. Validate state transition
+    if current_status != from_state:
+        raise InvalidStateTransition(
+            f"Expected {from_state}, found {current_status}"
+        )
+
+    # 3. Attempt atomic update with version check
+    result = db.execute(
+        """
+        UPDATE upload_records
+        SET status = :to_state,
+            version = :new_version,
+            updated_at = NOW()
+        WHERE upload_id = :upload_id
+          AND version = :current_version  -- Optimistic lock check
+        """,
+        {
+            "upload_id": upload_id,
+            "to_state": to_state,
+            "current_version": current_version,
+            "new_version": current_version + 1
+        }
+    )
+
+    # 4. Check if update succeeded
+    if result.rowcount == 0:
+        # Version mismatch → concurrent modification detected
+        raise ConcurrentModificationError(
+            f"Upload {upload_id} was modified by another coordinator. Retry."
+        )
+
+    # 5. Log state transition to ProvenanceLedger
+    log_state_transition(upload_id, from_state, to_state)
+```
+
+### Behavior
+
+**Concurrent update scenario:**
+
+```
+Time  Coordinator A                    Coordinator B
+----  ------------------------------  ------------------------------
+T0    Read: version=1, status=parsed   Read: version=1, status=parsed
+T1    UPDATE ... WHERE version=1       (processing...)
+      ✅ Success (version → 2)
+T2    (done)                           UPDATE ... WHERE version=1
+                                       ❌ rowcount=0 (version is now 2)
+                                       → ConcurrentModificationError
+T3                                     Retry: Read version=2
+                                       UPDATE ... WHERE version=2
+                                       ✅ Success
+```
+
+### Error Handling
+
+```python
+MAX_RETRIES = 3
+
+for attempt in range(MAX_RETRIES):
+    try:
+        transition_status(upload_id, from_state, to_state)
+        break  # Success
+    except ConcurrentModificationError:
+        if attempt == MAX_RETRIES - 1:
+            raise  # Give up after max retries
+        time.sleep(0.1 * (2 ** attempt))  # Exponential backoff
+```
+
+### Benefits
+
+✅ **No locks needed**: Database-level atomic update (no `SELECT FOR UPDATE`)
+✅ **Performance**: No row-level locks, high concurrency
+✅ **Simple**: Single integer field, standard pattern
+✅ **Detects lost updates**: Guaranteed to catch concurrent modifications
+
+### Trade-offs
+
+⚠️ **Retry required**: Coordinators must handle `ConcurrentModificationError` and retry
+⚠️ **Version field overhead**: +4 bytes per record (minimal)
 
 ---
 
