@@ -268,23 +268,23 @@ const result = await engine.execute(plan, {
 
 ---
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Migrate citation metadata when schema evolves.
+**Use Case**: Migrate founder fact metadata when schema evolves in RSRCH utilitario research system.
 
 **Migration Scenarios**:
-- Add `ORCID` field for authors
-- Change `issued` date format from array to ISO string
-- Add `DOI` validation constraint
+- Add `confidence` field for fact credibility
+- Change `subject_entity` from string to structured object
+- Add `investment_amount` validation constraint for investment facts
 
 **Example**:
 ```typescript
-// Scenario: Add ORCID field to 1M citations
+// Scenario: Migrate subject_entity from string to object for 1M facts
 const plan = await engine.generatePlan({
-  schema_id: "csl_citation",
+  schema_id: "founder_fact",
   from_version: "1.0.0",
-  to_version: "1.1.0",
-  table_name: "citations",
+  to_version: "2.0.0",
+  table_name: "facts",
   total_records: 1000000
 });
 
@@ -292,20 +292,20 @@ console.log(plan);
 // {
 //   steps: [
 //     {
-//       type: "ADD_NESTED_FIELD",
-//       parent_field: "author",
-//       field: "ORCID",
+//       type: "TRANSFORM_FIELD",
+//       field: "subject_entity",
+//       transform: "string_to_structured_entity",  // Lookup entity_id from knowledge base
 //       default_value: null
 //     }
 //   ],
-//   estimated_duration_ms: 180000, // 3 minutes
-//   requires_data_migration: false,
-//   breaking: false
+//   estimated_duration_ms: 300000, // 5 minutes (requires entity resolution lookups)
+//   requires_data_migration: true,
+//   breaking: true
 // }
 
 // Execute with progress tracking
 const result = await engine.execute(plan, {
-  batch_size: 20000,
+  batch_size: 10000,  // Smaller batches due to entity lookups
   on_progress: (progress) => {
     console.log(`ETA: ${progress.eta_ms}ms - ${progress.percent}%`);
   }

@@ -279,10 +279,10 @@ This primitive constructs verifiable truth about **raw extracted data storage** 
 - Composite key: `(upload_id, row_id)`
 - Example: 50 clauses from contract PDF
 
-**Research Domain:**
-- Store: `ObservationCitation[]` from bibliographies
-- Composite key: `(upload_id, row_id)`
-- Example: 30 citations from research paper
+**Research Domain (RSRCH - Utilitario):**
+- Store: `RawFact[]` from web scraping (TechCrunch articles, podcast transcripts)
+- Composite key: `(upload_id, row_id)` where upload_id = source URL
+- Example: 50 raw facts extracted from TechCrunch article about Sam Altman
 
 **Manufacturing Domain:**
 - Store: `ObservationMeasurement[]` from sensor logs

@@ -85,7 +85,7 @@ interface ParseLog {
 **Finance:** Log bank statement parsing (success rate, extraction latency)
 **Healthcare:** Log lab result extraction (which tests extracted, errors)
 **Legal:** Log contract parsing (clauses found, parsing time)
-**Research:** Log citation extraction (citations found, format errors)
+**Research (RSRCH - Utilitario):** Log fact extraction from web pages (facts found, parsing errors, source credibility score)
 **Manufacturing:** Log sensor data parsing (data points extracted, corruption detected)
 
 ---

@@ -24,7 +24,7 @@ This primitive is **domain-agnostic**. Same pattern applies to ANY entity simila
 | **Finance** | Transaction amount (±5%) | Transaction date (±7 days) | Merchant/Vendor name | Description text | Currency, account type |
 | **Healthcare** | Claim amount (±10%) | Service date (±60 days) | Patient name | Procedure codes (CPT) | Provider ID, diagnosis |
 | **Legal** | Filing fee (exact) | Filing date (±30 days) | Party names | Document type | Case number, jurisdiction |
-| **Research** | N/A (no amount) | Publication year (±1 year) | Author names | Title + abstract | Journal, DOI prefix |
+| **Research (RSRCH - Utilitario)** | Investment amount (±10%) | Discovery date (±30 days) | Entity names (founders/companies) | Fact claim text | Source type, source credibility |
 | **E-commerce** | Order amount (±5%) | Order date (±14 days) | Customer name | Product SKUs | Shipping address |
 | **Logistics** | Shipment value (±10%) | Ship date (±7 days) | Consignee name | Tracking number | Origin/destination |
 
@@ -523,36 +523,36 @@ score = scorer.calculate_confidence(pacer_filing, state_filing, legal_config)
 # features = {amount_diff: 0.00, date_diff_days: 2, counterparty_similarity: 0.90}
 ```
 
-### Research: Citation Deduplication Scoring
+### Research (RSRCH - Utilitario): Fact Deduplication Scoring
 
 ```python
 # Setup
-doi_citation = Citation(
-    amount=None,  # No amount for citations
-    date=date(2024, 1, 1),  # Publication year
-    counterparty="Smith, J.; Doe, A.",  # Authors
-    description="Machine Learning for Climate Prediction: A Review"
+techcrunch_fact = Fact(
+    amount=375000000,  # $375M investment
+    date=date(2025, 1, 15),  # TechCrunch article date
+    counterparty="Sam Altman",  # Subject entity
+    description="Sam Altman invested $375M in Helion Energy"
 )
 
-arxiv_citation = Citation(
-    amount=None,
-    date=date(2024, 1, 1),
-    counterparty="J. Smith, A. Doe",  # Different author format
-    description="ML for Climate Prediction - A Review"
+podcast_fact = Fact(
+    amount=375000000,
+    date=date(2025, 1, 20),  # Lex Fridman podcast date (5 days later)
+    counterparty="sama",  # Twitter handle variant
+    description="sama invested 375 million in Helion"
 )
 
-citation_config = ReconciliationConfig(
-    amount_tolerance_pct=Decimal("0.0"),  # No amount
-    date_tolerance_days=365,  # ±1 year
-    weights={"amount": 0.0, "date": 0.2, "counterparty": 0.4, "description": 0.4}
+fact_config = ReconciliationConfig(
+    amount_tolerance_pct=Decimal("0.10"),  # ±10% for investment amounts
+    date_tolerance_days=30,  # ±30 days
+    weights={"amount": 0.3, "date": 0.2, "counterparty": 0.3, "description": 0.2}
 )
 
 # Calculate confidence
-score = scorer.calculate_confidence(doi_citation, arxiv_citation, citation_config)
+score = scorer.calculate_confidence(techcrunch_fact, podcast_fact, fact_config)
 
 # Result:
-# confidence = 0.96 (AUTO_LINK)
-# scores = {amount: 0.0, date: 1.0, counterparty: 0.95, description: 0.90}
+# confidence = 0.94 (AUTO_LINK - same investment fact from 2 sources)
+# scores = {amount: 1.0, date: 0.83, counterparty: 0.95, description: 0.98}
 # features = {date_diff_days: 0, counterparty_similarity: 0.95, description_similarity: 0.90}
 ```
 

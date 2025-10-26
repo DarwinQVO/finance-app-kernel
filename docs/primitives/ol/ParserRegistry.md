@@ -65,7 +65,7 @@ parser = registry.get_parser("unknown")    # Raises ParserNotFoundError
 **Finance:** Register bank-specific parsers (BoFA, Chase, Wells Fargo)
 **Healthcare:** Register lab-specific parsers (LabCorp, Quest, hospital systems)
 **Legal:** Register contract parsers (DocuSign, HelloSign, manual PDF)
-**Research:** Register citation parsers (BibTeX, EndNote, Zotero)
+**Research (RSRCH - Utilitario):** Register web scraping parsers (TechCrunch parser, Twitter parser, Lex Fridman podcast transcript parser)
 **Manufacturing:** Register sensor parsers (CSV, JSON, proprietary formats)
 
 ---

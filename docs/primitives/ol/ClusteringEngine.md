@@ -18,7 +18,7 @@ Group similar items (merchants, providers, institutions, etc.) based on string s
 - Finance: Cluster merchant name variants ("AMAZON.COM", "AMZN MKTP US" → "Amazon")
 - Healthcare: Cluster provider name variations ("ST MARY'S", "ST MARY HOSP" → "St. Mary's Hospital")
 - Legal: Cluster related case names for matter grouping
-- Research: Cluster institution/author name variants for citation deduplication
+- Research (RSRCH - Utilitario): Cluster founder/company name variants for fact deduplication (@sama, sama, Sam Altman → "Sam Altman")
 
 ---
 
@@ -507,26 +507,26 @@ clusters = engine.create_clusters(
 # Cluster 2: Johnson v. ACME (2 variants)
 ```
 
-### Research: Author Name Clustering
+### Research (RSRCH - Utilitario): Founder Name Clustering
 
 ```python
-authors = [
-    "J. Smith",
-    "John Smith",
-    "Smith, J.",
-    "Smith, John",
-    "J. R. Smith"
+founders = [
+    "@sama",
+    "sama",
+    "Sam Altman",
+    "Samuel Altman",
+    "Sam H. Altman"
 ]
 
 clusters = engine.create_clusters(
-    authors,
+    founders,
     similarity_threshold=0.70,
     algorithm="dbscan"
 )
 
 # Result:
-# Cluster 1: John Smith (5 variants)
-#   - All variants grouped despite different formats
+# Cluster 1: Sam Altman (5 variants)
+#   - All variants grouped despite different formats (Twitter handle, nickname, full name)
 ```
 
 ---

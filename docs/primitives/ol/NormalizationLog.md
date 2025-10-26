@@ -88,7 +88,7 @@ interface NormalizationLog {
 **Finance:** Log transaction normalization (validation failures, duplicate rate)
 **Healthcare:** Log lab result normalization (unit conversion errors, range violations)
 **Legal:** Log clause normalization (categorization accuracy, parsing issues)
-**Research:** Log citation normalization (format errors, missing fields)
+**Research (RSRCH - Utilitario):** Log fact normalization (entity name resolution errors, missing source credibility, '@sama' → 'Sam Altman' transformations)
 **Manufacturing:** Log measurement normalization (calibration errors, out-of-range values)
 
 ---

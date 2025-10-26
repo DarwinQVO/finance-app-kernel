@@ -287,7 +287,7 @@ response = api_gateway.handle_request(request)
 - **Finance:** Bank API clients authenticate, get rate limited per tier
 - **Healthcare:** EHR systems use OAuth2 tokens, rate limited per hospital tenant
 - **Legal:** Law firm API keys scoped to tenant, CORS headers for web app
-- **Research:** University API keys for batch paper uploads, rate limits per institution
+- **Research (RSRCH - Utilitario):** VC firm API keys for querying founder facts (GET /v1/facts?subject_entity=Sam+Altman), rate limits per tier (1000 req/hour standard, 10000 req/hour enterprise), webhook authentication for real-time fact notifications
 - **E-Commerce:** SaaS platform OAuth2 integration, high rate limits (Enterprise tier)
 - **HR SaaS:** API keys for payroll processing, audit logging for compliance
 - **Insurance:** Claims processing API, rate limits per insurance company

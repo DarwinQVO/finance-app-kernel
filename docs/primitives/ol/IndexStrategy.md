@@ -157,16 +157,16 @@ suggestions = strategy.suggest_indexes()
 # → idx_clauses_counterparty_date
 ```
 
-### Research Domain
+### Research Domain (RSRCH - Utilitario)
 ```python
-strategy = IndexStrategy(table="canonical_citations")
+strategy = IndexStrategy(table="canonical_facts")
 
-strategy.record_query(filters={"publication_year", "author"}, sort="publication_year")
-strategy.record_query(filters={"topic"}, sort="publication_year")
+strategy.record_query(filters={"discovered_at", "subject_entity"}, sort="discovered_at")
+strategy.record_query(filters={"fact_type"}, sort="discovered_at")
 
 suggestions = strategy.suggest_indexes()
-# → idx_citations_year_author
-# → idx_citations_topic_year
+# → idx_facts_date_entity
+# → idx_facts_type_date
 ```
 
 ### Manufacturing Domain

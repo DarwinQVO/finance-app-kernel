@@ -175,7 +175,7 @@ canonical = normalizer.normalize(observation, rules)
 **Finance:** ObservationTransaction → CanonicalTransaction (dates, amounts, categories)
 **Healthcare:** ObservationLabResult → CanonicalLabResult (numeric values, units, ranges)
 **Legal:** ObservationClause → CanonicalClause (clause types, obligations, dates)
-**Research:** ObservationCitation → CanonicalCitation (authors, titles, DOIs)
+**Research (RSRCH - Utilitario):** RawFact → CanonicalFact (entity names, fact claims, source URLs)
 **Manufacturing:** ObservationMeasurement → CanonicalMeasurement (sensor values, units)
 **Media:** ObservationUtterance → CanonicalUtterance (timestamps, speaker IDs)
 

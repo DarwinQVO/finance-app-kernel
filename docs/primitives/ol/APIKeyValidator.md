@@ -282,7 +282,7 @@ new_api_key = validator.rotate_key(old_key_id, "tenant_acme", ["read", "write"])
 - **Finance:** Bank generates API key for automated statement uploads
 - **Healthcare:** Hospital generates API key for EHR integration
 - **Legal:** Law firm generates API key for contract extraction
-- **Research:** University generates API key for paper processing
+- **Research (RSRCH - Utilitario):** VC firm generates API key for querying founder facts (GET /v1/facts), background research system generates key for continuous web scraping
 - **E-Commerce:** SaaS platform generates API key for invoice reconciliation
 - **HR SaaS:** HR platform generates API key for W-2 processing
 - **Insurance:** Insurance company generates API key for claim processing

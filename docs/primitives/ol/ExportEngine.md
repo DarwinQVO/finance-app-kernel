@@ -202,19 +202,19 @@ result = engine.export_excel(
 # → Excel with formatting for legal team
 ```
 
-### Research Domain
+### Research Domain (RSRCH - Utilitario)
 ```python
-# Export bibliography
+# Export founder facts
 result = engine.export_csv(
-    rows=citation_store.query(filters={"author": "Smith", "year_from": 2020}),
+    rows=fact_store.query(filters={"subject_entity": "Sam Altman", "fact_type": "investment"}),
     config=ExportConfig(
         format="csv",
-        filename="smith-citations-2020-2025.csv",
-        filters_applied={"author": "Smith", "year": "2020+"},
-        columns=["title", "author", "year", "journal", "doi"]
+        filename="sam-altman-investments-2020-2025.csv",
+        filters_applied={"subject_entity": "Sam Altman", "fact_type": "investment"},
+        columns=["claim", "subject_entity", "investment_amount", "discovered_at", "source_url", "source_credibility"]
     )
 )
-# → Citation list for paper appendix
+# → Fact list for VC firm investment analysis
 ```
 
 ### Manufacturing Domain

@@ -265,21 +265,21 @@ if (errorTrend.direction === "increasing" && errorTrend.percentage_change > 20) 
 
 ---
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Monitor research paper parsing trends and detect citation extraction anomalies.
+**Use Case**: Monitor founder fact extraction trends and detect web scraping anomalies.
 
 **Trend Analysis**:
-- **Performance Trend**: GROBID parser 20% slower on recent papers
-- **Error Trend**: Citation extraction failure rate increased to 10%
-- **Capacity Forecast**: Bulk import of 5000 papers requires 3 hours
-- **Anomaly Detection**: 8 papers took >30 seconds (z-score: 3.5)
+- **Performance Trend**: TechCrunch parser 15% slower on recent articles (more ads/JS)
+- **Error Trend**: Entity resolution failure rate increased to 8% (new founder names)
+- **Capacity Forecast**: Bulk scraping of 5000 URLs requires 50 minutes
+- **Anomaly Detection**: 12 web pages took >10 seconds (z-score: 3.2)
 
 **Example**:
 ```typescript
 // Get performance trend
 const trend = await analyzer.getPerformanceTrend({
-  parser_id: "grobid_pdf_parser",
+  parser_id: "techcrunch_web_parser",
   time_window: "30d",
   metric: "duration_p95_ms"
 });
@@ -287,18 +287,18 @@ const trend = await analyzer.getPerformanceTrend({
 console.log(`Performance trend: ${trend.direction}`);
 console.log(`Change: ${trend.percentage_change}%`);
 
-// Detect anomalies in citation extraction
+// Detect anomalies in fact extraction
 const anomalies = await analyzer.detectAnomalies({
-  parser_id: "citation_parser_apa",
+  parser_id: "investment_fact_extractor",
   time_window: "24h",
   metric: "execution_time_ms",
   threshold_z_score: 2.5
 });
 
 if (anomalies.length > 10) {
-  console.log("⚠️  Multiple citation extraction anomalies detected");
+  console.log("⚠️  Multiple fact extraction anomalies detected");
   console.log(`Total anomalies: ${anomalies.length}`);
-  console.log(`Recommendation: Investigate recent papers with complex citation formats`);
+  console.log(`Recommendation: Investigate recent articles with complex investment structures`);
 }
 ```
 

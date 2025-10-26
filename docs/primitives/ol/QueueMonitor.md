@@ -244,39 +244,39 @@ console.log(`Estimated completion: ${estimatedMinutes.toFixed(0)} minutes`);
 
 ---
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Monitor research paper processing queues during bulk imports.
+**Use Case**: Monitor founder fact extraction queues during bulk web scraping.
 
 **Queue Types**:
-- `paper_import`: Paper uploads (1000+ papers)
-- `pdf_extraction`: PDF text extraction
-- `citation_parsing`: Citation extraction
-- `metadata_enrichment`: Metadata lookup (DOI, ORCID)
+- `web_scraping`: URL scraping queue (1000+ URLs)
+- `html_parsing`: HTML fact extraction
+- `entity_resolution`: Entity name normalization (@sama → Sam Altman)
+- `fact_deduplication`: Multi-source fact merging
 
 **Health Thresholds**:
-- **Healthy**: pending < 100, processing rate > 200 papers/min
-- **Degraded**: pending 100-500, processing rate 100-200 papers/min
-- **Critical**: pending > 500, processing rate < 100 papers/min
+- **Healthy**: pending < 100, processing rate > 100 pages/min
+- **Degraded**: pending 100-500, processing rate 50-100 pages/min
+- **Critical**: pending > 500, processing rate < 50 pages/min
 
 **Example**:
 ```typescript
-// Monitor bulk paper import
-const queueDepth = await monitor.getQueueDepth("paper_import");
+// Monitor bulk web scraping
+const queueDepth = await monitor.getQueueDepth("web_scraping");
 
 if (queueDepth.health_status === "degraded") {
   // Scale up workers
-  await workers.scaleUp("paper_import", 5);
+  await workers.scaleUp("web_scraping", 5);
 }
 
-// Get oldest pending document
-const oldestDocs = await monitor.getOldestPendingDocuments({
-  queue_name: "paper_import",
+// Get oldest pending URLs
+const oldestURLs = await monitor.getOldestPendingDocuments({
+  queue_name: "web_scraping",
   limit: 10
 });
 
-oldestDocs.forEach(doc => {
-  console.log(`Pending for ${doc.age_minutes} minutes: ${doc.document_id}`);
+oldestURLs.forEach(url => {
+  console.log(`Pending for ${url.age_minutes} minutes: ${url.document_id}`);
 });
 ```
 

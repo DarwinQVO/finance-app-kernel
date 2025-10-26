@@ -60,7 +60,7 @@ In real-world data systems, extraction and classification errors are inevitable:
 - **Finance**: Merchant names may be incorrectly extracted from receipts
 - **Healthcare**: Diagnosis codes might be miscategorized by automation
 - **Legal**: Case numbers could be misread from scanned documents
-- **Research**: Author names might be incorrectly parsed from citations
+- **Research (RSRCH - Utilitario)**: Entity names might be incorrectly parsed from web articles (e.g., '@sama' → needs manual correction to 'Sam Altman')
 
 Traditional approaches have significant drawbacks:
 

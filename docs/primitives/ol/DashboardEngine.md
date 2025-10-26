@@ -177,23 +177,23 @@ result = engine.calculate_metric(
 # Returns: {"total_hours": 320, "breakdown": [{"client": "ACME Corp", "hours": 120}, ...]}
 ```
 
-### Research Domain
+### Research Domain (RSRCH - Utilitario)
 ```python
-# Citation count
+# Fact count by founder
 result = engine.calculate_metric(
-    metric_type="citation_stats",
-    filters={"author": "researcher_123", "year": 2025},
-    user_id="researcher_123"
+    metric_type="fact_stats",
+    filters={"subject_entity": "Sam Altman", "year": 2025},
+    user_id="rsrch_analyst_001"
 )
-# Returns: {"total_citations": 450, "h_index": 18, "top_papers": [...]}
+# Returns: {"total_facts": 127, "fact_types": {"investment": 45, "founding": 12, "employment": 70}, "top_sources": ["TechCrunch", "Lex Fridman Podcast"]}
 
-# Papers by topic
+# Facts by topic
 result = engine.calculate_metric(
-    metric_type="papers_by_topic",
-    filters={"year": 2025},
-    user_id="researcher_123"
+    metric_type="facts_by_topic",
+    filters={"fact_type": "investment"},
+    user_id="rsrch_analyst_001"
 )
-# Returns: {"total_papers": 12, "breakdown": [{"topic": "AI", "count": 7}, ...]}
+# Returns: {"total_facts": 89, "breakdown": [{"topic": "AI", "count": 34}, {"topic": "Energy", "count": 21}, ...]}
 ```
 
 ### Manufacturing Domain

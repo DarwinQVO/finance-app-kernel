@@ -231,31 +231,31 @@ const slowestRules = await analyzer.getSlowestRules({
 
 ---
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Monitor research paper extraction and citation parsing efficiency.
+**Use Case**: Monitor founder fact extraction from web scraping and entity resolution efficiency.
 
 **Analysis Queries**:
-- What's the GROBID parser success rate? (Success: 94%, Failure: 6%)
-- How many citations extracted per paper? (Average: 45 citations/paper)
-- Which citation format parser is most accurate? (APA: 88% accuracy)
-- What's the processing rate for bulk imports? (Peak: 200 papers/min)
+- What's the TechCrunch parser success rate? (Success: 88%, Failure: 12% - broken links)
+- How many facts extracted per web page? (Average: 15 facts/page)
+- Which fact type extractor is most accurate? (Investment: 92% accuracy)
+- What's the processing rate for bulk scraping? (Peak: 100 web pages/min)
 
 **Example**:
 ```typescript
-// Get GROBID parser stats
-const grobidStats = await analyzer.getParserStats({
-  parser_id: "grobid_pdf_parser",
+// Get TechCrunch parser stats
+const webScraperStats = await analyzer.getParserStats({
+  parser_id: "techcrunch_web_parser",
   time_window: "7d"
 });
 
-console.log(`Papers parsed: ${grobidStats.total_executions}`);
-console.log(`Average citations per paper: ${grobidStats.avg_observations_extracted}`);
-console.log(`Failure rate: ${(1 - grobidStats.success_rate) * 100}%`);
+console.log(`Web pages parsed: ${webScraperStats.total_executions}`);
+console.log(`Average facts per page: ${webScraperStats.avg_observations_extracted}`);
+console.log(`Failure rate: ${(1 - webScraperStats.success_rate) * 100}%`);
 
-// Get citation parser effectiveness by format
-const citationStats = await analyzer.compareRulePerformance({
-  rule_ids: ["citation_parser_apa", "citation_parser_mla", "citation_parser_chicago"],
+// Get fact extractor effectiveness by type
+const factStats = await analyzer.compareRulePerformance({
+  rule_ids: ["investment_fact_extractor", "founding_fact_extractor", "employment_fact_extractor"],
   rule_type: "extraction",
   time_window: "30d"
 });

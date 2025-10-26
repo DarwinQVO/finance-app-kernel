@@ -258,92 +258,85 @@ await registry.publish({
 
 ---
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Manage citation and bibliography schemas for academic research platforms.
+**Use Case**: Manage founder/company fact schemas for RSRCH (utilitario research system).
 
 **Schemas Managed**:
-- Citation metadata (CSL JSON)
-- Author affiliation schemas
-- Research dataset schemas (DataCite)
-- Publication metadata (CrossRef)
-- Grant proposal schemas (NSF FastLane)
+- Fact metadata (subject_entity, claim, fact_type)
+- Source credibility schemas
+- Entity relationship schemas
+- Investment fact schemas
+- Founder profile schemas
 
 **Example**:
 ```typescript
-// Register CSL JSON citation schema
+// Register founder fact schema
 await registry.publish({
-  schema_id: "csl_citation",
+  schema_id: "founder_fact",
   version: "1.0.0",
   schema: {
     type: "object",
     properties: {
-      id: { type: "string" },
-      type: { type: "string", enum: ["article-journal", "book", "paper-conference"] },
-      title: { type: "string" },
-      author: {
+      fact_id: { type: "string" },
+      fact_type: { type: "string", enum: ["investment", "founding", "employment", "education"] },
+      claim: { type: "string" },
+      subject_entity: { type: "string" },  // e.g., "Sam Altman"
+      discovered_at: { type: "string", format: "date-time" },
+      sources: {
         type: "array",
         items: {
           type: "object",
           properties: {
-            family: { type: "string" },
-            given: { type: "string" }
+            source_type: { type: "string", enum: ["web_article", "podcast", "tweet", "interview"] },
+            source_url: { type: "string" },
+            source_credibility: { type: "number", minimum: 0, maximum: 1 }
           }
         }
-      },
-      issued: {
-        type: "object",
-        properties: {
-          "date-parts": {
-            type: "array",
-            items: { type: "array", items: { type: "number" } }
-          }
-        }
-      },
-      DOI: { type: "string" }
+      }
     },
-    required: ["id", "type", "title", "author"]
+    required: ["fact_id", "fact_type", "claim", "subject_entity", "sources"]
   },
-  description: "CSL JSON citation format (Citation Style Language)",
-  tags: ["research", "citation", "bibliography"]
+  description: "Founder fact schema for RSRCH utilitario research",
+  tags: ["rsrch", "founder", "fact", "investment"]
 });
 
-// Evolve schema: add ORCID field (minor version)
+// Evolve schema: add structured subject_entity object (minor version)
 await registry.publish({
-  schema_id: "csl_citation",
+  schema_id: "founder_fact",
   version: "1.1.0",
   schema: {
     type: "object",
     properties: {
-      id: { type: "string" },
-      type: { type: "string", enum: ["article-journal", "book", "paper-conference"] },
-      title: { type: "string" },
-      author: {
+      fact_id: { type: "string" },
+      fact_type: { type: "string", enum: ["investment", "founding", "employment", "education"] },
+      claim: { type: "string" },
+      subject_entity: {  // Changed from string to object
+        type: "object",
+        properties: {
+          entity_id: { type: "string" },
+          entity_name: { type: "string" },
+          entity_type: { type: "string", enum: ["founder", "company", "investor"] }
+        },
+        required: ["entity_id", "entity_name", "entity_type"]
+      },
+      discovered_at: { type: "string", format: "date-time" },
+      sources: {
         type: "array",
         items: {
           type: "object",
           properties: {
-            family: { type: "string" },
-            given: { type: "string" },
-            ORCID: { type: "string" } // New optional field
+            source_type: { type: "string", enum: ["web_article", "podcast", "tweet", "interview"] },
+            source_url: { type: "string" },
+            source_credibility: { type: "number", minimum: 0, maximum: 1 }
           }
         }
-      },
-      issued: {
-        type: "object",
-        properties: {
-          "date-parts": {
-            type: "array",
-            items: { type: "array", items: { type: "number" } }
-          }
-        }
-      },
-      DOI: { type: "string" }
+      }
     },
-    required: ["id", "type", "title", "author"]
+    required: ["fact_id", "fact_type", "claim", "subject_entity", "sources"]
   },
-  description: "CSL JSON citation format - added ORCID support",
-  tags: ["research", "citation", "bibliography"]
+  description: "Founder fact schema - structured subject_entity for entity resolution",
+  tags: ["rsrch", "founder", "fact", "investment"]
 });
 ```
 

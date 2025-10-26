@@ -218,10 +218,10 @@ This primitive constructs verifiable truth about **content identity through cryp
 - Verify document integrity (chain of custody)
 - Detect tampering in evidence files
 
-**Research/Academic Domain:**
-- Verify dataset integrity
-- Detect duplicate research submissions
-- Ensure reproducibility (same input hash → same results)
+**Research Domain (RSRCH - Utilitario):**
+- Verify integrity of scraped web pages (detect if TechCrunch article changed)
+- Detect duplicate podcast transcripts (same Lex Fridman episode scraped twice)
+- Ensure reproducibility of fact extraction (same source hash → same facts)
 
 **Software Development:**
 - Verify build artifacts

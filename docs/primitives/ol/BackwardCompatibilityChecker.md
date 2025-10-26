@@ -282,35 +282,35 @@ console.log(report.breaking_changes);
 
 ---
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Validate citation schema changes for research platforms.
+**Use Case**: Validate founder fact schema changes for RSRCH utilitario research system.
 
 **Breaking Changes Detected**:
-- Change `issued.date-parts` from array to ISO string → Format incompatibility
-- Remove `DOI` field → Breaks consumers
-- Change `author` from array to object → Structure incompatibility
+- Change `subject_entity` from string to object → Structure incompatibility
+- Remove `source_url` field → Breaks consumers
+- Change `sources` from array to single object → Structure incompatibility
 
 **Additive Changes Detected**:
-- Add optional `ORCID` field to author → Backward compatible
-- Add `retracted` boolean field → Backward compatible
+- Add optional `confidence` field for fact credibility → Backward compatible
+- Add `investment_amount` field for investment facts → Backward compatible
 
 **Example**:
 ```typescript
-// Detect breaking change: type change
+// Detect breaking change: subject_entity type change
 const oldSchema = {
   type: "object",
   properties: {
-    title: { type: "string" },
-    year: { type: "string" } // String type
+    claim: { type: "string" },
+    subject_entity: { type: "string" } // String type (e.g., "Sam Altman")
   }
 };
 
 const newSchema = {
   type: "object",
   properties: {
-    title: { type: "string" },
-    year: { type: "integer" } // Changed to integer
+    claim: { type: "string" },
+    subject_entity: { type: "object" } // Changed to object (entity_id, entity_name, entity_type)
   }
 };
 

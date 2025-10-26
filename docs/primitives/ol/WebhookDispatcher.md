@@ -342,7 +342,7 @@ else:
 - **Finance:** Webhook for upload.completed → Notify bank's ERP system
 - **Healthcare:** Webhook for observation.created → Trigger EHR update
 - **Legal:** Webhook for entity.resolved → Notify contract management system
-- **Research:** Webhook for observation.created → Update citation database
+- **Research (RSRCH - Utilitario):** Webhook for fact.discovered → Notify VC firm CRM, webhook for entity.resolved → Update founder profile in investment tracking system
 - **E-Commerce:** Webhook for reconciliation.completed → Trigger invoice approval
 - **HR SaaS:** Webhook for upload.completed → Notify payroll system
 - **Insurance:** Webhook for reconciliation.completed → Trigger claim approval workflow

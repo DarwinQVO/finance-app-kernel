@@ -904,18 +904,18 @@ const resolution = await engine.resolveField(
 
 ---
 
-### Example 4: Research - Author Name Resolution
+### Example 4: Research (RSRCH - Utilitario) - Founder Name Resolution
 
-**Scenario**: Resolve author name for academic paper citation
+**Scenario**: Resolve founder entity name from multiple web sources
 
 ```typescript
 // Input Data
-const paperId = 'paper_res_456';
+const factId = 'fact_sama_helion_001';
 const sources: ValueSources = {
-  manual_override: 'Smith, John A.',   // User provided full middle initial
-  rule_value: 'Smith, J.',             // Rule normalized from extraction
-  extraction_value: 'J. Smith',        // Extracted from PDF metadata
-  default_value: 'Unknown Author'
+  manual_override: 'Sam Altman',       // User provided canonical name
+  rule_value: 'Samuel Altman',         // Rule normalized from TechCrunch
+  extraction_value: '@sama',           // Extracted from Twitter
+  default_value: 'Unknown Entity'
 };
 
 // Resolution

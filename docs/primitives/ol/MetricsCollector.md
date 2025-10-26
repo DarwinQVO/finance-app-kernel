@@ -261,48 +261,50 @@ await collector.recordRuleExecution({
 
 ---
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Monitor research paper extraction and citation parsing performance.
+**Use Case**: Monitor founder fact extraction from web scraping and entity resolution performance.
 
 **Metrics Collected**:
-- PDF parser execution time for academic papers (arXiv, PubMed)
-- Citation extraction rule performance (APA, MLA, Chicago)
-- Author affiliation normalization rules
-- Error rates for paywalled or corrupted papers
-- Queue depth for bulk paper imports (1000+ papers)
+- Web page parser execution time (TechCrunch, Twitter, podcast transcripts)
+- Fact extraction rule performance (investment facts, founding facts, employment facts)
+- Entity name normalization rules (@sama → Sam Altman)
+- Error rates for 404s or broken web pages
+- Queue depth for bulk web scraping (1000+ URLs)
 
 **Example**:
 ```typescript
-// Record research paper parser
+// Record web page fact extraction
 await collector.recordParserExecution({
-  parser_id: "grobid_pdf_parser",
-  upload_id: "paper_234",
-  duration_ms: 3200,
+  parser_id: "techcrunch_web_parser",
+  upload_id: "article_techcrunch_sama_helion",
+  duration_ms: 1800,
   status: "success",
-  observations_extracted: 68,
+  observations_extracted: 15,
   metadata: {
-    file_size_bytes: 1048576,
-    page_count: 12,
-    citations_found: 45
+    source_url: "https://techcrunch.com/2025/01/15/sama-helion",
+    page_size_bytes: 524288,
+    facts_found: 15,
+    entities_detected: 3
   }
 });
 
-// Record citation extraction rule
+// Record fact extraction rule
 await collector.recordRuleExecution({
-  rule_id: "citation_parser_apa",
+  rule_id: "investment_fact_extractor",
   rule_type: "extraction",
-  execution_time_ms: 8,
+  execution_time_ms: 12,
   matched: true,
-  transformation_applied: "citation_format:apa",
+  transformation_applied: "fact_type:investment",
   context: {
-    citation_text: "Smith, J. (2023). Title. Journal, 10(2), 123-145.",
-    confidence: 0.88
+    claim: "Sam Altman invested $375M in Helion Energy",
+    subject_entity: "Sam Altman",
+    confidence: 0.92
   }
 });
 ```
 
-**Performance Target**: <10ms p95 per metric, 200+ papers/min during bulk import.
+**Performance Target**: <10ms p95 per metric, 100+ web pages/min during bulk scraping.
 
 ---
 

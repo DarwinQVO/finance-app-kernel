@@ -105,7 +105,7 @@ CREATE INDEX idx_canonicals_normalized_at ON canonicals(normalized_at);
 **Finance:** Store CanonicalTransaction (validated dates, amounts, categories)
 **Healthcare:** Store CanonicalLabResult (validated test values, units)
 **Legal:** Store CanonicalClause (categorized contract clauses)
-**Research:** Store CanonicalCitation (parsed authors, titles, DOIs)
+**Research (RSRCH - Utilitario):** Store CanonicalFact (validated founder/company facts with multi-source provenance, normalized entity names)
 **Manufacturing:** Store CanonicalMeasurement (calibrated sensor values)
 **Media:** Store CanonicalUtterance (cleaned transcripts with speaker IDs)
 

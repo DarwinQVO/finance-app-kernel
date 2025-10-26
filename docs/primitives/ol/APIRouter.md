@@ -360,7 +360,7 @@ response = router.route(request, request.auth_context)
 - **Finance:** Routes bank statement upload requests to create_upload_handler
 - **Healthcare:** Routes lab report queries to get_observations_handler
 - **Legal:** Routes contract entity retrieval to get_entities_handler
-- **Research:** Routes citation queries to get_entities_handler
+- **Research (RSRCH - Utilitario):** Routes founder fact queries (GET /v1/facts?subject_entity=Sam+Altman) to get_facts_handler, routes entity resolution (POST /v1/entities/resolve) to resolve_entity_handler
 - **E-Commerce:** Routes invoice reconciliation to trigger_reconciliation_handler
 - **HR SaaS:** Routes W-2 upload to create_upload_handler
 - **Insurance:** Routes claim queries to get_observations_handler

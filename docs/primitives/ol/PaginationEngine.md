@@ -212,21 +212,21 @@ clauses, page = engine.paginate(
 )
 ```
 
-### Research Domain
+### Research Domain (RSRCH - Utilitario)
 ```python
-# Paginate citations
+# Paginate founder facts
 rows = db.execute("""
-    SELECT * FROM canonical_citations
-    WHERE (publication_year, citation_id) < ($1, $2)
-    ORDER BY publication_year DESC, citation_id DESC
+    SELECT * FROM canonical_facts
+    WHERE (discovered_at, fact_id) < ($1, $2)
+    ORDER BY discovered_at DESC, fact_id DESC
     LIMIT 51
-""", cursor_year, cursor_id)
+""", cursor_date, cursor_id)
 
-citations, page = engine.paginate(
+facts, page = engine.paginate(
     rows=rows,
     limit=50,
-    sort_field="publication_year",
-    id_field="citation_id"
+    sort_field="discovered_at",
+    id_field="fact_id"
 )
 ```
 

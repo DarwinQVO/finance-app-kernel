@@ -24,7 +24,7 @@ ProjectionEngine operates on generic time series data (`TimeSeriesPoint<T>[]`) a
 - **Finance:** Income/expense projections, revenue forecasting
 - **Healthcare:** Patient volume forecasting, bed occupancy predictions
 - **Legal:** Case volume projections, billable hours forecasting
-- **Research:** Publication rate goals, grant funding runway
+- **Research (RSRCH - Utilitario):** Fact discovery rate forecasting, web scraping capacity planning
 - **E-commerce:** Sales forecasting, inventory demand predictions
 - **SaaS:** MRR projections, churn rate forecasting
 - **Logistics:** Shipment volume forecasting, fuel cost projections
@@ -666,26 +666,26 @@ console.log(response.projections);
 
 ---
 
-### Research: Publication Rate Projection
+### Research (RSRCH - Utilitario): Fact Discovery Rate Projection
 
-**Scenario:** Research lab wants to forecast publications per year to meet grant requirements.
+**Scenario:** RSRCH team wants to forecast founder fact discoveries per month to plan web scraping resources.
 
 ```typescript
-const publicationData = [
-  // Last 5 years of publications
-  { timestamp: new Date("2019-01-01"), value: 3 },
-  { timestamp: new Date("2020-01-01"), value: 4 },
-  { timestamp: new Date("2021-01-01"), value: 5 },
-  { timestamp: new Date("2022-01-01"), value: 6 },
-  { timestamp: new Date("2023-01-01"), value: 7 }
+const factDiscoveryData = [
+  // Last 5 months of fact discoveries
+  { timestamp: new Date("2024-08-01"), value: 450 },
+  { timestamp: new Date("2024-09-01"), value: 520 },
+  { timestamp: new Date("2024-10-01"), value: 610 },
+  { timestamp: new Date("2024-11-01"), value: 720 },
+  { timestamp: new Date("2024-12-01"), value: 850 }
 ];
 
 const request: ProjectionRequest = {
-  metric_type: "publications_per_year",
-  historical_data: publicationData,
+  metric_type: "facts_per_month",
+  historical_data: factDiscoveryData,
   horizon: 3,
-  horizon_unit: TimeUnit.Years,
-  algorithm: ProjectionAlgorithm.LinearRegression,  // Steady +1 publication/year trend
+  horizon_unit: TimeUnit.Months,
+  algorithm: ProjectionAlgorithm.LinearRegression,  // Growing discovery rate
   confidence_level: 0.90
 };
 
@@ -693,13 +693,13 @@ const response = await projectionEngine.forecast(request);
 
 console.log(response.projections);
 // [
-//   { period: "2024", point_estimate: 8, lower_bound: 7, upper_bound: 9 },
-//   { period: "2025", point_estimate: 9, lower_bound: 7, upper_bound: 11 },
-//   { period: "2026", point_estimate: 10, lower_bound: 8, upper_bound: 12 }
+//   { period: "2025-01", point_estimate: 980, lower_bound: 850, upper_bound: 1110 },
+//   { period: "2025-02", point_estimate: 1100, lower_bound: 920, upper_bound: 1280 },
+//   { period: "2025-03", point_estimate: 1230, lower_bound: 1000, upper_bound: 1460 }
 // ]
 ```
 
-**Grant Requirement:** Publish 25 papers over next 3 years. Projected: 27 papers (8+9+10). ✅ On track.
+**Resource Planning:** Need ~1200 facts/month capacity. Projected: 3310 facts over 3 months. ✅ On track for scaling.
 
 ---
 

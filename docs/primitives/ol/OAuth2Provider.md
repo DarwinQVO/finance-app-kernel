@@ -334,7 +334,7 @@ oauth2_provider.revoke_token(
 - **Finance:** Third-party budgeting app uses OAuth2 to access bank statements
 - **Healthcare:** Patient portal app uses OAuth2 to access lab reports
 - **Legal:** Contract management app uses OAuth2 to access extracted entities
-- **Research:** Citation manager uses OAuth2 to access paper observations
+- **Research (RSRCH - Utilitario):** VC firm CRM uses OAuth2 to access founder facts, investment tracking dashboard uses OAuth2 to query company facts
 - **E-Commerce:** Accounting software uses OAuth2 to access invoice observations
 - **HR SaaS:** Payroll app uses OAuth2 to access W-2 observations
 - **Insurance:** Claims portal uses OAuth2 to access claim observations

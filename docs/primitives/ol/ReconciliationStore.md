@@ -24,7 +24,7 @@ This primitive is **domain-agnostic**. Same pattern applies to ANY system requir
 | **Finance** | Bank reconciliation | Bank statements | Accounting ledger | 1:1 (single payment), 1:N (split deposit), N:1 (batch payment) |
 | **Healthcare** | Claim matching | Provider claims | Insurance payments | 1:1 (single claim), 1:N (partial payments), N:1 (bundled claim) |
 | **Legal** | Document linkage | Court filings | Case management | 1:1 (single filing), 1:N (multi-document case), N:1 (consolidated filing) |
-| **Research** | Citation reconciliation | Paper citations | Publication database | 1:1 (exact match), 1:N (citing multiple works), N:1 (duplicate citations) |
+| **Research (RSRCH - Utilitario)** | Fact deduplication | Web-scraped facts | Knowledge base facts | 1:1 (exact match), 1:N (same fact from TechCrunch + podcast), N:1 (duplicate extractions from same source) |
 | **E-commerce** | Order reconciliation | Purchase orders | Shipment tracking | 1:1 (single item), 1:N (split shipment), N:1 (combined order) |
 
 **Pattern:** Store match results with confidence scoring, support multiple cardinalities, enable audit trail for data quality, allow unmatch/rematch operations.

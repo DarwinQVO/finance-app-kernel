@@ -232,11 +232,11 @@ This primitive constructs verifiable truth about **raw data extraction** - a uni
 - Output: `ObservationClause[]` (clause_number, text, page_number)
 - Example: Extract clauses from legal contract
 
-**Research Domain:**
-- Parser: `citation_parser`
-- Input: Bibliography file
-- Output: `ObservationCitation[]` (author, title, year, journal)
-- Example: Extract citations from research paper
+**Research Domain (RSRCH - Utilitario):**
+- Parser: `web_page_fact_parser`
+- Input: TechCrunch HTML page
+- Output: `RawFact[]` (subject_entity, claim, fact_type, confidence)
+- Example: Extract founder investment facts from TechCrunch article
 
 **Manufacturing Domain:**
 - Parser: `sensor_log_parser`

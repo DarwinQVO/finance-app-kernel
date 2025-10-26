@@ -546,20 +546,20 @@ const TYPE_VALIDATORS: Record<string, (value: any) => boolean> = {
   }
 }
 
-// Research: Publication year must be 1900-2030
+// Research (RSRCH - Utilitario): Investment amount must be positive
 {
-  entity_type: "publication",
-  field_name: "year",
-  value: 1850,  // ❌ Too old
+  entity_type: "fact",
+  field_name: "investment_amount",
+  value: -375000000,  // ❌ Negative amount
 
   result: {
     valid: false,
     errors: [{
-      field: "year",
-      error: "Publication year must be between 1900 and 2030",
+      field: "investment_amount",
+      error: "Investment amount must be positive",
       code: "INVALID_RANGE",
-      suggested_value: null,
-      details: { min: 1900, max: 2030, received: 1850 }
+      suggested_value: 375000000,
+      details: { min: 0, received: -375000000 }
     }]
   }
 }
@@ -684,17 +684,17 @@ function validateRange(
   }
 }
 
-// Research: DOI must be valid format
+// Research (RSRCH - Utilitario): Source URL must be valid format
 {
-  entity_type: "publication",
-  field_name: "doi",
-  value: "not-a-doi",  // ❌ Invalid DOI
+  entity_type: "fact",
+  field_name: "source_url",
+  value: "not-a-url",  // ❌ Invalid URL
 
   result: {
     valid: false,
     errors: [{
-      field: "doi",
-      error: "DOI must match format: 10.NNNN/suffix (e.g., 10.1234/example)",
+      field: "source_url",
+      error: "Source URL must be valid HTTP/HTTPS URL (e.g., https://techcrunch.com/article)",
       code: "INVALID_FORMAT",
       suggested_value: null
     }]

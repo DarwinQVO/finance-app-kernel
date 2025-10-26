@@ -24,7 +24,7 @@ This primitive is **domain-agnostic**. Same pattern applies to ANY recurring eve
 | **Finance** | Recurring payments, subscriptions, salary | Monthly on 15th, biweekly Friday | Last day of month (Jan 31 → Feb 28) |
 | **Healthcare** | Medication schedules, therapy sessions | Every 3 days, weekly Tuesday | Prescription refills spanning months |
 | **Legal** | Filing deadlines, retainer payments | Monthly 1st, quarterly last day | Court calendar holidays |
-| **Research** | Grant disbursements, data collection | Quarterly 1st, semiannual | Academic calendar alignment |
+| **Research (RSRCH - Utilitario)** | Web scraping schedules, fact discovery reports | Daily web scraping runs, weekly founder profile updates | Source availability windows |
 | **Manufacturing** | Maintenance schedules, inventory orders | Weekly Monday, monthly last Friday | Production calendar shifts |
 | **Media** | Content publishing, subscription renewals | Daily 9am, monthly 1st | Time zone handling |
 
@@ -814,19 +814,20 @@ instances = engine.generate_expected_instances(
 )
 ```
 
-### Research: Biannual Conference
+### Research (RSRCH - Utilitario): Weekly Founder Profile Update
 
 ```python
-# Conference every 6 months (Jan and Jul)
-frequency = FrequencyPattern(type="monthly", day_of_month=15, interval=6)
+# Update founder profiles weekly (every Monday)
+frequency = FrequencyPattern(type="weekly", day_of_week="monday")
 
-dates = [date(2024, 1, 15)]
+dates = [date(2024, 1, 1)]  # Starting Monday
 for _ in range(5):
     next_date = engine.calculate_next_expected(frequency, dates[-1])
     dates.append(next_date)
 
 print(dates)
-# [2024-01-15, 2024-07-15, 2025-01-15, 2025-07-15, 2026-01-15, 2026-07-15]
+# [2024-01-01, 2024-01-08, 2024-01-15, 2024-01-22, 2024-01-29, 2024-02-05]
+# Weekly re-scraping of founder facts from TechCrunch/Twitter/podcasts
 ```
 
 ---

@@ -205,9 +205,9 @@ This primitive constructs verifiable truth about **uploaded content metadata** -
 - Contracts, court documents, evidence files
 - Signed agreements, discovery materials
 
-**Research/Academic Domain:**
-- Research papers, datasets, supplementary materials
-- Grant applications, ethics approvals
+**Research Domain (RSRCH - Utilitario):**
+- TechCrunch HTML pages (web scraping sources), podcast transcripts (Lex Fridman interviews)
+- Tweet JSON dumps (Twitter API responses), interview audio files (founder interviews)
 
 **Media/Publishing Domain:**
 - Articles, images, videos for publication

@@ -138,11 +138,11 @@ explanation = explainer.explain_field("can_clause_789", "risk_level")
 # Returns: "Classified as high-risk because clause contains keyword: 'unlimited liability'"
 ```
 
-**Research:**
+**Research (RSRCH - Utilitario):**
 ```python
 explainer = DecisionExplainer(...)
-explanation = explainer.explain_field("can_citation_202", "credibility")
-# Returns: "Marked as primary source because author is first author + peer-reviewed journal"
+explanation = explainer.explain_field("fact_sama_helion_001", "source_credibility")
+# Returns: "Marked as high credibility (0.95) because source is TechCrunch (0.9) + confirmed in Lex Fridman podcast (0.98)"
 ```
 
 **Manufacturing:**

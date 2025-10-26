@@ -130,11 +130,11 @@ data = tracer.trace_lineage("can_contract_clause_789", "usr_lawyer_01")
 # Returns: Contract clause → OCR output → contract PDF
 ```
 
-**Research:**
+**Research (RSRCH - Utilitario):**
 ```python
 tracer = ProvenanceTracer(...)
-data = tracer.trace_lineage("can_citation_202", "usr_researcher_88")
-# Returns: Citation → extracted metadata → paper PDF
+data = tracer.trace_lineage("fact_sama_helion_001", "usr_rsrch_analyst_01")
+# Returns: Canonical fact → Entity resolution → TechCrunch HTML page + Lex Fridman podcast transcript
 ```
 
 **Manufacturing:**

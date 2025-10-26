@@ -23,7 +23,7 @@
 - Finance: BofA parser v1.5.0 → v2.0.0 → v2.1.0 (breaking: merchant → counterparty)
 - Healthcare: HL7 v2.3 → v2.5 → v2.8 parser (breaking: field position changes)
 - Legal: Court filing parser v1.0 → v2.0 (breaking: jurisdiction codes updated)
-- Research: BibTeX parser v1.0 → v2.0 (breaking: DOI format validation)
+- Research (RSRCH - Utilitario): WebPageParser v1.0 → v2.0 (breaking: entity extraction now requires subject_entity field)
 
 ---
 

@@ -932,18 +932,18 @@ relationship = store.create(
 )
 ```
 
-### Research: Citation Relationship
+### Research (RSRCH - Utilitario): Investment-Founder Relationship
 
 ```python
-# Paper → cited paper
+# Investment fact → Founder entity
 relationship = store.create(
-    user_id="researcher_789",
-    txn_1_id="paper_my_research_001",
-    txn_2_id="paper_cited_work_002",
-    type="cites",  # Custom type for research domain
+    user_id="rsrch_scraper_001",
+    txn_1_id="fact_sama_helion_investment",
+    txn_2_id="entity_sam_altman",
+    type="subject_of",  # Fact is about this founder
     detection_method="auto",
-    confidence=0.98,  # High confidence from citation extraction
-    notes="Cited in introduction section"
+    confidence=0.98,  # High confidence from entity extraction
+    notes="Sam Altman identified as subject of investment fact from TechCrunch article"
 )
 ```
 

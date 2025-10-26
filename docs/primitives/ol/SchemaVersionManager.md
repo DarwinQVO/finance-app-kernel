@@ -213,14 +213,14 @@ console.log(satisfiesRange); // true (1.2.1 is compatible with ^1.0.0)
 
 ---
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Version citation metadata schemas for research platforms.
+**Use Case**: Version founder fact schemas for RSRCH utilitario research system.
 
 **Versioning Scenarios**:
-- **PATCH**: Correct example in schema documentation (1.0.0 → 1.0.1)
-- **MINOR**: Add optional `ORCID` field for authors (1.0.1 → 1.1.0)
-- **MAJOR**: Change `issued.date-parts` from array of arrays to ISO string (1.1.0 → 2.0.0)
+- **PATCH**: Correct example in fact schema documentation (1.0.0 → 1.0.1)
+- **MINOR**: Add optional `confidence` field for fact credibility (1.0.1 → 1.1.0)
+- **MAJOR**: Change `subject_entity` from string to structured object (1.1.0 → 2.0.0)
 
 **Example**:
 ```typescript
@@ -235,14 +235,14 @@ console.log(parsed);
 //   original: "1.1.0"
 // }
 
-// Get upgrade path
+// Get upgrade path for fact schema evolution
 const upgradePath = manager.getUpgradePath("1.0.0", "2.0.0");
 
 console.log(upgradePath);
 // [
-//   { from: "1.0.0", to: "1.0.1", type: "PATCH" },
-//   { from: "1.0.1", to: "1.1.0", type: "MINOR" },
-//   { from: "1.1.0", to: "2.0.0", type: "MAJOR" }
+//   { from: "1.0.0", to: "1.0.1", type: "PATCH" },  // Fix doc examples
+//   { from: "1.0.1", to: "1.1.0", type: "MINOR" },  // Add confidence field
+//   { from: "1.1.0", to: "2.0.0", type: "MAJOR" }   // Structured subject_entity
 // ]
 ```
 

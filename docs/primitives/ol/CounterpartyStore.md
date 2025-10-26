@@ -837,21 +837,22 @@ class LawFirmStore(OpenRegistryStore):
     store.add_alias(firm.id, "lawyer_456", "Jones Legal Group")
 ```
 
-### Research: Institution Registry
+### Research (RSRCH - Utilitario): Founder/Company Entity Registry
 
 ```python
-class ResearchInstitutionStore(OpenRegistryStore):
-    """Same pattern for research domain."""
+class RSRCHEntityStore(OpenRegistryStore):
+    """Same pattern for RSRCH domain (founders/companies fact research)."""
 
-    # Research institution has many name variations in publications
-    institution = store.find_or_create(
-        user_id="researcher_789",
-        institution_name="MIT"
+    # Founder has many name variations across web sources (Twitter, articles, podcasts)
+    founder = store.find_or_create(
+        user_id="rsrch_scraper_001",
+        entity_name="Sam Altman"
     )
 
-    store.add_alias(institution.id, "researcher_789", "Massachusetts Institute of Technology")
-    store.add_alias(institution.id, "researcher_789", "MIT Cambridge")
-    store.add_alias(institution.id, "researcher_789", "MIT.EDU")
+    store.add_alias(founder.id, "rsrch_scraper_001", "@sama")
+    store.add_alias(founder.id, "rsrch_scraper_001", "sama")
+    store.add_alias(founder.id, "rsrch_scraper_001", "Samuel Altman")
+    store.add_alias(founder.id, "rsrch_scraper_001", "Sam H. Altman")
 ```
 
 ---

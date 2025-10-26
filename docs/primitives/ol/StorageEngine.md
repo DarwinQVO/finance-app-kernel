@@ -267,9 +267,13 @@ This primitive constructs verifiable truth about **content identity and integrit
 - Dedupe same contract with multiple signatories
 - Chain of custody verification
 
-**Research/Academic Domain:**
-- Store datasets, papers, experimental results
-- Dedupe identical data submissions
+**Research Domain (RSRCH - Utilitario):**
+- **Context**: RSRCH collects facts about founders/companies from web, tweets, interviews, podcasts
+- Store TechCrunch HTML pages (web scraping sources)
+- Store podcast transcripts (Lex Fridman interviews with founders)
+- Store tweet JSON (Twitter API responses about investments)
+- Store interview audio files (first-person founder interviews)
+- Dedupe when same article/transcript scraped multiple times (e.g., TechCrunch article re-scraped during fact extraction retries)
 
 **Media/Content Domain:**
 - Store photos, videos, audio files
