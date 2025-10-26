@@ -189,31 +189,56 @@ const correction = await retroactiveCorrector.correct({
 });
 ```
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Correct citation metadata or experimental data.
+**Use Case**: Enrich facts retroactively as new sources are discovered.
+
+**Context**: RSRCH facts are initially vague (extracted from tweets/headlines) and get enriched with specific details from interviews/podcasts. Corrections are retroactive to the original fact date.
 
 **Corrections**:
-- Author name corrections
-- Publication year updates
-- DOI corrections
-- Experimental data corrections
+- Fact enrichment (vague → specific amount, date, details)
+- Entity normalization (@sama → Sam Altman)
+- Multi-source confirmation (add corroborating source)
+- Contradiction resolution (conflicting values from different sources)
+- Fact merger (duplicate facts from different sources unified)
 
-**Compliance**: Academic integrity requires tracking metadata corrections.
+**Compliance**: Provenance transparency - track which source contributed which field, when discovered, effective retroactively.
 
-**Example**:
+**Example (Enrich Investment Fact)**:
 ```typescript
-// Correct author list
-const correction = await retroactiveCorrector.correct({
-  entity_id: "cite_001",
-  field_name: "authors",
-  old_value: "J. Smith, et al.",
-  new_value: "Jane Smith, Robert Johnson, Maria Garcia, Li Wei",
-  effective_date: "2024-11-01T00:00:00Z", // Original publication date
-  reason: "Full author list from DOI lookup - original PDF extraction incomplete",
-  user_id: "researcher_alice_wong"
+// Scenario: Initial TechCrunch article (Jan 15) said "Sam Altman invested in Helion"
+// Podcast discovered (Feb 20) reveals the amount was $375 million
+// Retroactively enrich the fact effective Jan 15 (when investment actually happened)
+
+const enrichment = await retroactiveCorrector.correct({
+  entity_id: "fact_sama_helion_001",
+  field_name: "investment_amount",
+  old_value: null, // Initially unknown
+  new_value: 375000000, // $375 million
+  effective_date: "2025-01-15T00:00:00Z", // Investment date (retroactive to Jan 15)
+  reason: "Amount revealed in Lex Fridman podcast episode #456 with Sam Altman",
+  user_id: "podcast_parser_lex_fridman",
+  metadata: {
+    source_url: "https://youtube.com/watch?v=xyz",
+    source_type: "podcast_transcript",
+    source_credibility: 0.95,
+    quote: "I invested three hundred and seventy-five million dollars in Helion",
+    timestamp_in_video: "1:23:45"
+  }
 });
+
+console.log(`Fact enriched: ${enrichment.field_name}`);
+console.log(`  Old value: ${enrichment.old_value} (unknown)`);
+console.log(`  New value: $${enrichment.new_value / 1000000}M`);
+console.log(`  Effective: ${enrichment.effective_date} (retroactive ${enrichment.retroactive_days} days)`);
+console.log(`  Source: Lex Fridman podcast`);
+console.log(`  Confidence: 0.95 (first-person interview)`);
 ```
+
+**RSRCH-Specific Patterns**:
+- **Retroactive Enrichment**: Vague fact from tweet → Specific fact from podcast (retroactive to tweet date)
+- **Multi-Source Confirmation**: TechCrunch says "$300-400M" → Podcast confirms "$375M" → Retroactively update to exact amount
+- **Entity Normalization**: @sama (tweet) → sama (informal) → Sam Altman (canonical) - all retroactive to original mention date
 
 ### 5. E-commerce
 

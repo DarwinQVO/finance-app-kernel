@@ -52,17 +52,20 @@ class MatchDecision(Enum):
 
 @dataclass
 class ReconciliationItem:
-    """Generic item from any source (transaction, invoice, claim, order, etc.)."""
+    """
+    Generic item from any source (transaction, invoice, claim, order, etc.).
+
+    IMPORTANT: This is domain-agnostic. Do NOT add domain-specific fields here.
+    Store domain-specific fields in metadata dict.
+    """
     item_id: str
     source_id: str
     type: str  # "bank_transaction", "invoice", "claim", "order", etc.
-    amount: Decimal
-    currency: str
-    date: date
-    counterparty: str
-    description: Optional[str]
+    amount: Decimal  # Primary numeric value (universal across domains)
+    date: date  # Primary temporal value (universal across domains)
+    description: Optional[str]  # Human-readable description (universal)
     reconciliation_status: str  # "unmatched", "matched", "rejected", "excluded"
-    metadata: Dict  # Source-specific fields
+    metadata: Dict  # Domain-specific fields (currency, counterparty, patient_id, etc.)
 
 @dataclass
 class MatchCandidate:
@@ -102,6 +105,34 @@ class ReconciliationConfig:
 
     created_at: datetime
     updated_at: datetime
+
+@dataclass
+class FieldMatcher:
+    """
+    Configurable field comparison logic for domain-specific matching.
+
+    Allows each domain to plug in custom comparison functions for their specific fields.
+
+    Example (Finance - Currency):
+        FieldMatcher(
+            field_name="currency",
+            matcher_fn=lambda a, b: 1.0 if a.metadata['currency'] == b.metadata['currency'] else 0.0,
+            weight=0.1,
+            blocking=True  # Pre-filter: only compare items with same currency
+        )
+
+    Example (Healthcare - Patient ID):
+        FieldMatcher(
+            field_name="patient_id",
+            matcher_fn=lambda a, b: 1.0 if a.metadata['patient_id'] == b.metadata['patient_id'] else 0.0,
+            weight=0.3,
+            blocking=False
+        )
+    """
+    field_name: str
+    matcher_fn: Callable[[ReconciliationItem, ReconciliationItem], float]  # Returns 0.0-1.0 similarity
+    weight: float  # Contribution to overall confidence score (all weights must sum to 1.0)
+    blocking: bool = False  # If True, pre-filter candidates (must match exactly)
 
 @dataclass
 class BulkReconciliationResult:
@@ -148,12 +179,53 @@ class ReconciliationEngine:
         match_scorer: 'MatchScorer',
         threshold_manager: 'ThresholdManager',
         recon_store: 'ReconciliationStore',
-        db_connection
+        db_connection,
+        field_matchers: Optional[List[FieldMatcher]] = None
     ):
         self.scorer = match_scorer
         self.threshold_mgr = threshold_manager
         self.store = recon_store
         self.db = db_connection
+        self.field_matchers: List[FieldMatcher] = field_matchers or []
+
+    def add_field_matcher(
+        self,
+        field_name: str,
+        matcher_fn: Callable[[ReconciliationItem, ReconciliationItem], float],
+        weight: float,
+        blocking: bool = False
+    ):
+        """
+        Register domain-specific field matcher.
+
+        Args:
+            field_name: Name of field being compared (for debugging/logging)
+            matcher_fn: Function that compares two items and returns 0.0-1.0 similarity
+            weight: Contribution to overall confidence (all weights must sum to 1.0)
+            blocking: If True, pre-filter candidates (exact match required)
+
+        Example (Finance - Currency):
+            engine.add_field_matcher(
+                field_name="currency",
+                matcher_fn=lambda a, b: 1.0 if a.metadata.get('currency') == b.metadata.get('currency') else 0.0,
+                weight=0.1,
+                blocking=True  # Only compare items with same currency
+            )
+
+        Example (Healthcare - Procedure Code):
+            engine.add_field_matcher(
+                field_name="procedure_code",
+                matcher_fn=lambda a, b: 1.0 if a.metadata.get('procedure_code') == b.metadata.get('procedure_code') else 0.5,
+                weight=0.2,
+                blocking=False
+            )
+        """
+        self.field_matchers.append(FieldMatcher(
+            field_name=field_name,
+            matcher_fn=matcher_fn,
+            weight=weight,
+            blocking=blocking
+        ))
 
     def find_candidates(
         self,
@@ -511,16 +583,16 @@ class ReconciliationEngine:
 
         Blocking reduces search space from O(n) to O(m) where m << n.
 
-        Default blocking dimensions:
+        Universal blocking dimensions (built-in):
         1. Date: item.date ± blocking_date_range_days (default: ±30 days)
         2. Amount: item.amount ± blocking_amount_range_pct (default: ±20%)
 
-        Additional blocking dimensions (domain-specific):
+        Domain-specific blocking (via field_matchers with blocking=True):
         - Finance: Currency must match
-        - Healthcare: Patient name first letter
-        - Legal: Case number prefix
+        - Healthcare: Patient ID prefix match
+        - Legal: Case number prefix match
         - Research: Publication year ± 1
-        - E-commerce: Customer ID
+        - E-commerce: Customer ID match
 
         Performance impact:
         - Without blocking: 10K × 10K = 100M comparisons (~10s)
@@ -536,11 +608,12 @@ class ReconciliationEngine:
             Filtered list of candidates within blocking bounds
 
         Example (Finance):
-            item = BankTransaction(amount=5000.00, date="2024-10-15")
+            item = BankTransaction(amount=5000.00, date="2024-10-15", metadata={'currency': 'USD'})
 
             # Blocking filters:
             # - Date: 2024-09-15 to 2024-11-14 (±30 days)
             # - Amount: $4,000 to $6,000 (±20%)
+            # - Currency: USD only (via field_matcher with blocking=True)
 
             blocked_candidates = _apply_blocking(item, all_invoices, config)
             # Returns ~500 invoices instead of 10K (50x reduction)
@@ -548,21 +621,21 @@ class ReconciliationEngine:
         if not config.blocking_enabled:
             return candidates
 
-        # Date blocking
+        # Universal blocking: Date
         date_min = item.date - timedelta(days=config.blocking_date_range_days)
         date_max = item.date + timedelta(days=config.blocking_date_range_days)
 
-        # Amount blocking
+        # Universal blocking: Amount
         amount_min = item.amount * (1 - config.blocking_amount_range_pct)
         amount_max = item.amount * (1 + config.blocking_amount_range_pct)
 
         filtered = []
         for candidate in candidates:
-            # Apply date filter
+            # Apply universal date filter
             if not (date_min <= candidate.date <= date_max):
                 continue
 
-            # Apply amount filter (absolute value for negative amounts)
+            # Apply universal amount filter (absolute value for negative amounts)
             candidate_amt = abs(candidate.amount)
             item_amt = abs(item.amount)
             if not (abs(item_amt) * (1 - config.blocking_amount_range_pct)
@@ -570,8 +643,16 @@ class ReconciliationEngine:
                     <= abs(item_amt) * (1 + config.blocking_amount_range_pct)):
                 continue
 
-            # Currency must match (finance-specific)
-            if candidate.currency != item.currency:
+            # Apply domain-specific blocking filters (via field_matchers)
+            passes_blocking = True
+            for matcher in self.field_matchers:
+                if matcher.blocking:
+                    # Blocking field must match exactly (score = 1.0)
+                    if matcher.matcher_fn(item, candidate) < 1.0:
+                        passes_blocking = False
+                        break
+
+            if not passes_blocking:
                 continue
 
             filtered.append(candidate)
@@ -646,28 +727,67 @@ class InvalidConfigError(Exception):
 ### Finance: Bank-to-Invoice Reconciliation
 
 ```python
-# Setup
+# Setup engine with finance-specific field matchers
+engine = ReconciliationEngine(
+    match_scorer=scorer,
+    threshold_manager=threshold_mgr,
+    recon_store=store,
+    db_connection=db
+)
+
+# Register finance-specific field matchers
+engine.add_field_matcher(
+    field_name="currency",
+    matcher_fn=lambda a, b: 1.0 if a.metadata.get('currency') == b.metadata.get('currency') else 0.0,
+    weight=0.1,
+    blocking=True  # Pre-filter: only compare items with same currency
+)
+
+engine.add_field_matcher(
+    field_name="counterparty",
+    matcher_fn=lambda a, b: jaro_winkler(a.metadata.get('counterparty', ''), b.metadata.get('counterparty', '')),
+    weight=0.2,
+    blocking=False
+)
+
+# Reconciliation config
 config = ReconciliationConfig(
     source_a_id="bank_chase",
     source_b_id="invoices_qb",
     amount_tolerance_pct=Decimal("0.05"),  # ±5%
     date_tolerance_days=7,
-    weights={"amount": 0.4, "date": 0.3, "counterparty": 0.2, "description": 0.1},
+    weights={"amount": 0.4, "date": 0.3, "currency": 0.1, "counterparty": 0.2},  # Matches field_matchers
     thresholds={"auto_link": 0.95, "auto_suggest": 0.70, "manual": 0.50},
     blocking_enabled=True,
     blocking_date_range_days=30,
     blocking_amount_range_pct=Decimal("0.20")
 )
 
+# Create finance items with metadata
+bank_transaction = ReconciliationItem(
+    item_id="txn_12345",
+    source_id="bank_chase",
+    type="bank_transaction",
+    amount=Decimal("-5000.00"),
+    date=date(2024, 10, 15),
+    description="Payment to Acme Corp",
+    reconciliation_status="unmatched",
+    metadata={
+        "currency": "USD",
+        "counterparty": "Acme Corporation",
+        "account_number": "****1234"
+    }
+)
+
 # Find candidates for single bank payment
 candidates = engine.find_candidates(
     source_a_id="bank_chase",
     source_b_id="invoices_qb",
-    item_id="txn_12345",  # $5,000 payment on Oct 15
+    item_id="txn_12345",
     config=config
 )
 
-# Expected: Invoice INV-2024-001 ($5,000, Oct 14, "Acme Corporation") with confidence 0.98
+# Expected: Invoice INV-2024-001 ($5,000, Oct 14, "Acme Corporation", USD) with confidence 0.98
 
 # Bulk reconcile all bank transactions with invoices
 result = engine.bulk_reconcile(
@@ -683,28 +803,68 @@ result = engine.bulk_reconcile(
 ### Healthcare: Claim-to-Payment Reconciliation
 
 ```python
-# Setup for healthcare
+# Setup engine with healthcare-specific field matchers
+healthcare_engine = ReconciliationEngine(
+    match_scorer=scorer,
+    threshold_manager=threshold_mgr,
+    recon_store=store,
+    db_connection=db
+)
+
+# Register healthcare-specific field matchers
+healthcare_engine.add_field_matcher(
+    field_name="patient_id",
+    matcher_fn=lambda a, b: 1.0 if a.metadata.get('patient_id') == b.metadata.get('patient_id') else 0.0,
+    weight=0.3,
+    blocking=True  # Pre-filter: only compare claims/payments for same patient
+)
+
+healthcare_engine.add_field_matcher(
+    field_name="procedure_code",
+    matcher_fn=lambda a, b: 1.0 if a.metadata.get('procedure_code') == b.metadata.get('procedure_code') else 0.5,
+    weight=0.2,
+    blocking=False  # Similar procedures might match
+)
+
+# Reconciliation config
 healthcare_config = ReconciliationConfig(
     source_a_id="claims_bcbs",
     source_b_id="payments_eob",
     amount_tolerance_pct=Decimal("0.10"),  # ±10% (insurance adjustments common)
     date_tolerance_days=60,  # Claims can take 60+ days to process
-    weights={"amount": 0.3, "date": 0.2, "counterparty": 0.3, "description": 0.2},  # Counterparty (patient) more important
+    weights={"amount": 0.3, "date": 0.2, "patient_id": 0.3, "procedure_code": 0.2},  # Matches field_matchers
     thresholds={"auto_link": 0.95, "auto_suggest": 0.70, "manual": 0.50},
     blocking_enabled=True,
     blocking_date_range_days=90,  # Wider date range
     blocking_amount_range_pct=Decimal("0.30")  # Wider amount range (adjustments)
 )
 
+# Create healthcare items with metadata
+insurance_claim = ReconciliationItem(
+    item_id="claim_67890",
+    source_id="claims_bcbs",
+    type="insurance_claim",
+    amount=Decimal("1250.00"),
+    date=date(2024, 9, 15),  # Service date
+    description="Office visit - Dr. Smith",
+    reconciliation_status="unmatched",
+    metadata={
+        "patient_id": "P123456",
+        "patient_name": "John Doe",
+        "procedure_code": "99213",  # CPT code
+        "provider_id": "NPI_789"
+    }
+)
+
 # Find payment for insurance claim
-candidates = engine.find_candidates(
+candidates = healthcare_engine.find_candidates(
     source_a_id="claims_bcbs",
     source_b_id="payments_eob",
-    item_id="claim_67890",  # $1,250 claim for John Doe, service date Sep 15
+    item_id="claim_67890",
     config=healthcare_config
 )
 
-# Expected: EOB payment ($1,125 after 10% co-pay, processed Oct 30) with confidence 0.85
+# Expected: EOB payment ($1,125 after 10% co-pay, patient P123456, processed Oct 30) with confidence 0.85
 ```
 
 ### Legal: Court Filing Reconciliation
@@ -734,32 +894,156 @@ candidates = engine.find_candidates(
 # Expected: State court case SC-2024-CV-0456 (same parties, filed Oct 3) with confidence 0.88
 ```
 
-### Research: Citation Deduplication
+### Research (RSRCH): Fact Deduplication (Multi-Source Truth Construction)
+
+**RSRCH Context:** Research system for founders/companies/entities collecting facts from web, interviews, tweets, podcasts, transcripts. Deduplicate and reconcile facts across sources to build canonical truth.
 
 ```python
-# Setup for research
-citation_config = ReconciliationConfig(
-    source_a_id="doi_database",
-    source_b_id="arxiv_database",
+# Setup engine with RSRCH-specific field matchers
+rsrch_engine = ReconciliationEngine(
+    match_scorer=scorer,
+    threshold_manager=threshold_mgr,
+    recon_store=store,
+    db_connection=db
+)
+
+# Register RSRCH-specific field matchers
+rsrch_engine.add_field_matcher(
+    field_name="subject_entity",
+    matcher_fn=lambda a, b: 1.0 if normalize_entity(a.metadata.get('subject_entity', '')) == normalize_entity(b.metadata.get('subject_entity', '')) else 0.0,
+    weight=0.3,
+    blocking=True  # Pre-filter: only compare facts about same entity
+)
+
+rsrch_engine.add_field_matcher(
+    field_name="fact_type",
+    matcher_fn=lambda a, b: 1.0 if a.metadata.get('fact_type') == b.metadata.get('fact_type') else 0.3,
+    weight=0.2,
+    blocking=False  # Different types might be related (investment vs founding)
+)
+
+rsrch_engine.add_field_matcher(
+    field_name="claim_similarity",
+    matcher_fn=lambda a, b: semantic_similarity(a.description, b.description),  # NLP embeddings
+    weight=0.4,
+    blocking=False
+)
+
+rsrch_engine.add_field_matcher(
+    field_name="source_credibility",
+    matcher_fn=lambda a, b: (a.metadata.get('source_credibility', 0.5) + b.metadata.get('source_credibility', 0.5)) / 2,
+    weight=0.1,
+    blocking=False
+)
+
+# Reconciliation config for fact deduplication
+fact_dedup_config = ReconciliationConfig(
+    source_a_id="techcrunch",
+    source_b_id="interview_transcripts",
     amount_tolerance_pct=Decimal("0.0"),  # No amount field
-    date_tolerance_days=365,  # Publication year tolerance
-    weights={"amount": 0.0, "date": 0.2, "counterparty": 0.4, "description": 0.4},  # Authors + title critical
-    thresholds={"auto_link": 0.95, "auto_suggest": 0.70, "manual": 0.50},
+    date_tolerance_days=180,  # Facts within 6 months might be same event
+    weights={"amount": 0.0, "date": 0.0, "subject_entity": 0.3, "fact_type": 0.2, "claim_similarity": 0.4, "source_credibility": 0.1},
+    thresholds={"auto_link": 0.90, "auto_suggest": 0.70, "manual": 0.50},
     blocking_enabled=True,
-    blocking_date_range_days=730,  # ±2 years
-    blocking_amount_range_pct=Decimal("0.0")
+    blocking_date_range_days=365,  # ±1 year
+    blocking_amount_range_pct=Decimal("1.0")  # Not applicable
 )
 
-# Find arXiv paper for DOI entry
-candidates = engine.find_candidates(
-    source_a_id="doi_database",
-    source_b_id="arxiv_database",
-    item_id="doi_10.1234/example.2024.001",  # Paper published 2024, authors "Smith, J. et al"
-    config=citation_config
+# Example facts to reconcile
+fact_techcrunch = ReconciliationItem(
+    item_id="fact_tc_001",
+    source_id="techcrunch",
+    type="fact",
+    amount=Decimal("0"),  # Not applicable
+    date=date(2021, 11, 15),  # Article publication date
+    description="Sam Altman invested $375 million in Helion Energy",
+    reconciliation_status="unmatched",
+    metadata={
+        "subject_entity": "Sam Altman",
+        "fact_type": "investment",
+        "claim": "Sam Altman invested $375 million in Helion Energy",
+        "source_url": "https://techcrunch.com/2021/11/15/sam-altman-helion",
+        "source_type": "web_article",
+        "source_credibility": 0.9,  # TechCrunch is high-quality
+        "entities_mentioned": ["Sam Altman", "Helion Energy"],
+        "amount_mentioned": "$375M"
+    }
 )
 
-# Expected: arXiv:2024.12345 (same title, same authors, published 2024) with confidence 0.96
+fact_interview = ReconciliationItem(
+    item_id="fact_int_002",
+    source_id="interview_transcripts",
+    type="fact",
+    amount=Decimal("0"),
+    date=date(2021, 11, 20),  # Interview date
+    description="Sam backed Helion with $375 million in Series E",
+    reconciliation_status="unmatched",
+    metadata={
+        "subject_entity": "sama",  # Nickname used in interview
+        "fact_type": "investment",
+        "claim": "Sam backed Helion with $375 million in Series E",
+        "source_url": "https://ycombinator.com/podcast/sama-episode-42",
+        "source_type": "podcast_transcript",
+        "source_credibility": 0.95,  # First-person account
+        "entities_mentioned": ["sama", "Helion"],
+        "amount_mentioned": "$375M"
+    }
+)
+
+# Find duplicates for TechCrunch fact
+candidates = rsrch_engine.find_candidates(
+    source_a_id="techcrunch",
+    source_b_id="interview_transcripts",
+    item_id="fact_tc_001",
+    config=fact_dedup_config
+)
+
+# Expected result: fact_int_002 with confidence 0.92
+# Reasoning:
+# - Subject entity: 1.0 ("Sam Altman" == normalize("sama")) × 0.3 = 0.30
+# - Fact type: 1.0 (both "investment") × 0.2 = 0.20
+# - Claim similarity: 0.95 (semantic NLP) × 0.4 = 0.38
+# - Source credibility: 0.925 (avg of 0.9 and 0.95) × 0.1 = 0.09
+# Total confidence: 0.97 → AUTO-LINK (duplicate fact)
+
+# Use case examples:
+
+# 1. Founder Investment Research
+# Sources: TechCrunch, Bloomberg, Twitter, Podcast interviews
+# Dedupe: "Sam invested in Helion" across 4 sources → 1 canonical fact with provenance
+
+# 2. Company Founding Research
+# Sources: Wikipedia, LinkedIn, Company website, News articles
+# Dedupe: "Elon founded SpaceX in 2002" across sources → Canonical truth + source citations
+
+# 3. Contradiction Detection
+# Fact A (Blog, 2020): "Company X has 50 employees"
+# Fact B (LinkedIn, 2024): "Company X has 200 employees"
+# Result: NO duplicate (different dates) → Track as "updates" relationship
+
+# Truth Construction Pattern:
+# 1. Collect facts from multiple sources (web scraping, APIs, transcripts)
+# 2. ReconciliationEngine deduplicates similar facts
+# 3. High-confidence matches → Merge into canonical fact with multi-source provenance
+# 4. Low-confidence matches → Flag for manual review (possible contradiction)
+# 5. Result: Single source of truth with traceable provenance
 ```
+
+**Key Differences from Academic Research:**
+
+| Aspect | Academic (Papers) | RSRCH (Founders/Companies) |
+|--------|-------------------|----------------------------|
+| Entity types | Papers, Authors | Founders, Companies, Investments |
+| Sources | DOI, arXiv, PubMed | TechCrunch, Twitter, Interviews, Podcasts |
+| Identifiers | DOI (unique) | Entity names (ambiguous: "Sam", "@sama", "Sam Altman") |
+| Matching | Title + Authors | Semantic NLP + Entity resolution |
+| Truth value | Static (paper content doesn't change) | Dynamic (company size, roles change over time) |
+| Contradictions | Rare | Common (outdated info, conflicting sources) |
+
+**RSRCH as Truth Construction:**
+- Collect raw facts from web → Dedupe with ReconciliationEngine → Build canonical knowledge graph
+- Same primitives as finance (ReconciliationEngine, ProvenanceLedger) but different domain
+- Validates universal applicability: Finance constructs transaction truth, RSRCH constructs entity truth
 
 ### E-commerce: Order-to-Shipment Reconciliation
 
@@ -858,6 +1142,44 @@ def test_bulk_reconcile_performance():
 
 ---
 
+## Domain-Agnostic Design (P1 Fix Applied)
+
+**Problem (Original Design):**
+ReconciliationEngine had hardcoded finance assumptions:
+- `ReconciliationItem` had hardcoded `currency` and `counterparty` fields
+- `_apply_blocking()` had hardcoded currency check: `if candidate.currency != item.currency: continue`
+- Healthcare couldn't use it (no currency field)
+- Legal couldn't use it (uses "jurisdiction" not "currency")
+- Research couldn't use it (uses "doi" and "authors" not "counterparty")
+
+**Solution (P1 Fix):**
+1. **Generic ReconciliationItem**: Moved domain-specific fields to `metadata: Dict`
+   - Universal fields: `amount`, `date`, `description` (work across ALL domains)
+   - Domain-specific fields: Store in `metadata` (currency, counterparty, patient_id, doi, etc.)
+
+2. **Configurable FieldMatcher**: New abstraction for domain-specific comparison logic
+   ```python
+   @dataclass
+   class FieldMatcher:
+       field_name: str
+       matcher_fn: Callable[[ReconciliationItem, ReconciliationItem], float]  # 0.0-1.0 similarity
+       weight: float
+       blocking: bool = False  # Pre-filter candidates if True
+   ```
+
+3. **Pluggable Field Matchers**: Each domain registers its own comparison functions
+   - Finance: `engine.add_field_matcher("currency", currency_matcher, 0.1, blocking=True)`
+   - Healthcare: `engine.add_field_matcher("patient_id", patient_matcher, 0.3, blocking=True)`
+   - Research: `engine.add_field_matcher("doi", doi_matcher, 0.3, blocking=False)`
+
+**Result:**
+✅ **True domain-agnosticism** - Works for Finance, Healthcare, Legal, Research, E-commerce without modification
+✅ **No hardcoded fields** - All domain logic is pluggable via field_matchers
+✅ **Validated with RSRCH** - Source Collection System can use ReconciliationEngine for paper deduplication
+✅ **Backward compatible** - Finance can still use currency/counterparty matching, just in metadata
+
+---
+
 ## Summary
 
 ReconciliationEngine is the **orchestrator** for multi-source reconciliation:
@@ -867,9 +1189,11 @@ ReconciliationEngine is the **orchestrator** for multi-source reconciliation:
 ✅ **Multi-cardinality** support (one-to-one, one-to-many, many-to-one)
 ✅ **Domain-agnostic** pattern (finance, healthcare, legal, research, e-commerce)
 ✅ **Configurable thresholds** (auto-link, suggest, manual review)
+✅ **Pluggable field matchers** (P1 fix) - No hardcoded domain assumptions
 
 **Key Design Decisions:**
 - Blocking is optional but recommended for large datasets (>1K items)
 - Default thresholds (0.95 auto-link, 0.70 suggest, 0.50 manual) are conservative
 - Batch size (1000) balances memory usage and performance
 - Items loaded on-demand, not all in memory at once
+- Field matchers registered at engine initialization (domain-specific logic)

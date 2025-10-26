@@ -16,10 +16,28 @@ Universal interface for transforming raw observations into validated canonical r
 
 ## Interface Contract
 
+**🔧 P1 Fix Applied:** Added generic types for type safety across domains
+
 ```python
 from abc import ABC, abstractmethod
+from typing import TypeVar, Generic, List
+from dataclasses import dataclass
 
-class Normalizer(ABC):
+TObservation = TypeVar('TObservation')
+TCanonical = TypeVar('TCanonical')
+
+@dataclass
+class NormalizationResult(Generic[TCanonical]):
+    """
+    Container for normalization output with metadata.
+    """
+    canonical: TCanonical
+    confidence: float  # 0.0-1.0
+    applied_rules: List[str]  # Rule IDs that were applied
+    warnings: List[str]  # Non-fatal validation warnings
+    metadata: dict  # Additional context
+
+class Normalizer(ABC, Generic[TObservation, TCanonical]):
     @property
     @abstractmethod
     def version(self) -> str:
@@ -29,23 +47,81 @@ class Normalizer(ABC):
     @abstractmethod
     def normalize(
         self,
-        observation: Observation,
+        observation: TObservation,
         rules: NormalizationRuleSet
-    ) -> Canonical:
+    ) -> NormalizationResult[TCanonical]:
         """
         Transform raw observation into validated canonical.
 
         Args:
-            observation: Raw observation from ObservationStore
+            observation: Raw observation from ObservationStore (type-safe)
             rules: Domain-specific normalization rules
 
         Returns:
-            Validated canonical record
+            NormalizationResult containing:
+            - canonical: Validated canonical record (type-safe)
+            - confidence: Float [0.0, 1.0]
+            - applied_rules: List of rule IDs
+            - warnings: Non-fatal validation warnings
 
         Raises:
-            ValidationError: If observation data is invalid
+            ValidationError: If observation data is invalid (fatal)
         """
         pass
+```
+
+**Type Safety Example:**
+
+```python
+# Finance implementation
+class FinanceNormalizer(Normalizer[ObservationTransaction, CanonicalTransaction]):
+    def normalize(
+        self,
+        obs: ObservationTransaction,  # Type-checked at compile time
+        rules: NormalizationRuleSet
+    ) -> NormalizationResult[CanonicalTransaction]:  # Return type enforced
+        canonical = CanonicalTransaction(
+            canonical_id=generate_id(obs.upload_id, obs.row_id),
+            date=parse_iso_date(obs.raw_data['date']),
+            amount=Decimal(obs.raw_data['amount']),
+            ...
+        )
+        return NormalizationResult(
+            canonical=canonical,
+            confidence=0.95,
+            applied_rules=['date_iso', 'amount_decimal'],
+            warnings=[],
+            metadata={}
+        )
+
+# Healthcare implementation
+class HealthcareNormalizer(Normalizer[ObservationLabResult, CanonicalLabResult]):
+    def normalize(
+        self,
+        obs: ObservationLabResult,  # Different type, same interface
+        rules: NormalizationRuleSet
+    ) -> NormalizationResult[CanonicalLabResult]:
+        canonical = CanonicalLabResult(
+            result_id=generate_id(obs.upload_id, obs.row_id),
+            test_date=parse_iso_date(obs.raw_data['date']),
+            value=Decimal(obs.raw_data['value']),
+            unit=obs.raw_data['unit'],
+            ...
+        )
+        return NormalizationResult(
+            canonical=canonical,
+            confidence=0.98,
+            applied_rules=['date_iso', 'value_decimal', 'unit_loinc'],
+            warnings=[],
+            metadata={}
+        )
+```
+
+**Benefits of Generic Types:**
+- ✅ Compile-time type checking (catch errors before runtime)
+- ✅ Better IDE autocomplete (knows canonical.date exists)
+- ✅ Self-documenting code (clear input/output types)
+- ✅ Prevents mixing domains (can't pass ObservationTransaction to HealthcareNormalizer)
 ```
 
 ---

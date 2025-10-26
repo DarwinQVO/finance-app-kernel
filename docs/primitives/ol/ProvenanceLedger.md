@@ -230,48 +230,94 @@ await ledger.append({
 });
 ```
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Track citation corrections, author affiliations, and paper versions.
+**Use Case**: Track fact extraction, enrichment, and corrections from multiple sources (web, interviews, tweets, podcasts).
+
+**Context**: RSRCH collects facts about founders/companies/entities. Same fact evolves as new sources are discovered. Provenance ledger tracks complete fact lifecycle with multi-source attribution.
 
 **Events Tracked**:
-- Citation metadata extraction
-- Author name corrections
-- Publication year updates
-- DOI assignments
-- Retraction notices
-- Version updates
+- Fact extracted from source (TechCrunch, interview, tweet)
+- Fact enriched (vague → specific)
+- Entity name normalized (@sama → Sam Altman)
+- Source added (multi-source confirmation)
+- Contradiction detected (conflicting values from different sources)
+- Fact merged (duplicate facts unified)
 
-**Compliance**: Academic integrity requires tracking all corrections to published work.
+**Compliance**: Provenance transparency for truth construction - track which sources contributed to each fact.
 
-**Example**:
+**Example (Investment Fact Lifecycle)**:
 ```typescript
-// Initial citation extracted from PDF
+// Step 1: Initial fact extracted from TechCrunch article (Jan 15)
 await ledger.append({
-  entity_id: "cite_001",
-  entity_type: "citation",
+  entity_id: "fact_sama_helion_001",
+  entity_type: "fact",
   event_type: "extracted",
-  field_name: "authors",
+  field_name: "claim",
   old_value: null,
-  new_value: "J. Smith, et al.",
-  valid_time: "2024-11-01T00:00:00Z",
-  user_id: "pdf_parser_v2",
-  reason: "Extracted from PDF reference section"
+  new_value: "Sam Altman invested in Helion Energy",
+  valid_time: "2025-01-15T00:00:00Z", // Article publication date
+  user_id: "web_scraper_techcrunch",
+  reason: "Extracted from TechCrunch article",
+  metadata: {
+    source_url: "https://techcrunch.com/2025/01/15/sama-helion",
+    source_type: "web_article",
+    source_credibility: 0.9
+  }
 });
 
-// Researcher corrects to full author list
+// Step 2: Fact enriched with specific amount from podcast (Feb 20, retroactive to Jan 15)
 await ledger.append({
-  entity_id: "cite_001",
-  entity_type: "citation",
-  event_type: "corrected",
-  field_name: "authors",
-  old_value: "J. Smith, et al.",
-  new_value: "Jane Smith, Robert Johnson, Maria Garcia, Li Wei",
-  valid_time: "2024-11-01T00:00:00Z", // Effective from original publication
-  user_id: "researcher_alice_wong",
-  reason: "Full author list from DOI lookup"
+  entity_id: "fact_sama_helion_001",
+  entity_type: "fact",
+  event_type: "enriched",
+  field_name: "investment_amount",
+  old_value: null,
+  new_value: 375000000, // $375 million
+  valid_time: "2025-01-15T00:00:00Z", // Investment happened on Jan 15
+  user_id: "podcast_parser_lex_fridman",
+  reason: "Amount revealed in Lex Fridman podcast interview",
+  metadata: {
+    source_url: "https://youtube.com/watch?v=xyz",
+    source_type: "podcast_transcript",
+    source_credibility: 0.95
+  }
+});
+
+// Step 3: Entity name normalized (retroactive to Jan 15)
+await ledger.append({
+  entity_id: "fact_sama_helion_001",
+  entity_type: "fact",
+  event_type: "normalized",
+  field_name: "subject_entity",
+  old_value: "@sama", // Twitter handle from tweet
+  new_value: "Sam Altman", // Canonical name
+  valid_time: "2025-01-15T00:00:00Z",
+  user_id: "entity_normalizer_v2",
+  reason: "Normalized Twitter handle to canonical name"
+});
+
+// Step 4: Multi-source confirmation (Bloomberg article confirms TechCrunch)
+await ledger.append({
+  entity_id: "fact_sama_helion_001",
+  entity_type: "fact",
+  event_type: "source_added",
+  field_name: "sources",
+  old_value: ["techcrunch"],
+  new_value: ["techcrunch", "bloomberg", "lex_fridman_podcast"],
+  valid_time: "2025-01-15T00:00:00Z",
+  user_id: "fact_consolidator",
+  reason: "Multi-source confirmation increases confidence",
+  metadata: {
+    combined_confidence: 0.98 // (0.9 + 0.9 + 0.95) / 3
+  }
 });
 ```
+
+**RSRCH-Specific Patterns**:
+- **Retroactive Enrichment**: Initial fact from TechCrunch (vague) → Enriched by podcast (specific) → Effective date retroactive to original article date
+- **Multi-Source Provenance**: Track WHICH sources contributed WHICH fields to the complete fact
+- **Entity Normalization Trail**: @sama → sama → Sam Altman (complete provenance of normalization steps)
 
 ### 5. E-commerce
 

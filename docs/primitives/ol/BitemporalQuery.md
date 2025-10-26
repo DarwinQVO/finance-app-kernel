@@ -180,34 +180,56 @@ const collectionTimeline = await bitemporalQuery.queryValidTime({
 });
 ```
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Track citation metadata corrections and versioning.
+**Use Case**: Track fact corrections from multiple sources (web articles, interviews, podcasts, tweets).
+
+**Context**: RSRCH collects facts about founders/companies/entities from diverse sources. Same fact appears across multiple sources with varying completeness/accuracy. Bitemporal tracking enables truth construction from multi-source provenance.
 
 **Queries**:
-- Transaction time: "What citation metadata was in our database when we published?"
-- Valid time: "What is the correct metadata as of today?"
-- Bitemporal: "When did we learn about the author name correction?"
+- Transaction time: "What facts did we know when we published our report?"
+- Valid time: "What is the correct fact as of today (with all source corrections)?"
+- Bitemporal: "When did we learn the complete investment amount?"
 
-**Compliance**: Academic integrity requires tracking all metadata corrections.
+**Compliance**: Provenance transparency requires tracking which sources contributed to each fact.
 
 **Example**:
 ```typescript
-// What author names were in our system when we published our paper?
-const publishedCitations = await bitemporalQuery.queryTransactionTime({
-  entity_type: "citation",
-  paper_id: "paper_789",
-  transaction_time: "2024-11-01T00:00:00Z",
-  field_name: "authors"
-});
+// Scenario: Investment fact evolves as more sources are discovered
+// Jan 15: TechCrunch mentions "Sam Altman invested in Helion Energy" (no amount)
+// Feb 20: Podcast transcript reveals "$375 million investment"
 
-// What are the current correct author names?
-const currentCitations = await bitemporalQuery.getCurrentState({
-  entity_type: "citation",
-  paper_id: "paper_789",
-  field_name: "authors"
+// What facts did we know on Jan 20? (before podcast)
+const earlyKnowledge = await bitemporalQuery.queryTransactionTime({
+  entity_type: "fact",
+  subject_entity: "Sam Altman",
+  transaction_time: "2025-01-20T00:00:00Z",
+  field_name: "investment_amount"
 });
+// Returns: null (amount not known yet)
+
+// What was actually true on Jan 20? (with retroactive correction from podcast)
+const actualTruth = await bitemporalQuery.queryValidTime({
+  entity_type: "fact",
+  subject_entity: "Sam Altman",
+  valid_time: "2025-01-20T00:00:00Z",
+  field_name: "investment_amount"
+});
+// Returns: 375000000 (podcast corrected the amount retroactively to Jan 15)
+
+// Get complete fact with all corrections applied
+const completeFact = await bitemporalQuery.getCurrentState({
+  entity_type: "fact",
+  fact_id: "fact_sama_helion_investment",
+  field_name: "claim"
+});
+// Returns: "Sam Altman invested $375 million in Helion Energy"
 ```
+
+**RSRCH-Specific Patterns**:
+- **Multi-Source Convergence**: Same fact confirmed by TechCrunch (0.9 confidence) + First-person interview (0.95 confidence) â†’ Higher combined confidence
+- **Retroactive Enrichment**: Initial fact from tweet (vague) â†’ Enriched by interview transcript (specific) â†’ Effective date retroactive to original tweet date
+- **Contradiction Detection**: Source A says "invested $300M" (Jan 15) â†’ Source B says "$375M" (Feb 20) â†’ Bitemporal query shows when contradiction was discovered
 
 ### 5. E-commerce
 
@@ -920,7 +942,7 @@ for (const correction of retroactive) {
   console.log(`  Field: ${correction.field_name}`);
   console.log(`  Effective: ${correction.valid_time}`);
   console.log(`  Corrected: ${correction.transaction_time}`);
-  console.log(`  Value: ${correction.old_value} ’ ${correction.new_value}`);
+  console.log(`  Value: ${correction.old_value} ï¿½ ${correction.new_value}`);
 }
 ```
 
@@ -957,19 +979,19 @@ console.log(`Timeline for txn_001.merchant:`);
 for (const event of timeline) {
   const retroFlag = event.is_retroactive ? "[RETROACTIVE]" : "";
   console.log(`${event.transaction_time} ${retroFlag}:`);
-  console.log(`  ${event.old_value} ’ ${event.new_value}`);
+  console.log(`  ${event.old_value} ï¿½ ${event.new_value}`);
   console.log(`  Effective: ${event.valid_time}`);
   console.log(`  Reason: ${event.reason}`);
 }
 
 // Output:
 // 2025-01-15T10:00:00Z:
-//   null ’ "AMZN MKTP US*1234"
+//   null ï¿½ "AMZN MKTP US*1234"
 //   Effective: 2025-01-15T10:00:00Z
 //   Reason: Extracted from bank statement
 //
 // 2025-01-20T14:30:00Z [RETROACTIVE]:
-//   "AMZN MKTP US*1234" ’ "Amazon.com"
+//   "AMZN MKTP US*1234" ï¿½ "Amazon.com"
 //   Effective: 2025-01-15T10:00:00Z
 //   Reason: Normalized merchant name
 ```

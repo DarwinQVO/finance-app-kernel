@@ -176,31 +176,86 @@ const report = await reconstructor.export(timeline, {
 });
 ```
 
-### 4. Research
+### 4. Research (RSRCH - Utilitario)
 
-**Use Case**: Citation metadata evolution timeline.
+**Use Case**: Fact evolution timeline showing multi-source truth construction.
+
+**Context**: RSRCH facts evolve as new sources (TechCrunch, podcasts, interviews, tweets) are discovered. Timeline shows complete provenance from initial vague fact to complete enriched fact.
 
 **Timeline Output**:
-- Initial extraction from PDF
-- Author name corrections
-- DOI assignment
-- Publication date updates
+- Initial fact extraction from source (TechCrunch article)
+- Entity normalization (@sama → Sam Altman)
+- Fact enrichment (vague → specific amount)
+- Multi-source confirmation (podcast, Bloomberg)
+- Contradiction detection (conflicting values)
+- Final canonical fact with complete provenance
 
-**Example**:
+**Example (Investment Fact Timeline)**:
 ```typescript
-// Reconstruct citation history
+// Reconstruct fact timeline: "Sam Altman invested $375M in Helion Energy"
 const timeline = await reconstructor.reconstructTimeline({
-  entity_id: "cite_001",
-  field_names: ["authors", "title", "year"]
+  entity_id: "fact_sama_helion_001",
+  field_names: ["claim", "investment_amount", "subject_entity", "sources"]
 });
 
-// Highlight data quality improvements
-const improvements = timeline.events.filter(e =>
-  e.event_type === 'corrected' && e.is_retroactive
-);
+console.log("Fact Evolution Timeline:");
+console.log("========================");
 
-console.log(`${improvements.length} data quality corrections`);
+for (const event of timeline.events) {
+  console.log(`${event.transaction_time} [${event.event_type}]:`);
+  console.log(`  Field: ${event.field_name}`);
+  console.log(`  ${event.old_value} → ${event.new_value}`);
+  console.log(`  Source: ${event.user_id}`);
+  console.log(`  Effective: ${event.valid_time}`);
+  if (event.is_retroactive) {
+    console.log(`  🕰️ RETROACTIVE (${event.retroactive_days} days lag)`);
+  }
+  console.log();
+}
+
+// Output:
+// 2025-01-15T10:00:00Z [extracted]:
+//   Field: claim
+//   null → "Sam Altman invested in Helion Energy"
+//   Source: web_scraper_techcrunch
+//   Effective: 2025-01-15T00:00:00Z
+//
+// 2025-01-20T14:30:00Z [normalized]:
+//   Field: subject_entity
+//   "@sama" → "Sam Altman"
+//   Source: entity_normalizer_v2
+//   Effective: 2025-01-15T00:00:00Z
+//   🕰️ RETROACTIVE (5 days lag)
+//
+// 2025-02-20T09:15:00Z [enriched]:
+//   Field: investment_amount
+//   null → 375000000
+//   Source: podcast_parser_lex_fridman
+//   Effective: 2025-01-15T00:00:00Z
+//   🕰️ RETROACTIVE (36 days lag)
+//
+// 2025-02-22T11:00:00Z [source_added]:
+//   Field: sources
+//   ["techcrunch"] → ["techcrunch", "bloomberg", "lex_fridman_podcast"]
+//   Source: fact_consolidator
+//   Effective: 2025-01-15T00:00:00Z
+//   🕰️ RETROACTIVE (38 days lag)
+
+// Analyze multi-source convergence
+const sourceEvents = timeline.events.filter(e => e.event_type === 'source_added');
+console.log(`Fact confirmed by ${sourceEvents.length} independent sources`);
+
+// Highlight retroactive enrichments
+const enrichments = timeline.events.filter(e =>
+  e.event_type === 'enriched' && e.is_retroactive
+);
+console.log(`${enrichments.length} retroactive enrichments (vague → specific)`);
 ```
+
+**RSRCH-Specific Insights**:
+- **Time Lag Analysis**: Track delay between fact occurrence (valid_time) and discovery (transaction_time)
+- **Source Attribution**: Visualize WHICH source contributed WHICH field
+- **Confidence Evolution**: Show how fact confidence increases with multi-source confirmation
 
 ### 5. E-commerce
 
@@ -585,7 +640,7 @@ console.log(`- ${timeline.snapshots.length} snapshots`);
 for (const event of timeline.events) {
   const retro = event.is_retroactive ? "[RETROACTIVE]" : "";
   console.log(`${event.timestamp} ${retro}: ${event.field_name}`);
-  console.log(`  ${event.old_value} � ${event.new_value}`);
+  console.log(`  ${event.old_value} � ${event.new_value}`);
 }
 ```
 
@@ -1490,9 +1545,9 @@ class AuditTrailViewer {
       console.log(`\n${event.timestamp}`);
       console.log(`  User: ${event.user_id}`);
       console.log(`  Field: ${event.field_name}`);
-      console.log(`  Change: ${event.old_value} � ${event.new_value}`);
+      console.log(`  Change: ${event.old_value} � ${event.new_value}`);
       if (event.is_retroactive) {
-        console.log(`  �  Retroactive (effective ${event.effective_time})`);
+        console.log(`  �  Retroactive (effective ${event.effective_time})`);
       }
     }
   }
