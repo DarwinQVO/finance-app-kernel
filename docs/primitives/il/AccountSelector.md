@@ -967,18 +967,18 @@ function formatCurrency(amount: number, currency: string): string {
 // Use case: Recording client payment to trust account
 ```
 
-### Research Domain (Grant Funding Source)
+### Research Domain (RSRCH - Utilitario) - Funding Source
 ```tsx
 <AccountSelector
-  accounts={researchAccounts}
-  currentAccountId={expense.grant_id}
-  onAccountSelect={(id) => updateExpense({ grant_id: id })}
-  filterByType={["grant", "budget"]}
+  accounts={rsrchAccounts}
+  currentAccountId={expense.research_fund_id}
+  onAccountSelect={(id) => updateExpense({ research_fund_id: id })}
+  filterByType={["research_fund", "scraping_budget"]}
   groupBy="currency"
   placeholder="Select funding source..."
   showBalance={true}
 />
-// Use case: Recording research expense, selecting grant that covers it
+// Use case: Recording web scraping expense, selecting research fund that covers it
 ```
 
 ### Manufacturing Domain (Inventory Account)

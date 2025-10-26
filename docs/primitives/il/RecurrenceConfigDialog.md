@@ -1079,17 +1079,17 @@ if (dates.length > 12) {
 />
 ```
 
-### Research Domain
+### Research Domain (RSRCH - Utilitario)
 ```tsx
-// Grant disbursement (semi-annual)
+// API subscription billing (monthly) + scraping service (quarterly)
 <RecurrenceConfigDialog
   frequency={{
     type: "custom",
-    dates: ["2024-01-15", "2024-07-15"]
+    dates: ["2024-01-01", "2024-04-01", "2024-07-01", "2024-10-01"]
   }}
   onClose={closeDialog}
   onConfirm={(freq) => {
-    createResearchSeries({ ...seriesData, frequency: freq });
+    createRSRCHSeries({ ...seriesData, frequency: freq });
   }}
   showPreview={true}
   showWarnings={true}

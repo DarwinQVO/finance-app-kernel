@@ -2062,13 +2062,13 @@ usePerformanceTracking('SecurityDashboard')
 />
 ```
 
-### 6. Academic Research (IRB Compliance)
+### 6. Research (RSRCH - Utilitario) - Founder Data Privacy
 
 ```typescript
 <SecurityDashboard
-  tenantIds={['university-research']}
+  tenantIds={['rsrch-vc-firm']}
   timeRange="30d"
-  refreshInterval={null} // Manual refresh for research
+  refreshInterval={null} // Manual refresh for research compliance
   initialFilters={{
     piiTypes: ['medical', 'email'],
     eventTypes: ['pii_access', 'data_export'],

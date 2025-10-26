@@ -18,7 +18,7 @@ Provide intuitive UI for managing text normalization rules with priority orderin
 - Finance: Manage merchant normalization rules
 - Healthcare: Manage provider/medication normalization rules
 - Legal: Manage case/party name normalization rules
-- Research: Manage institution/author normalization rules
+- Research (RSRCH - Utilitario): Manage entity/source normalization rules (founder names, company names)
 
 ---
 

@@ -511,8 +511,8 @@ interface AuditAPIClient {
 │  │ 2025-10-25 14:15  rbrown@acme.com role.assign     User: jdoe    1.2...│ │
 │  │   ▶ Details: Assigned "Editor" role to jdoe@acme.com                  │ │
 │  │                                                                        │ │
-│  │ 2025-10-25 13:47  jdoe@acme.com   quote.delete    Quote #456   1.2... │ │
-│  │   ⚠️ Critical: Deleted quote with 12 citations                         │ │
+│  │ 2025-10-25 13:47  jdoe@acme.com   fact.delete     Fact #456    1.2... │ │
+│  │   ⚠️ Critical: Deleted founder fact with 12 source references          │ │
 │  │                                                                        │ │
 │  │ 2025-10-25 13:22  klee@acme.com   document.read   Doc #789     5.6... │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │

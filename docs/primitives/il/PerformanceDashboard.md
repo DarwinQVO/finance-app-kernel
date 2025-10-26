@@ -1561,15 +1561,15 @@ Auto-refresh in: 59s... 58s... 57s... → 0s → [Refreshing...] → Ready
 - Identify stuck documents in OCR queue
 - Analyze parsing errors by document type
 
-### 4. Research: Data Pipeline Dashboard
+### 4. Research (RSRCH - Utilitario): Web Scraping Pipeline Dashboard
 
-**Context:** A research institute processes experimental data from various instruments.
+**Context:** RSRCH team monitors fact extraction from web sources (TechCrunch, podcasts, Twitter).
 
 **Configuration:**
 
 ```typescript
 <PerformanceDashboard
-  title="Research Data Pipeline"
+  title="RSRCH Fact Discovery Pipeline"
   initialTimeRange="7d"
   refreshInterval={300}
   thresholds={{
@@ -1577,7 +1577,7 @@ Auto-refresh in: 59s... 58s... 57s... → 0s → [Refreshing...] → Ready
     queueDepth: { warning: 10, critical: 50 }
   }}
   initialFilters={{
-    parserId: ['genomic_data_parser', 'imaging_data_parser', 'sensor_data_parser']
+    parserId: ['techcrunch_web_parser', 'podcast_transcript_parser', 'twitter_api_parser']
   }}
 />
 ```

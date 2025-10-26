@@ -1043,20 +1043,20 @@ function CaseAuditLog({ caseId }: { caseId: string }) {
 
 ---
 
-### Example 4: Research - Citation Author Corrections
+### Example 4: Research (RSRCH - Utilitario) - Founder Entity Name Corrections
 
-**Scenario:** Researcher reviews author name correction history in bibliography.
+**Scenario:** RSRCH analyst reviews founder entity name correction history.
 
 ```typescript
-function CitationAuditPanel({ citationId }: { citationId: string }) {
+function FounderFactAuditPanel({ factId }: { factId: string }) {
   return (
-    <div className="citation-audit">
-      <h3>Author Name History</h3>
+    <div className="fact-audit">
+      <h3>Entity Name History</h3>
 
       <AuditTrailViewer
-        entityId={citationId}
-        entityType="citation"
-        fieldName="authors"
+        entityId={factId}
+        entityType="fact"
+        fieldName="subject_entity"
         variant="compact"
         showIcons={true}
         showTimestamps={true}
@@ -1074,24 +1074,24 @@ function CitationAuditPanel({ citationId }: { citationId: string }) {
 ```json
 [
   {
-    "audit_id": "aud_cite_001",
-    "entity_id": "cite_001",
-    "entity_type": "citation",
-    "field_name": "authors",
+    "audit_id": "aud_fact_001",
+    "entity_id": "fact_sama_helion_001",
+    "entity_type": "fact",
+    "field_name": "subject_entity",
     "action": "override",
-    "old_value": "J. Smith, et al.",
-    "new_value": "Jane Smith, Robert Johnson, Maria Garcia",
-    "changed_by": "researcher_alice",
+    "old_value": "@sama",
+    "new_value": "Sam Altman",
+    "changed_by": "rsrch_analyst_alice",
     "changed_by_name": "Alice Wong",
     "changed_at": "2025-10-23T09:00:00Z",
-    "reason": "Full author list from DOI lookup",
+    "reason": "Normalized Twitter handle to canonical name",
     "created_at": "2025-10-23T09:00:00Z"
   },
   {
-    "audit_id": "aud_cite_002",
-    "entity_id": "cite_001",
-    "entity_type": "citation",
-    "field_name": "authors",
+    "audit_id": "aud_fact_002",
+    "entity_id": "fact_sama_helion_001",
+    "entity_type": "fact",
+    "field_name": "subject_entity",
     "action": "extracted",
     "old_value": null,
     "new_value": "J. Smith, et al.",

@@ -165,7 +165,7 @@ interface UploadListProps {
 
 **Props**: `rows`, `columns`, `sortField`, `sortOrder`, `onSort`, `pagination`, `onPageChange`, `loading`
 **Features**: Server-side sorting, cursor-based pagination, loading skeletons
-**Reusable across**: Finance transactions, healthcare records, legal documents, research papers
+**Reusable across**: Finance transactions, healthcare records, legal documents, RSRCH founder facts
 
 ---
 
@@ -178,7 +178,7 @@ interface UploadListProps {
 
 **Props**: `drilldownData`, `loading`, `error`, `onClose`, `onDownloadArtifact`, `defaultTab`, `theme`
 **Features**: Tabbed interface (Overview, Raw Data, Provenance, Artifact), responsive (panel/full-screen), keyboard navigation
-**Reusable across**: Transaction drill-down, lab result inspection, contract clause analysis, citation verification
+**Reusable across**: Transaction drill-down, lab result inspection, contract clause analysis, fact source verification
 
 ---
 
@@ -275,7 +275,7 @@ type WidgetType =
 - Finance: Transaction dashboard
 - Healthcare: Patient vitals dashboard
 - Legal: Case management dashboard
-- Research: Research metrics dashboard
+- Research (RSRCH - Utilitario): Fact discovery metrics dashboard
 - Manufacturing: Production dashboard
 - Media: Content analytics dashboard
 
@@ -371,7 +371,7 @@ interface MetricCardProps {
 - Finance: Income card, expense card, net card, deductible card
 - Healthcare: Heart rate card, blood pressure card, BMI card
 - Legal: Cases won/lost card, hours billed card
-- Research: Papers published card, citations card, h-index card
+- Research (RSRCH - Utilitario): Facts discovered card, sources count card, entities tracked card
 - Manufacturing: Units produced card, defect rate card, yield card
 - Media: Views card, engagement rate card, subscriber count card
 
@@ -470,7 +470,7 @@ interface SavedView {
 - Finance: Dashboard view selector, saved filter selector, report template selector
 - Healthcare: Patient query selector, saved search selector, report view selector
 - Legal: Case search selector, document filter selector, custom view selector
-- Research: Paper library view selector, citation query selector, saved search selector
+- Research (RSRCH - Utilitario): Fact library view selector, source query selector, entity search selector
 - Manufacturing: QC dashboard selector, production view selector, custom report selector
 - Media: Analytics view selector, content filter selector, saved segment selector
 
@@ -556,7 +556,7 @@ interface Account {
 - Finance: Manage bank accounts, credit cards
 - Healthcare: Manage insurance providers, medical facilities
 - Legal: Manage trust accounts, client accounts
-- Research: Manage funding sources, grants
+- Research (RSRCH - Utilitario): Manage research budgets, API subscriptions
 - Manufacturing: Manage cost centers, departments
 - Media: Manage revenue streams, ad accounts
 
@@ -633,7 +633,7 @@ interface AccountSelectorProps {
 - Finance: Select account in transaction edit, filter transactions by account, select account for transfer
 - Healthcare: Select insurance provider in claim edit
 - Legal: Select trust account in transaction allocation
-- Research: Select funding source in expense reporting
+- Research (RSRCH - Utilitario): Select research budget in scraping cost tracking
 - Manufacturing: Select cost center in work order
 - Media: Select revenue stream in content analytics
 
@@ -766,7 +766,7 @@ All components accept `className` and respect CSS variables:
 - Finance: Manage merchants and payees
 - Healthcare: Manage healthcare providers
 - Legal: Manage opposing parties and law firms
-- Research: Manage publishers and co-authors
+- Research (RSRCH - Utilitario): Manage source providers and API vendors
 - Manufacturing: Manage suppliers and vendors
 - Media: Manage advertisers and sponsors
 
@@ -790,7 +790,7 @@ All components accept `className` and respect CSS variables:
 - Finance: Select merchant in transaction edit, filter by counterparty
 - Healthcare: Select provider in claim edit
 - Legal: Select opposing party in case allocation
-- Research: Select publisher in citation management
+- Research (RSRCH - Utilitario): Select source provider in fact attribution
 - Manufacturing: Select supplier in purchase order
 - Media: Select advertiser in campaign analytics
 
@@ -814,7 +814,7 @@ All components accept `className` and respect CSS variables:
 - Finance: Merge duplicate merchants ("OpenAI" + "OpenAI Inc")
 - Healthcare: Merge duplicate providers ("Blue Cross" + "BCBS")
 - Legal: Merge duplicate parties ("Smith Law" + "Smith & Associates")
-- Research: Merge duplicate publishers ("Nature" + "Nature Publishing")
+- Research (RSRCH - Utilitario): Merge duplicate source providers ("TechCrunch" + "TechCrunch News")
 - Manufacturing: Merge duplicate suppliers ("Acme Corp" + "ACME")
 - Media: Merge duplicate advertisers ("YouTube" + "YouTube Inc")
 
@@ -870,7 +870,7 @@ All components accept `className` and respect CSS variables:
 - Finance: Manage subscriptions, bills, recurring income
 - Healthcare: Manage insurance premiums, prescription refills
 - Legal: Manage monthly retainers, recurring court fees
-- Research: Manage recurring grant disbursements, lab subscriptions
+- Research (RSRCH - Utilitario): Manage recurring API subscriptions, scraping service payments
 - Manufacturing: Manage equipment lease payments, maintenance schedules
 - Media: Manage licensing fees, hosting subscriptions
 
@@ -917,7 +917,7 @@ All components accept `className` and respect CSS variables:
 - Finance: Select series in transaction edit, link payment to subscription
 - Healthcare: Select insurance premium series in claim edit
 - Legal: Select retainer series in payment allocation
-- Research: Select grant series in expense reporting
+- Research (RSRCH - Utilitario): Select API subscription series in cost tracking
 - Manufacturing: Select lease series in accounting entry
 - Media: Select license series in revenue tracking
 
@@ -987,7 +987,7 @@ All components accept `className` and respect CSS variables:
 - Finance: Configure payment schedules, income patterns
 - Healthcare: Configure medication refill schedules, therapy sessions
 - Legal: Configure recurring court dates, retainer billing
-- Research: Configure grant disbursement schedules, lab maintenance
+- Research (RSRCH - Utilitario): Configure API billing schedules, scraping service renewals
 - Manufacturing: Configure equipment maintenance schedules, inventory audits
 - Media: Configure content publication schedules, license renewals
 
@@ -1037,7 +1037,7 @@ All components accept `className` and respect CSS variables:
 - Finance: Select tax category (Schedule C, SAT)
 - Healthcare: Select CPT code, ICD-10 diagnosis code
 - Legal: Select case category, filing type
-- Research: Select grant expense category, compliance classification
+- Research (RSRCH - Utilitario): Select fact type category, data source classification
 - Manufacturing: Select safety category, environmental classification
 - Media: Select content classification, licensing category
 

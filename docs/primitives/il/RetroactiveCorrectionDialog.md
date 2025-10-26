@@ -1592,29 +1592,29 @@ const correction: RetroactiveCorrection = {
 - Risk mitigation (avoid missed statute of limitations)
 - Court record accuracy
 
-### 4. Research: Dataset Correction
+### 4. Research (RSRCH - Utilitario): Founder Fact Correction
 
-**Use Case:** Researcher corrects measurement error in published dataset
+**Use Case:** RSRCH analyst corrects investment amount error in founder fact
 
-**Entity Type:** `research_dataset_record`
+**Entity Type:** `founder_fact_record`
 
 **Scenario:**
-- Measurement recorded as 120.5 (decimal point error)
-- Researcher discovers error during peer review
-- Researcher makes retroactive correction
+- Investment amount recorded as $3.75B (misread from source)
+- Analyst discovers error during VC report review
+- Analyst makes retroactive correction to $375M
 
 **Correction Configuration:**
 ```typescript
 const correction: RetroactiveCorrection = {
-  entityId: 'participant_001',
-  entityType: 'research_dataset_record',
+  entityId: 'fact_sama_helion_001',
+  entityType: 'founder_fact_record',
   fieldChanges: [
     {
-      fieldName: 'measurement',
-      oldValue: 120.5,
-      newValue: 12.05,
+      fieldName: 'investment_amount',
+      oldValue: 3750000000,
+      newValue: 375000000,
       fieldType: 'number',
-      oldConfidence: 0.95,
+      oldConfidence: 0.85,
       newConfidence: 1.0
     }
   ],

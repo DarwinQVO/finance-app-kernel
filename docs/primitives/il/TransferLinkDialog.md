@@ -2169,26 +2169,26 @@ User: Clears search and tries different query
 // Notes: "Duplicate payment refunded - see refund transaction on 2024-11-05"
 ```
 
-### Research Domain: Grant Budget Transfer
+### Research Domain (RSRCH - Utilitario): API Cost Allocation
 ```tsx
 <TransferLinkDialog
   currentTransaction={{
-    transaction_id: "grant_001",
+    transaction_id: "rsrch_api_001",
     amount: -5000.00,
     currency: "USD",
     date: "2024-10-01",
-    description: "Equipment Purchase - Grant #NSF-2024-001",
-    account_name: "Grant Account A",
-    counterparty_name: "Lab Equipment Inc"
+    description: "Twitter API Subscription - October 2024",
+    account_name: "RSRCH Research Budget",
+    counterparty_name: "Twitter API"
   }}
   isOpen={true}
   onClose={closeDialog}
-  onCreate={createGrantLink}
-  onSearchTransactions={searchGrantTransactions}
+  onCreate={createRSRCHLink}
+  onSearchTransactions={searchRSRCHTransactions}
 />
-// Use case: Link grant expense to budget reallocation
+// Use case: Link API subscription cost to fact discovery budget allocation
 // Relationship type: "transfer"
-// Notes: "Budget reallocated from Category 1 to Category 2 per NSF approval"
+// Notes: "Budget allocated from general research fund to API costs - Q4 2024"
 ```
 
 ---

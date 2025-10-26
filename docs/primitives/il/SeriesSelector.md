@@ -923,20 +923,20 @@ function formatAmount(amount: number, account?: Account): string {
 // Use case: Link legal payment to recurring obligation
 ```
 
-### Research Domain
+### Research Domain (RSRCH - Utilitario)
 ```tsx
 <SeriesSelector
-  series={researchSeries}
-  accounts={researchAccounts}
+  series={rsrchSeries}
+  accounts={rsrchAccounts}
   value={selectedSeriesId}
   onChange={setSelectedSeriesId}
-  accountId={disbursement.account_id}
-  categoryFilter={["grants", "subscriptions"]}
-  onCreateNew={openCreateResearchSeriesDialog}
-  placeholder="Link to grant or subscription..."
+  accountId={expense.account_id}
+  categoryFilter={["api_subscriptions", "scraping_services"]}
+  onCreateNew={openCreateRSRCHSeriesDialog}
+  placeholder="Link to API subscription or service..."
 />
-// Series: NSF Grant Disbursement, Journal Subscription, Lab Equipment Maintenance
-// Use case: Link research payment to recurring funding or cost
+// Series: Twitter API Subscription, Web Scraping Service, Cloud Infrastructure
+// Use case: Link web scraping payment to recurring API subscription or service cost
 ```
 
 ---

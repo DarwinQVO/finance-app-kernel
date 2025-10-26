@@ -1550,23 +1550,23 @@ Each state has visual feedback:
 5. User clicks "View Migration Plan" to see data transformation steps
 6. Publishes as v3.0.0 with migration script
 
-### 4. Research: Experiment Result Schema
+### 4. Research (RSRCH - Utilitario): Founder Fact Schema
 
-**Context:** A research lab needs to track additional metadata for reproducibility.
+**Context:** RSRCH team needs to track additional metadata for fact sources.
 
 **Initial Schema (v1.0.0):**
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "title": "Experiment Result",
+  "title": "Founder Fact",
   "properties": {
-    "experimentId": { "type": "string" },
-    "hypothesis": { "type": "string" },
-    "results": {
+    "factId": { "type": "string" },
+    "claim": { "type": "string" },
+    "sources": {
       "type": "object",
       "properties": {
-        "outcome": { "type": "string", "enum": ["success", "failure", "inconclusive"] },
+        "sourceType": { "type": "string", "enum": ["web_article", "podcast", "tweet"] },
         "measurements": { "type": "array", "items": { "type": "number" } }
       }
     },

@@ -332,7 +332,7 @@ Request count (last 30 days): 15,234
 - **Finance:** Bank admin generates API key for ERP integration
 - **Healthcare:** Hospital IT generates API key for EHR system
 - **Legal:** Law firm admin generates API key for contract management system
-- **Research:** University IT generates API key for citation database
+- **Research (RSRCH - Utilitario):** RSRCH team admin generates API key for VC firm CRM integration (querying founder facts)
 - **E-Commerce:** SaaS admin generates API key for invoice processing
 - **HR SaaS:** HR admin generates API key for payroll system
 - **Insurance:** Insurance IT generates API key for claims portal

@@ -932,14 +932,14 @@ The FXConversionCard follows a **Currency/Unit Conversion Display** pattern that
 
 ---
 
-### 3. Research Domain (Grant Currency Conversions)
+### 3. Research Domain (RSRCH - Utilitario) - International Scraping Service Payments
 
-**Use case:** Display conversion for international research grant (awarded in EUR, spent in USD)
+**Use case:** Display conversion for international web scraping service (billed in EUR, paid in USD)
 
 ```tsx
 <FXConversionCard
   relationship={{
-    id: "rel_grant_001",
+    id: "rel_scraping_service_001",
     type: "fx_conversion",
     metadata: {
       fromCurrency: "EUR",

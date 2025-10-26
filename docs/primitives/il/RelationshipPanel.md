@@ -1217,46 +1217,46 @@ interface LegalRelationship extends TransactionRelationship {
 // Icon: 📄 (customized for legal domain)
 ```
 
-### Research Domain: Citation Relationships
+### Research Domain (RSRCH - Utilitario): Fact Source Relationships
 
 ```tsx
-interface ResearchRelationship extends TransactionRelationship {
-  type: "citation" | "rebuttal" | "methodology" | "dataset";
+interface RSRCHRelationship extends TransactionRelationship {
+  type: "fact_source" | "corroboration" | "contradiction" | "enrichment";
   target_transaction: {
     canonical_id: string;
-    publication_date: string;
-    title: string;
-    authors: string;
-    journal?: string;
-    doi?: string;
+    discovered_at: string;
+    claim: string;
+    source_type: string;
+    source_url?: string;
+    subject_entity?: string;
   };
 }
 
 <RelationshipPanel
-  transactionId="paper_001"
+  transactionId="fact_sama_helion_001"
   relationships={[
     {
-      relationship_id: "rel_cite_001",
-      type: "citation",
+      relationship_id: "rel_source_001",
+      type: "corroboration",
       target_transaction: {
-        canonical_id: "paper_123",
-        publication_date: "2024-03-15",
-        title: "Deep Learning for Time Series Analysis",
-        authors: "Smith, J. et al.",
-        journal: "Nature Machine Intelligence",
-        doi: "10.1038/s42256-024-00123-4"
+        canonical_id: "fact_sama_helion_002",
+        discovered_at: "2024-03-15",
+        claim: "Sam Altman invested $375M in Helion Energy",
+        source_type: "podcast",
+        source_url: "https://lexfridman.com/sama-interview",
+        subject_entity: "Sam Altman"
       },
-      confidence_score: 88,
+      confidence_score: 92,
       detection_method: "auto",
       created_at: "2025-05-23T14:00:00Z",
-      created_by: "system:citation_extractor_v3.0"
+      created_by: "system:fact_linker_v2.0"
     }
   ]}
-  onNavigate={(id) => router.push(`/papers/${id}`)}
-  onUnlink={unlinkCitation}
+  onNavigate={(id) => router.push(`/facts/${id}`)}
+  onUnlink={unlinkFactSource}
 />
-// Shows: Paper citation relationship
-// Icon: 📚 (customized for research domain)
+// Shows: Fact source corroboration relationship
+// Icon: 🔗 (customized for RSRCH domain)
 ```
 
 ### Domain-Agnostic Pattern
@@ -1291,9 +1291,9 @@ const domainConfig = {
     icon: "📄"
   },
   research: {
-    relationshipTypes: ["citation", "rebuttal", "methodology", "dataset"],
-    summaryFields: ["title", "authors", "journal", "publication_date", "doi"],
-    icon: "📚"
+    relationshipTypes: ["fact_source", "corroboration", "contradiction", "enrichment"],
+    summaryFields: ["claim", "subject_entity", "source_type", "discovered_at", "source_url"],
+    icon: "🔗"
   }
 };
 ```

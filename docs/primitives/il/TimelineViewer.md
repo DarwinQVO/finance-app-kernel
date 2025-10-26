@@ -1346,53 +1346,53 @@ Document:     ●─────────────────────
 - **Case management:** Track document evolution for case strategy
 - **Billing accuracy:** Audit trail for attorney time tracking
 
-### 4. Research: Dataset Provenance
+### 4. Research (RSRCH - Utilitario): Founder Fact Provenance
 
-**Use Case:** Track corrections and versions in research dataset
+**Use Case:** Track corrections and versions in founder fact data
 
-**Entity Type:** `research_dataset_record`
+**Entity Type:** `founder_fact_record`
 
 **Timeline Events:**
-1. **Extraction** (2024-01-20 10:00:00) - system_etl ingests data from external API
-   - Fields: participant_id="P001", measurement=120.5, measurement_date=2024-01-15
-   - Confidence: 95%
+1. **Extraction** (2024-01-20 10:00:00) - system_web_scraper ingests data from TechCrunch
+   - Fields: subject_entity="@sama", investment_amount=375000000, discovered_at=2024-01-15
+   - Confidence: 85%
 
-2. **Validation** (2024-01-20 10:00:01) - system_validator checks measurement range
-   - Fields: measurement (out of expected range 60-100)
+2. **Validation** (2024-01-20 10:00:01) - system_validator checks entity name format
+   - Fields: subject_entity (Twitter handle detected, needs normalization)
    - Severity: warning
 
-3. **Override** (2024-01-22 09:30:00) - user_researcher corrects measurement
-   - Fields: measurement=120.5 → 12.05
-   - Reason: "Decimal point error in source data"
+3. **Override** (2024-01-22 09:30:00) - user_rsrch_analyst corrects entity name
+   - Fields: subject_entity="@sama" → "Sam Altman"
+   - Reason: "Normalized Twitter handle to canonical founder name"
    - Confidence: 100%
 
-4. **Recomputation** (2024-01-22 09:30:01) - system_stats recalculates derived metrics
-   - Fields: z_score=-0.5 → 1.2
-   - Caused by: evt_003 (measurement correction)
+4. **Enrichment** (2024-01-22 09:30:01) - system_entity_resolver adds entity metadata
+   - Fields: entity_type="founder", entity_id="founder_sama_001"
+   - Caused by: evt_003 (entity normalization)
    - Confidence: 100%
 
-5. **Correction** (2024-02-10 11:00:00) - user_researcher backdates measurement
-   - Fields: measurement_date=2024-01-15 → 2024-01-10
-   - Valid time: 2024-01-10 (backdated to actual lab date)
-   - Reason: "Lab report shows specimen collected on Jan 10"
+5. **Correction** (2024-02-10 11:00:00) - user_rsrch_analyst backdates discovery
+   - Fields: discovered_at=2024-01-15 → 2024-01-10
+   - Valid time: 2024-01-10 (backdated to actual TechCrunch publication)
+   - Reason: "TechCrunch article published on Jan 10, scraped Jan 15"
    - Confidence: 100%
 
 **Timeline Visualization:**
 ```
-Measurement:  ●────●──────────────────────────────────
-              120.5  12.05 (Corrected)
+Entity:       ●────●──────────────────────────────────
+              @sama  Sam Altman (Normalized)
 
-Z-Score:      ────●───●───────────────────────────────
-              -0.5  1.2 (Recomputed)
+Entity Type:  ────●───●───────────────────────────────
+              null   founder (Enriched)
 
-Lab Date:     ●─────────────●─────────────────────────
+Discovery:    ●─────────────●─────────────────────────
               Jan 15        Jan 10 (Corrected)
 ```
 
 **Value Proposition:**
-- **Research integrity:** Document all data corrections for publication
+- **Research integrity:** Document all fact corrections for VC analysis
 - **Reproducibility:** Enable exact replication of analysis with version history
-- **Peer review:** Transparent provenance for reviewer scrutiny
+- **Audit trail:** Transparent provenance for investment team scrutiny
 
 ### 5. E-commerce: Order History
 

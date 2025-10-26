@@ -1202,19 +1202,19 @@ const AccountCreateModal: React.FC<{
 // Accounts: Smith Family Trust, Property Escrow, Client Retainer Fund
 ```
 
-### Research Domain
+### Research Domain (RSRCH - Utilitario)
 ```tsx
 <AccountManager
-  accounts={researchAccounts}
-  currentUserId="researcher_101"
-  onAccountCreate={createResearchAccount}
-  onAccountUpdate={updateResearchAccount}
-  onAccountArchive={archiveResearchAccount}
-  onAccountRestore={restoreResearchAccount}
-  initialFilter={{ types: ["grant", "budget"] }}
+  accounts={rsrchAccounts}
+  currentUserId="rsrch_analyst_101"
+  onAccountCreate={createRSRCHAccount}
+  onAccountUpdate={updateRSRCHAccount}
+  onAccountArchive={archiveRSRCHAccount}
+  onAccountRestore={restoreRSRCHAccount}
+  initialFilter={{ types: ["research_fund", "scraping_budget"] }}
   groupBy="currency"
 />
-// Accounts: NSF Grant 2025, Lab Budget, Conference Travel
+// Accounts: VC Research Fund 2025, Web Scraping Budget, API Costs Account
 ```
 
 ### Manufacturing Domain

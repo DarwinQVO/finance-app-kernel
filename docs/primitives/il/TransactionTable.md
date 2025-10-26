@@ -170,18 +170,18 @@ const TransactionTable: React.FC<TransactionTableProps> = (props) => {
 ```tsx
 <TransactionTable
   columns={[
-    { key: "title", label: "Title", sortable: true },
-    { key: "author", label: "Author", sortable: true },
-    { key: "publication_year", label: "Year", sortable: true },
-    { key: "journal", label: "Journal", sortable: false },
+    { key: "claim", label: "Fact Claim", sortable: true },
+    { key: "subject_entity", label: "Subject Entity", sortable: true },
+    { key: "discovered_at", label: "Discovery Date", sortable: true },
+    { key: "source_type", label: "Source", sortable: false },
     {
-      key: "doi",
-      label: "DOI",
+      key: "source_url",
+      label: "Source URL",
       sortable: false,
-      render: (value) => <a href={`https://doi.org/${value}`}>{value}</a>
+      render: (value) => <a href={value} target="_blank">{value}</a>
     }
   ]}
-  rows={citations}
+  rows={founderFacts}
 />
 ```
 

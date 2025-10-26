@@ -1729,21 +1729,21 @@ const CounterpartyCreateModal: React.FC<{
 // Use case: Managing legal entities and government agencies
 ```
 
-### Research Domain
+### Research Domain (RSRCH - Utilitario)
 ```tsx
 <CounterpartyManager
-  counterparties={researchCounterparties}
-  transactionCounts={fundingCounts}
-  currentUserId="researcher_101"
-  onCounterpartyCreate={createFunder}
-  onCounterpartyUpdate={updateFunder}
-  onCounterpartyDelete={deleteFunder}
-  onCounterpartiesMerge={mergeFunders}
+  counterparties={rsrchCounterparties}
+  transactionCounts={sourceProviderCounts}
+  currentUserId="rsrch_analyst_101"
+  onCounterpartyCreate={createSourceProvider}
+  onCounterpartyUpdate={updateSourceProvider}
+  onCounterpartyDelete={deleteSourceProvider}
+  onCounterpartiesMerge={mergeSourceProviders}
   showDuplicates={true}
   groupBy="type"
 />
-// Counterparties: NSF, NIH, University of XYZ, Lab Supply Inc
-// Use case: Managing grant agencies and vendors
+// Counterparties: TechCrunch, Twitter API, Lex Fridman (podcast), Scraping Service Inc
+// Use case: Managing fact source providers and API vendors
 ```
 
 ---

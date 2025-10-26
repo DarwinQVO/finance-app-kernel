@@ -1287,99 +1287,95 @@ User Clicks "View History"
 
 ---
 
-### 4. Research: Edit Publication Metadata
+### 4. Research (RSRCH - Utilitario): Edit Founder Fact Metadata
 
-**Use Case**: Researcher corrects author affiliations extracted from PDF.
+**Use Case**: RSRCH analyst corrects entity names and investment amounts extracted from web sources.
 
 **Configuration**:
 ```typescript
 <CorrectionDialog
   mode="single"
   entity={{
-    entity_id: "pub_11223",
-    type: "publication",
-    title: "Machine Learning in Healthcare: A Systematic Review",
-    authors: "Smith J, Doe A, Johnson R",
-    year: 2024,
-    journal: "Journal of Medical AI",
-    volume: "15",
-    issue: "3",
-    pages: "245-267",
-    doi: "10.1234/jmai.2024.15.3.245",
+    entity_id: "fact_sama_helion_001",
+    type: "founder_fact",
+    claim: "Sam Altman invested $375M in Helion Energy",
+    subject_entity: "@sama",
+    object_entity: "Helion",
+    investment_amount: 375000000,
+    source_type: "web_article",
+    source_url: "https://techcrunch.com/sama-helion-investment",
+    discovered_at: "2024-03-15T10:00:00Z",
     _confidence: {
-      authors: 0.78,  // PDF extraction uncertainty
-      year: 0.99,
-      journal: 0.95
+      subject_entity: 0.78,  // Twitter handle needs normalization
+      investment_amount: 0.95,
+      object_entity: 0.92
     }
   }}
-  entityType="publication"
+  entityType="founder_fact"
   editableFields={[
     {
-      field_name: "title",
-      label: "Title",
+      field_name: "claim",
+      label: "Fact Claim",
       type: "textarea",
       required: true,
-      helpText: "Full publication title"
+      helpText: "Full fact statement"
     },
     {
-      field_name: "authors",
-      label: "Authors",
-      type: "textarea",
+      field_name: "subject_entity",
+      label: "Subject Entity",
+      type: "text",
       required: true,
-      helpText: "Comma-separated list: Last F, Last F",
+      helpText: "Canonical entity name (e.g., 'Sam Altman')",
       validate: (value) => {
-        if (!value.includes(",")) {
-          return "Multiple authors should be comma-separated";
+        if (value.startsWith("@")) {
+          return "Use canonical name, not Twitter handle";
         }
       }
     },
     {
-      field_name: "year",
-      label: "Publication Year",
+      field_name: "investment_amount",
+      label: "Investment Amount",
       type: "number",
       required: true,
-      min: 1900,
-      max: new Date().getFullYear(),
+      min: 0,
+      helpText: "Amount in USD",
       validate: (value) => {
-        if (value > new Date().getFullYear()) {
-          return "Year cannot be in the future";
+        if (value < 0) {
+          return "Amount cannot be negative";
         }
       }
     },
     {
-      field_name: "journal",
-      label: "Journal Name",
+      field_name: "object_entity",
+      label: "Object Entity",
       type: "text",
+      required: true,
+      helpText: "Company or entity receiving investment"
+    },
+    {
+      field_name: "source_type",
+      label: "Source Type",
+      type: "select",
+      options: ["web_article", "podcast", "tweet", "interview"],
       required: true
     },
     {
-      field_name: "volume",
-      label: "Volume",
-      type: "text"
-    },
-    {
-      field_name: "issue",
-      label: "Issue",
-      type: "text"
-    },
-    {
-      field_name: "pages",
-      label: "Page Range",
+      field_name: "source_url",
+      label: "Source URL",
       type: "text",
-      pattern: "^[0-9]+-[0-9]+$",
-      helpText: "Format: 123-456"
+      pattern: "^https?://.*$",
+      helpText: "Format: https://..."
     },
     {
-      field_name: "doi",
-      label: "DOI",
-      type: "text",
-      pattern: "^10\\.[0-9]{4,}/.*$",
-      helpText: "Format: 10.1234/..."
+      field_name: "discovered_at",
+      label: "Discovery Date",
+      type: "date",
+      helpText: "When this fact was first discovered"
     }
   ]}
   onSave={async (overrides) => {
-    await api.savePublicationCorrections(overrides);
-    toast.success("Publication metadata updated");
+    await api.saveFounderFactCorrections(overrides);
+    toast.success("Founder fact metadata updated");
   }}
   showHistory={true}
   showConfidence={true}

@@ -456,7 +456,7 @@ DELETE /api/webhooks/${webhookId}
 - **Finance:** Bank registers webhook for upload.completed → Notify ERP
 - **Healthcare:** Hospital registers webhook for observation.created → Update EHR
 - **Legal:** Law firm registers webhook for entity.resolved → Notify contract system
-- **Research:** University registers webhook for observation.created → Update citation DB
+- **Research (RSRCH - Utilitario):** RSRCH team registers webhook for fact.discovered → Update VC firm CRM with founder facts
 - **E-Commerce:** SaaS registers webhook for reconciliation.completed → Trigger invoice approval
 - **HR SaaS:** HR platform registers webhook for upload.completed → Notify payroll
 - **Insurance:** Insurance company registers webhook for reconciliation.completed → Trigger claim approval

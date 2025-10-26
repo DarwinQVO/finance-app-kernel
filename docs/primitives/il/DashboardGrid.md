@@ -313,7 +313,7 @@ function detectCollisions(widgets: WidgetConfig[]): boolean {
 - Finance: MetricCard (income, expenses, net)
 - Healthcare: VitalsCard (glucose, blood pressure, heart rate)
 - Legal: CaseMetricCard (won, lost, settled)
-- Research: PublicationMetricCard (papers, citations, h-index)
+- Research (RSRCH - Utilitario): FounderFactMetricCard (facts discovered, sources, entities tracked)
 - Manufacturing: ProductionMetricCard (units, defects, pass rate)
 - Media: EngagementMetricCard (views, likes, watch time)
 

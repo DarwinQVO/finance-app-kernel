@@ -1431,40 +1431,40 @@ const comparison = {
 - **Risk mitigation:** Avoid missed statute of limitations due to data entry errors
 - **Audit trail:** Document all corrections with reasons
 
-### 4. Research: Dataset Version Control
+### 4. Research (RSRCH - Utilitario): Founder Fact Version Control
 
-**Use Case:** Researcher needs to reproduce analysis from paper submission date
+**Use Case:** RSRCH analyst needs to reproduce fact analysis from investor report date
 
-**Entity Type:** `research_dataset_record`
+**Entity Type:** `founder_fact_record`
 
 **Scenario:**
-- Paper submitted on June 1, 2024
-- Dataset corrected on July 15, 2024 (found data quality issues)
-- Peer reviewers request reproducibility on August 1, 2024
+- Investment report generated on June 1, 2024
+- Fact corrected on July 15, 2024 (found Sam Altman investment amount updated)
+- VC partners request reproducibility on August 1, 2024
 
 **Query:**
 ```typescript
-const querySubmissionDate: AsOfQuery = {
+const queryReportDate: AsOfQuery = {
   mode: 'transaction',
   transactionTime: new Date('2024-06-01T23:59:59Z')
 }
-// Returns dataset exactly as it was on submission date
+// Returns founder facts exactly as known on report date
 // Ensures analysis can be perfectly reproduced
 ```
 
 **Workflow:**
-1. Researcher opens AsOfQueryBuilder
+1. RSRCH analyst opens AsOfQueryBuilder
 2. Selects "Transaction Time" mode
 3. Enters June 1, 2024
 4. Executes query
 5. Exports results as CSV
-6. Reruns analysis script on exported data
-7. Confirms results match paper
+6. Reruns investment analysis on exported data
+7. Confirms results match original report
 
 **Value Proposition:**
-- **Reproducibility:** Perfect replication of historical analysis
-- **Peer review:** Transparent data versioning for reviewers
-- **Integrity:** Document all data corrections with timestamps
+- **Reproducibility:** Perfect replication of historical fact analysis
+- **Audit trail:** Transparent fact versioning for VC partners
+- **Integrity:** Document all fact corrections with timestamps
 
 ### 5. E-commerce: Order History Investigation
 

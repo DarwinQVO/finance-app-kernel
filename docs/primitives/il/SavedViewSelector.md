@@ -577,15 +577,15 @@ const ViewItem: React.FC<{
 // Views: "Active Cases", "Won Cases 2025", "Pending Appeals"
 ```
 
-### Research Domain
+### Research Domain (RSRCH - Utilitario)
 ```tsx
 <SavedViewSelector
-  views={paperLibraryViews}
-  currentViewId="view_my_papers"
-  onViewSelect={(id) => loadPaperLibrary(id)}
-  onViewCreate={() => openSaveLibraryViewModal()}
+  views={founderFactViews}
+  currentViewId="view_investment_facts"
+  onViewSelect={(id) => loadFounderFactLibrary(id)}
+  onViewCreate={() => openSaveFactViewModal()}
 />
-// Views: "My Papers", "Peer-Reviewed Only", "AI & ML Topics"
+// Views: "Investment Facts", "TechCrunch Sources Only", "AI Founders"
 ```
 
 ### Manufacturing Domain

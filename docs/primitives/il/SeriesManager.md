@@ -1444,26 +1444,26 @@ const InstanceRow: React.FC<{
 // Use case: Track recurring legal fees and obligations
 ```
 
-### Research Domain
+### Research Domain (RSRCH - Utilitario)
 ```tsx
 <SeriesManager
-  series={researchSeries}
-  instances={researchInstances}
-  accounts={researchAccounts}
-  counterparties={researchFunders}
-  categories={["grants", "subscriptions", "equipment", "other"]}
-  currentUserId="researcher_101"
-  onSeriesCreate={createResearchSeries}
-  onSeriesUpdate={updateResearchSeries}
-  onSeriesArchive={archiveResearchSeries}
-  onSeriesUnarchive={unarchiveResearchSeries}
-  onInstanceLink={linkResearchInstance}
-  onInstanceUnlink={unlinkResearchInstance}
-  onInstanceSkip={skipResearchInstance}
+  series={rsrchSeries}
+  instances={rsrchInstances}
+  accounts={rsrchAccounts}
+  counterparties={rsrchProviders}
+  categories={["api_subscriptions", "scraping_services", "infrastructure", "other"]}
+  currentUserId="rsrch_analyst_101"
+  onSeriesCreate={createRSRCHSeries}
+  onSeriesUpdate={updateRSRCHSeries}
+  onSeriesArchive={archiveRSRCHSeries}
+  onSeriesUnarchive={unarchiveRSRCHSeries}
+  onInstanceLink={linkRSRCHInstance}
+  onInstanceUnlink={unlinkRSRCHInstance}
+  onInstanceSkip={skipRSRCHInstance}
   groupBy="category"
 />
-// Series: NSF Grant Disbursement (+$50000/quarter), Journal Subscription ($1200/year), Lab Equipment Maintenance ($500/month)
-// Use case: Track grant disbursements and recurring research costs
+// Series: Twitter API Subscription ($5000/month), Web Scraping Service ($2500/month), Cloud Infrastructure ($800/month)
+// Use case: Track recurring API costs and web scraping service expenses
 ```
 
 ---

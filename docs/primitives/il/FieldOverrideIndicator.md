@@ -1054,53 +1054,53 @@ export function CasesList() {
 
 ---
 
-### Example 4: Research - Author Name Correction
+### Example 4: Research (RSRCH - Utilitario) - Entity Name Correction
 
 ```typescript
 'use client'
 
 import { FieldOverrideIndicator } from '@/components/il/field-override-indicator'
 
-interface ResearchPaper {
+interface FounderFact {
   id: string
-  title: string
-  authors: Author[]
+  claim: string
+  entities: FounderEntity[]
 }
 
-interface Author {
+interface FounderEntity {
   name: string
-  affiliation: string
+  company: string
   override?: {
     originalName: string
     correctedBy: string
     correctedAt: string
-    source: 'orcid' | 'manual' | 'publisher'
+    source: 'twitter' | 'manual' | 'techcrunch'
   }
 }
 
-function AuthorList({ authors }: { authors: Author[] }) {
+function EntityList({ entities }: { entities: FounderEntity[] }) {
   return (
     <div className="space-y-1">
-      {authors.map((author, idx) => (
+      {entities.map((entity, idx) => (
         <div key={idx} className="flex items-center gap-2">
-          <span className="font-medium">{author.name}</span>
+          <span className="font-medium">{entity.name}</span>
 
           <FieldOverrideIndicator
-            isOverridden={!!author.override}
-            overriddenBy={author.override?.correctedBy}
-            overriddenAt={author.override?.correctedAt}
-            originalValue={author.override?.originalName}
-            currentValue={author.name}
+            isOverridden={!!entity.override}
+            overriddenBy={entity.override?.correctedBy}
+            overriddenAt={entity.override?.correctedAt}
+            originalValue={entity.override?.originalName}
+            currentValue={entity.name}
             variant="dot"
             size="sm"
             tooltipContent={
-              author.override && (
+              entity.override && (
                 <div className="space-y-2 text-sm">
-                  <div className="font-semibold">Author Name Corrected</div>
-                  <div>Original: {author.override.originalName}</div>
-                  <div>Corrected: {author.name}</div>
+                  <div className="font-semibold">Entity Name Corrected</div>
+                  <div>Original: {entity.override.originalName}</div>
+                  <div>Corrected: {entity.name}</div>
                   <div className="pt-2 border-t text-xs text-muted-foreground">
-                    Source: {author.override.source.toUpperCase()}
+                    Source: {entity.override.source.toUpperCase()}
                   </div>
                 </div>
               )
@@ -1108,7 +1108,7 @@ function AuthorList({ authors }: { authors: Author[] }) {
           />
 
           <span className="text-sm text-muted-foreground">
-            {author.affiliation}
+            {entity.company}
           </span>
         </div>
       ))}
@@ -1117,32 +1117,32 @@ function AuthorList({ authors }: { authors: Author[] }) {
 }
 
 // Example usage
-export function PaperMetadata() {
-  const paper: ResearchPaper = {
-    id: 'paper_001',
-    title: 'Machine Learning Applications in Healthcare',
-    authors: [
+export function FounderFactMetadata() {
+  const fact: FounderFact = {
+    id: 'fact_sama_helion_001',
+    claim: 'Sam Altman invested $375M in Helion Energy',
+    entities: [
       {
-        name: 'Dr. Sarah J. Chen',
-        affiliation: 'Stanford University',
+        name: 'Sam Altman',
+        company: 'OpenAI',
         override: {
-          originalName: 'S. Chen',
-          correctedBy: 'Research Librarian',
+          originalName: '@sama',
+          correctedBy: 'RSRCH Analyst',
           correctedAt: '2025-10-20T16:00:00Z',
-          source: 'orcid'
+          source: 'twitter'
         }
       },
       {
-        name: 'Dr. Michael Torres',
-        affiliation: 'MIT'
+        name: 'David Kirtley',
+        company: 'Helion Energy'
       }
     ]
   }
 
   return (
     <div className="space-y-3">
-      <h2 className="text-xl font-bold">{paper.title}</h2>
-      <AuthorList authors={paper.authors} />
+      <h2 className="text-xl font-bold">{fact.claim}</h2>
+      <EntityList entities={fact.entities} />
     </div>
   )
 }

@@ -2122,16 +2122,16 @@ aria-live="polite"
 ### Research Domain (Grant Categories)
 ```tsx
 <TaxCategoryManager
-  categories={grantCategories}
-  usageStats={grantUsageStats}
-  jurisdiction="nsf"
-  availableJurisdictions={["nsf", "nih"]}
-  currentUserId="researcher_101"
-  onCategoryCreate={createGrantCategory}
-  onCategoryUpdate={updateGrantCategory}
-  onCategoryArchive={archiveGrantCategory}
-  onCategoryRestore={restoreGrantCategory}
-  onCategoriesMerge={mergeGrantCategories}
+  categories={rsrchCategories}
+  usageStats={rsrchUsageStats}
+  jurisdiction="fact_types"
+  availableJurisdictions={["investment_facts", "employment_facts"]}
+  currentUserId="rsrch_analyst_101"
+  onCategoryCreate={createRSRCHCategory}
+  onCategoryUpdate={updateRSRCHCategory}
+  onCategoryArchive={archiveRSRCHCategory}
+  onCategoryRestore={restoreRSRCHCategory}
+  onCategoriesMerge={mergeRSRCHCategories}
   showUsageStats={true}
 />
 ```

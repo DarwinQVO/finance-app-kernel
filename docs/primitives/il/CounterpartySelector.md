@@ -988,19 +988,19 @@ function highlightMatch(text: string, query: string): React.ReactNode {
 // Use case: Assigning case to client
 ```
 
-### Research Domain (Funding Source Selector)
+### Research Domain (RSRCH - Utilitario) - Source Provider Selector
 ```tsx
 <CounterpartySelector
-  counterparties={researchCounterparties}
-  currentCounterpartyId={expense.funder_id}
-  transactionCounts={fundingCounts}
-  onCounterpartySelect={(id) => updateExpense({ funder_id: id })}
-  filterByType={["government", "business"]}  // Only funders
+  counterparties={rsrchCounterparties}
+  currentCounterpartyId={expense.source_provider_id}
+  transactionCounts={sourceProviderCounts}
+  onCounterpartySelect={(id) => updateExpense({ source_provider_id: id })}
+  filterByType={["api_provider", "media"]}  // Only source providers
   groupBy="type"
-  placeholder="Select funding agency..."
+  placeholder="Select source provider..."
   showTransactionCount={true}
 />
-// Use case: Recording research expense, selecting grant agency
+// Use case: Recording web scraping expense, selecting API provider (Twitter API, etc.)
 ```
 
 ### Manufacturing Domain (Supplier Selector)

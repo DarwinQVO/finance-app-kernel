@@ -1409,9 +1409,9 @@ type OptimizerState =
 - Use n-gram similarity for better performance
 - Cache results for common document types
 
-### 4. Research: Data Validation Rules
+### 4. Research (RSRCH - Utilitario): Fact Validation Rules
 
-**Context:** A research institute validates experimental data formats.
+**Context:** RSRCH team validates founder fact data formats from web scraping.
 
 **Sample Data:**
 
@@ -1419,10 +1419,10 @@ type OptimizerState =
 {
   "rules": [
     {
-      "ruleId": "genomic_sequence_validator",
-      "ruleName": "Genomic Sequence Validator",
+      "ruleId": "source_url_validator",
+      "ruleName": "Source URL Validator",
       "ruleType": "regex",
-      "definition": "^[ACGT]+$",
+      "definition": "^https?://(techcrunch\\.com|twitter\\.com|youtube\\.com)/.+$",
       "executions": 234567,
       "avgTime": 567,
       "p95Time": 1234,

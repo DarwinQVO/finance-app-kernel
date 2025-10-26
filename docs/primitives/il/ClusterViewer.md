@@ -18,7 +18,7 @@ Visualize entity clusters, show similarity heatmaps, and enable user-driven merg
 - Finance: View merchant name clusters for normalization
 - Healthcare: View provider name clusters for deduplication
 - Legal: View case name clusters for matter grouping
-- Research: View author/institution clusters for citation management
+- Research (RSRCH - Utilitario): View founder/company name clusters for fact deduplication (@sama, Sam Altman → "Sam Altman")
 
 ---
 

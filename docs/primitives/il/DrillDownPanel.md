@@ -485,13 +485,13 @@ const DrillDownSkeleton: React.FC = () => {
 // Displays: Contract clause details, contract PDF
 ```
 
-**Research:**
+**Research (RSRCH - Utilitario):**
 ```tsx
 <DrillDownPanel
-  drilldownData={citationDrilldown}
+  drilldownData={founderFactDrilldown}
   onClose={() => setOpen(false)}
 />
-// Displays: Citation details, paper PDF
+// Displays: Founder fact details, source URLs (TechCrunch article, podcast transcript)
 ```
 
 **Domain-agnostic nature:** Same component, different data. Tabs and structure remain identical.
