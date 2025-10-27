@@ -130,41 +130,15 @@ interface NormalizationLog {
 
 ## Simplicity Profiles
 
-The same NormalizationLog interface supports three implementation scales: Personal (simple JSON files), Small Business (JSON + metrics aggregation), Enterprise (Elasticsearch + distributed tracing + real-time monitoring).
-
 ### Personal Profile (60 LOC)
 
-**Darwin's Approach:** Simple JSON file per upload with normalization execution details
-
-**What Darwin needs:**
-- Did normalization succeed or fail?
-- How many observations were processed?
-- Which fields had errors? (for manual review)
-- How long did it take?
-
-**What Darwin DOESN'T need:**
-- ❌ Elasticsearch with daily index rotation
-- ❌ Distributed tracing (trace_id/span_id)
-- ❌ Real-time alerting (PagerDuty)
-- ❌ Grafana dashboards with p95 latency
-- ❌ Historical trend analysis
+**Contexto del Usuario:**
+Darwin procesa 12 uploads al año (1 upload mensual ×12 meses). Necesita saber si la normalización funcionó, cuántas observaciones se procesaron, y qué errores ocurrieron para revisión manual. JSON simple en disco local es suficiente.
 
 **Implementation:**
-
-**Storage:**
-```
-~/.finance-app/logs/normalize/
-  UL_abc123.log.json
-  UL_def456.log.json
-  UL_xyz789.log.json
-```
-
-**Code Example (60 LOC):**
 ```python
-# normalize_service.py (Darwin's personal finance app)
-
+# lib/normalization_log.py (Personal - 60 LOC)
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -179,709 +153,443 @@ class NormalizationLog:
         """Write normalization log to JSON file."""
         log_path = self.base_path / f"{upload_id}.log.json"
 
-        # Add timestamp if not present
+        # Add timestamps
         if "started_at" not in log_entry:
             log_entry["started_at"] = datetime.now().isoformat()
         if "completed_at" not in log_entry:
             log_entry["completed_at"] = datetime.now().isoformat()
 
-        # Write to file (pretty-printed for human readability)
+        # Write (pretty-printed for readability)
         with open(log_path, "w") as f:
             json.dump(log_entry, f, indent=2)
 
     def read(self, upload_id: str) -> dict:
         """Read normalization log for specific upload."""
         log_path = self.base_path / f"{upload_id}.log.json"
-
         if not log_path.exists():
             return None
-
         with open(log_path, "r") as f:
             return json.load(f)
 
-# Usage in normalizer
-def normalize_observations(upload_id: str):
-    log = NormalizationLog()
-    start = datetime.now()
+# Usage
+log = NormalizationLog()
 
-    try:
-        # Process observations
-        results = process_all_observations(upload_id)
+# Normalize observations
+start = datetime.now()
+results = process_all_observations(upload_id)
+duration_ms = int((datetime.now() - start).total_seconds() * 1000)
 
-        # Calculate duration
-        duration_ms = int((datetime.now() - start).total_seconds() * 1000)
-
-        # Write log
-        log.write(upload_id, {
-            "upload_id": upload_id,
-            "normalizer_version": "1.0.0",
-            "rule_set_version": "2024.10",
-            "observations_processed": results["total"],
-            "canonicals_created": results["success"],
-            "failures": results["failures"],
-            "warnings": results["warnings"],
-            "failure_details": results["error_list"],
-            "warning_details": results["warning_list"],
-            "duration_ms": duration_ms
-        })
-
-    except Exception as e:
-        # Log error
-        log.write(upload_id, {
-            "upload_id": upload_id,
-            "observations_processed": 0,
-            "canonicals_created": 0,
-            "failures": -1,
-            "error": str(e)
-        })
+# Write log
+log.write(upload_id, {
+    "upload_id": upload_id,
+    "normalizer_version": "1.0.0",
+    "observations_processed": results["total"],
+    "canonicals_created": results["success"],
+    "failures": results["failures"],
+    "warnings": results["warnings"],
+    "failure_details": results["error_list"],
+    "duration_ms": duration_ms
+})
 ```
 
-**Example Log File (UL_abc123.log.json):**
+**Log File Example:**
 ```json
 {
   "upload_id": "UL_abc123",
   "normalizer_version": "1.0.0",
-  "rule_set_version": "2024.10",
   "observations_processed": 42,
-  "canonicals_created": 42,
-  "failures": 0,
-  "warnings": 3,
-  "warning_details": [
-    {
-      "canonical_id": "CT_001",
-      "flag": "possible_duplicate",
-      "message": "Similar transaction on 10/14 for $87.42"
-    },
-    {
-      "canonical_id": "CT_015",
-      "flag": "merchant_fuzzy_match",
-      "message": "Matched 'WHL FOODS' to 'Whole Foods Market' (85% confidence)"
-    },
-    {
-      "canonical_id": "CT_028",
-      "flag": "category_inference",
-      "message": "Auto-categorized as 'Gas Stations' based on merchant"
-    }
+  "canonicals_created": 40,
+  "failures": 2,
+  "warnings": 5,
+  "failure_details": [
+    {"row_id": "OBS_row_15", "reason": "Invalid amount: 'N/A'"},
+    {"row_id": "OBS_row_23", "reason": "Missing merchant name"}
   ],
-  "duration_ms": 3421,
-  "started_at": "2024-10-27T09:15:32.123456",
-  "completed_at": "2024-10-27T09:15:35.544456"
+  "warnings": [
+    {"row_id": "OBS_row_7", "reason": "Low confidence merchant match: 0.72"}
+  ],
+  "duration_ms": 450,
+  "started_at": "2025-10-27T10:15:00",
+  "completed_at": "2025-10-27T10:15:01"
 }
 ```
 
-**Checking logs (Darwin's workflow):**
-```bash
-# Check if normalization succeeded
-$ cat ~/.finance-app/logs/normalize/UL_abc123.log.json | jq '.failures'
-0
+**Características Incluidas:**
+- ✅ JSON file per upload (~12 files/year)
+- ✅ Success/failure counts
+- ✅ Error details for manual review
+- ✅ Duration tracking
+- ✅ Human-readable format (pretty-printed)
 
-# See which transactions had warnings
-$ cat ~/.finance-app/logs/normalize/UL_abc123.log.json | jq '.warning_details'
-[
-  {
-    "canonical_id": "CT_001",
-    "flag": "possible_duplicate",
-    "message": "Similar transaction on 10/14 for $87.42"
-  }
-]
+**Características NO Incluidas:**
+- ❌ Elasticsearch (YAGNI: 12 files/year, grep works fine)
+- ❌ Distributed tracing (YAGNI: single-process app)
+- ❌ Real-time monitoring (YAGNI: batch processing, check after upload)
+- ❌ Grafana dashboards (YAGNI: manual review sufficient)
+- ❌ PagerDuty alerts (YAGNI: non-critical personal app)
+
+**Configuración:**
+```python
+# Hardcoded (no config needed)
+LOG_DIR = "~/.finance-app/logs/normalize"
 ```
 
-**Testing:**
-- ❌ No automated tests (simple file I/O, low risk)
-- Manual verification: Run normalizer, check JSON file exists and has correct fields
+**Performance:**
+- Write latency: 5ms (local SSD)
+- Read latency: 3ms
+- Storage: ~2KB per log file
+- Total storage: 24KB/year (12 files × 2KB)
 
-**Monitoring:**
-- ❌ No monitoring (Darwin manually checks logs when reviewing transactions)
-
-**Decision Context:**
-- Darwin processes 10 PDFs/month → 10 log files/month → 120 files/year
-- Total storage: ~50 KB/year (negligible)
-- When normalization fails, Darwin checks the log file to see which observations had errors
-- YAGNI: No need for Elasticsearch when you have 120 JSON files
+**Upgrade Triggers:**
+- Si >100 uploads/year → Small Business (agregación needed)
+- Si multi-usuario → Small Business (shared log analysis)
 
 ---
 
 ### Small Business Profile (250 LOC)
 
-**Use Case:** Accounting firm processing 50 client statements/month with quality monitoring
-
-**What they need (vs Personal):**
-- ✅ All Personal features (JSON files, error details)
-- ✅ **Metrics aggregation** (success rate, warning rate, failure trends)
-- ✅ **Rule version tracking** (which rule set was used?)
-- ✅ **Email alerts** (if failure rate > 5%)
-- ❌ No Elasticsearch (50 logs/month = manageable with SQLite)
-- ❌ No distributed tracing (single-server deployment)
-- ❌ No Grafana dashboards (CSV exports sufficient)
+**Contexto del Usuario:**
+Empresa procesa 100 uploads/mes (1,200/año). Necesitan agregaciones mensuales: tasa de éxito, errores comunes, duración promedio. JSON files + análisis en memoria es suficiente. No necesitan Elasticsearch todavía.
 
 **Implementation:**
-
-**Storage:**
-```
-/var/app/logs/normalize/
-  2024-10/
-    UL_abc123.log.json
-    UL_def456.log.json
-  2024-11/
-    UL_xyz789.log.json
-
-/var/app/db/normalization_metrics.db (SQLite)
-```
-
-**Code Example (250 LOC):**
 ```python
-# normalization_log.py (Small Business)
-
-import json
-import sqlite3
+# lib/normalization_log.py (Small Business - 250 LOC)
+import json, sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-import smtplib
-from email.message import EmailMessage
+from collections import defaultdict
 
 class NormalizationLog:
-    """JSON files + SQLite metrics for quality monitoring."""
+    """JSON logs + SQLite index for aggregations."""
 
-    def __init__(self, base_path="/var/app/logs/normalize", db_path="/var/app/db/normalization_metrics.db"):
+    def __init__(self, base_path="./logs/normalize"):
         self.base_path = Path(base_path)
-        self.db_path = db_path
+        self.base_path.mkdir(parents=True, exist_ok=True)
+        self.db_path = self.base_path / "index.db"
         self._init_db()
 
     def _init_db(self):
-        """Create metrics table if not exists."""
+        """Create SQLite index for fast queries."""
         conn = sqlite3.connect(self.db_path)
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS normalization_metrics (
+            CREATE TABLE IF NOT EXISTS normalization_logs (
                 upload_id TEXT PRIMARY KEY,
-                normalizer_version TEXT,
-                rule_set_version TEXT,
+                started_at TEXT,
+                completed_at TEXT,
                 observations_processed INTEGER,
                 canonicals_created INTEGER,
                 failures INTEGER,
                 warnings INTEGER,
-                duration_ms INTEGER,
-                started_at TIMESTAMP,
-                completed_at TIMESTAMP,
-                success_rate REAL,  -- (canonicals / observations) * 100
-                warning_rate REAL   -- (warnings / observations) * 100
+                duration_ms INTEGER
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_completed ON normalization_metrics(completed_at)")
         conn.commit()
         conn.close()
 
     def write(self, upload_id: str, log_entry: dict):
-        """Write log to JSON + insert metrics to SQLite."""
-        # 1. Write JSON file (for detailed error inspection)
-        month_dir = self.base_path / datetime.now().strftime("%Y-%m")
-        month_dir.mkdir(parents=True, exist_ok=True)
-
-        log_path = month_dir / f"{upload_id}.log.json"
+        """Write log to JSON + SQLite index."""
+        # Write JSON file
+        log_path = self.base_path / f"{upload_id}.log.json"
         with open(log_path, "w") as f:
             json.dump(log_entry, f, indent=2)
 
-        # 2. Insert metrics to SQLite (for aggregation queries)
+        # Update SQLite index
         conn = sqlite3.connect(self.db_path)
-
-        success_rate = 0
-        warning_rate = 0
-        if log_entry.get("observations_processed", 0) > 0:
-            success_rate = (log_entry["canonicals_created"] / log_entry["observations_processed"]) * 100
-            warning_rate = (log_entry.get("warnings", 0) / log_entry["observations_processed"]) * 100
-
         conn.execute("""
-            INSERT OR REPLACE INTO normalization_metrics
-            (upload_id, normalizer_version, rule_set_version, observations_processed,
-             canonicals_created, failures, warnings, duration_ms, started_at, completed_at,
-             success_rate, warning_rate)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO normalization_logs VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             upload_id,
-            log_entry.get("normalizer_version"),
-            log_entry.get("rule_set_version"),
-            log_entry.get("observations_processed", 0),
-            log_entry.get("canonicals_created", 0),
-            log_entry.get("failures", 0),
+            log_entry["started_at"],
+            log_entry["completed_at"],
+            log_entry["observations_processed"],
+            log_entry["canonicals_created"],
+            log_entry["failures"],
             log_entry.get("warnings", 0),
-            log_entry.get("duration_ms", 0),
-            log_entry.get("started_at"),
-            log_entry.get("completed_at"),
-            success_rate,
-            warning_rate
+            log_entry["duration_ms"]
         ))
         conn.commit()
         conn.close()
 
-        # 3. Check alert thresholds
-        self._check_alerts(log_entry)
-
-    def _check_alerts(self, log_entry: dict):
-        """Send email if failure rate exceeds threshold."""
-        obs = log_entry.get("observations_processed", 0)
-        failures = log_entry.get("failures", 0)
-
-        if obs == 0:
-            return
-
-        failure_rate = (failures / obs) * 100
-
-        if failure_rate > 5.0:
-            self._send_alert_email(
-                subject=f"High Normalization Failure Rate: {failure_rate:.1f}%",
-                body=f"""
-                Upload: {log_entry['upload_id']}
-                Observations: {obs}
-                Failures: {failures}
-                Failure Rate: {failure_rate:.1f}%
-
-                Details: /var/app/logs/normalize/{log_entry['upload_id']}.log.json
-                """
-            )
-
-    def _send_alert_email(self, subject: str, body: str):
-        """Send email via SMTP."""
-        msg = EmailMessage()
-        msg["From"] = "alerts@accounting-firm.com"
-        msg["To"] = "admin@accounting-firm.com"
-        msg["Subject"] = subject
-        msg.set_content(body)
-
-        with smtplib.SMTP("localhost", 1025) as smtp:
-            smtp.send_message(msg)
-
-    def get_metrics_summary(self, days: int = 30) -> dict:
-        """Get aggregated metrics for last N days."""
+    def get_monthly_stats(self, year: int, month: int) -> dict:
+        """Aggregate stats for a month."""
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.execute(f"""
+        cursor = conn.execute("""
             SELECT
                 COUNT(*) as total_uploads,
-                AVG(success_rate) as avg_success_rate,
-                AVG(warning_rate) as avg_warning_rate,
-                AVG(duration_ms) as avg_duration_ms,
-                MAX(duration_ms) as p95_duration_ms
-            FROM normalization_metrics
-            WHERE completed_at >= datetime('now', '-{days} days')
-        """)
+                SUM(observations_processed) as total_observations,
+                SUM(canonicals_created) as total_canonicals,
+                SUM(failures) as total_failures,
+                SUM(warnings) as total_warnings,
+                AVG(duration_ms) as avg_duration_ms
+            FROM normalization_logs
+            WHERE started_at LIKE ?
+        """, (f"{year}-{month:02d}%",))
 
         row = cursor.fetchone()
         conn.close()
 
         return {
             "total_uploads": row[0],
-            "avg_success_rate": round(row[1], 2) if row[1] else 0,
-            "avg_warning_rate": round(row[2], 2) if row[2] else 0,
-            "avg_duration_ms": int(row[3]) if row[3] else 0,
-            "p95_duration_ms": row[4]
+            "total_observations": row[1],
+            "total_canonicals": row[2],
+            "total_failures": row[3],
+            "total_warnings": row[4],
+            "avg_duration_ms": int(row[5]) if row[5] else 0,
+            "success_rate": (row[2] / row[1] * 100) if row[1] > 0 else 0
         }
 
-    def export_to_csv(self, output_path: str, days: int = 30):
-        """Export metrics to CSV for analysis."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.execute(f"""
-            SELECT upload_id, normalizer_version, rule_set_version,
-                   observations_processed, canonicals_created, failures, warnings,
-                   success_rate, warning_rate, duration_ms, completed_at
-            FROM normalization_metrics
-            WHERE completed_at >= datetime('now', '-{days} days')
-            ORDER BY completed_at DESC
-        """)
-
-        import csv
-        with open(output_path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["Upload ID", "Normalizer", "Rules", "Observations",
-                           "Canonicals", "Failures", "Warnings", "Success %",
-                           "Warning %", "Duration (ms)", "Completed"])
-            writer.writerows(cursor.fetchall())
-
-        conn.close()
-```
-
-**Usage:**
-```python
-# After normalization completes
+# Usage
 log = NormalizationLog()
 
-log.write("UL_abc123", {
-    "upload_id": "UL_abc123",
-    "normalizer_version": "1.2.0",
-    "rule_set_version": "2024.11",
-    "observations_processed": 250,
-    "canonicals_created": 245,
-    "failures": 5,
-    "warnings": 18,
-    "failure_details": [...],
-    "warning_details": [...],
-    "duration_ms": 8200,
-    "started_at": "2024-10-27T10:00:00",
-    "completed_at": "2024-10-27T10:00:08"
-})
-
-# Monthly quality report
-summary = log.get_metrics_summary(days=30)
-print(f"Success Rate: {summary['avg_success_rate']}%")
-print(f"P95 Latency: {summary['p95_duration_ms']} ms")
-
-# Export for accounting review
-log.export_to_csv("/tmp/normalization_metrics_oct.csv", days=30)
+# Monthly report
+stats = log.get_monthly_stats(2025, 10)
+print(f"Success rate: {stats['success_rate']:.1f}%")
+print(f"Avg duration: {stats['avg_duration_ms']}ms")
 ```
 
-**Testing:**
-- ✅ Unit tests for metrics calculation (success_rate, warning_rate)
-- ✅ Integration test for email alerts (mock SMTP)
-- ✅ CSV export validation
+**Características Incluidas:**
+- ✅ JSON files + SQLite index
+- ✅ Monthly aggregation queries
+- ✅ Success rate calculation
+- ✅ Average duration tracking
+- ✅ Fast lookups (SQLite indexed)
 
-**Monitoring:**
-- Weekly CSV export reviewed by operations manager
-- Email alerts for high failure rates
-- Monthly trend analysis (is quality improving?)
+**Características NO Incluidas:**
+- ❌ Elasticsearch (YAGNI: 1,200 logs/year, SQLite handles it)
+- ❌ Distributed tracing (YAGNI: single server)
+- ❌ Real-time dashboards (monthly reports sufficient)
+- ❌ Daily index rotation (YAGNI: single DB file works)
+
+**Configuración:**
+```yaml
+normalization_log:
+  base_path: "./logs/normalize"
+  retention_days: 365  # Keep 1 year
+```
+
+**Performance:**
+- Write: 8ms (JSON + SQLite insert)
+- Monthly aggregation: 50ms (1,200 rows scan)
+- Storage: 2MB/year (1,200 × 2KB)
+
+**Upgrade Triggers:**
+- Si >10K uploads/mes → Enterprise (Elasticsearch)
+- Si necesitan real-time monitoring → Enterprise
 
 ---
 
 ### Enterprise Profile (900 LOC)
 
-**Use Case:** National bank processing 5M transactions/day with real-time quality monitoring
-
-**What they need (vs Small Business):**
-- ✅ All Small Business features (metrics, alerts, rule tracking)
-- ✅ **Elasticsearch** with daily index rotation (logs.normalization-2024.10.27)
-- ✅ **Distributed tracing** (trace_id/span_id for correlation)
-- ✅ **Prometheus metrics** (histograms for latency, counters for failures)
-- ✅ **Real-time alerting** (PagerDuty if failure rate spikes)
-- ✅ **Grafana dashboards** (p50/p95/p99 latency, success rate trends)
-- ✅ **Confidence score tracking** (ML model confidence per normalization)
-- ✅ **Rule change audit** (which rule version was active?)
+**Contexto del Usuario:**
+Procesa 5M transacciones/día = 5M normalization logs/día. Necesitan real-time monitoring: dashboards con p95 latency, alertas para failure rate >1%, distributed tracing para debug, histórico de 90 días. Elasticsearch con daily index rotation.
 
 **Implementation:**
-
-**Storage:**
-```
-Elasticsearch:
-  Index: logs.normalization-2024.10.27
-  Retention: 90 days
-  Shards: 5 (distributed across cluster)
-
-Prometheus Metrics:
-  normalization_observations_total (counter)
-  normalization_failures_total (counter)
-  normalization_warnings_total (counter)
-  normalization_duration_seconds (histogram)
-  normalization_confidence_score (histogram)
-```
-
-**Code Example (900 LOC - excerpt):**
 ```python
-# normalization_log.py (Enterprise)
-
-import json
-import time
-from datetime import datetime
-from typing import Optional, Dict, List
+# lib/normalization_log.py (Enterprise - 900 LOC)
 from elasticsearch import Elasticsearch
-from prometheus_client import Counter, Histogram
+from datetime import datetime
 import uuid
 
-# Prometheus metrics
-OBSERVATIONS_PROCESSED = Counter(
-    'normalization_observations_total',
-    'Total observations processed',
-    ['normalizer_version', 'rule_set_version']
-)
-
-FAILURES = Counter(
-    'normalization_failures_total',
-    'Total normalization failures',
-    ['normalizer_version', 'error_type']
-)
-
-WARNINGS = Counter(
-    'normalization_warnings_total',
-    'Total normalization warnings',
-    ['warning_flag']
-)
-
-DURATION = Histogram(
-    'normalization_duration_seconds',
-    'Normalization duration in seconds',
-    buckets=[0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0]
-)
-
-CONFIDENCE_SCORE = Histogram(
-    'normalization_confidence_score',
-    'ML model confidence scores',
-    ['field_name'],
-    buckets=[0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1.0]
-)
-
 class NormalizationLog:
-    """Enterprise logging with Elasticsearch, distributed tracing, Prometheus."""
+    """Enterprise logging with Elasticsearch + distributed tracing."""
 
-    def __init__(self, es_hosts: List[str], pagerduty_key: Optional[str] = None):
+    def __init__(self, es_hosts=["localhost:9200"]):
         self.es = Elasticsearch(es_hosts)
-        self.pagerduty_key = pagerduty_key
         self._ensure_index_template()
 
     def _ensure_index_template(self):
-        """Create Elasticsearch index template for normalization logs."""
-        template = {
-            "index_patterns": ["logs.normalization-*"],
-            "settings": {
-                "number_of_shards": 5,
-                "number_of_replicas": 2,
-                "index.lifecycle.name": "logs-90day-retention"
-            },
-            "mappings": {
-                "properties": {
-                    "upload_id": {"type": "keyword"},
-                    "trace_id": {"type": "keyword"},
-                    "span_id": {"type": "keyword"},
-                    "parent_span_id": {"type": "keyword"},
-                    "normalizer_version": {"type": "keyword"},
-                    "rule_set_version": {"type": "keyword"},
-                    "observations_processed": {"type": "integer"},
-                    "canonicals_created": {"type": "integer"},
-                    "failures": {"type": "integer"},
-                    "warnings": {"type": "integer"},
-                    "duration_ms": {"type": "integer"},
-                    "started_at": {"type": "date"},
-                    "completed_at": {"type": "date"},
-                    "success_rate": {"type": "float"},
-                    "warning_rate": {"type": "float"},
-                    "failure_details": {
-                        "type": "nested",
-                        "properties": {
-                            "observation_id": {"type": "keyword"},
-                            "field": {"type": "keyword"},
-                            "error": {"type": "text"},
-                            "error_type": {"type": "keyword"}
-                        }
-                    },
-                    "warning_details": {
-                        "type": "nested",
-                        "properties": {
-                            "canonical_id": {"type": "keyword"},
-                            "flag": {"type": "keyword"},
-                            "message": {"type": "text"},
-                            "confidence_score": {"type": "float"}
-                        }
-                    }
-                }
-            }
-        }
-
+        """Create daily index template."""
         self.es.indices.put_index_template(
             name="normalization-logs",
-            body=template
-        )
-
-    def write(
-        self,
-        upload_id: str,
-        log_entry: dict,
-        trace_id: Optional[str] = None,
-        parent_span_id: Optional[str] = None
-    ):
-        """Write log to Elasticsearch with distributed tracing."""
-        # Generate span ID for this normalization operation
-        span_id = f"normalize-{uuid.uuid4().hex[:16]}"
-
-        # Add tracing context
-        log_entry["trace_id"] = trace_id or f"trace-{uuid.uuid4()}"
-        log_entry["span_id"] = span_id
-        log_entry["parent_span_id"] = parent_span_id
-
-        # Calculate metrics
-        obs = log_entry.get("observations_processed", 0)
-        success = log_entry.get("canonicals_created", 0)
-        failures = log_entry.get("failures", 0)
-        warnings = log_entry.get("warnings", 0)
-
-        if obs > 0:
-            log_entry["success_rate"] = (success / obs) * 100
-            log_entry["warning_rate"] = (warnings / obs) * 100
-        else:
-            log_entry["success_rate"] = 0
-            log_entry["warning_rate"] = 0
-
-        # Index to Elasticsearch (daily indices)
-        index_name = f"logs.normalization-{datetime.now().strftime('%Y.%m.%d')}"
-
-        self.es.index(
-            index=index_name,
-            document=log_entry,
-            id=upload_id
-        )
-
-        # Update Prometheus metrics
-        self._update_metrics(log_entry)
-
-        # Check alert thresholds
-        self._check_alerts(log_entry)
-
-    def _update_metrics(self, log_entry: dict):
-        """Update Prometheus metrics."""
-        normalizer_ver = log_entry.get("normalizer_version", "unknown")
-        rule_ver = log_entry.get("rule_set_version", "unknown")
-
-        # Observations processed
-        obs = log_entry.get("observations_processed", 0)
-        OBSERVATIONS_PROCESSED.labels(
-            normalizer_version=normalizer_ver,
-            rule_set_version=rule_ver
-        ).inc(obs)
-
-        # Failures by type
-        for failure in log_entry.get("failure_details", []):
-            error_type = failure.get("error_type", "unknown")
-            FAILURES.labels(
-                normalizer_version=normalizer_ver,
-                error_type=error_type
-            ).inc()
-
-        # Warnings by flag
-        for warning in log_entry.get("warning_details", []):
-            flag = warning.get("flag", "unknown")
-            WARNINGS.labels(warning_flag=flag).inc()
-
-            # Confidence scores
-            if "confidence_score" in warning:
-                field_name = warning.get("field", "unknown")
-                CONFIDENCE_SCORE.labels(field_name=field_name).observe(
-                    warning["confidence_score"]
-                )
-
-        # Duration
-        duration_s = log_entry.get("duration_ms", 0) / 1000.0
-        DURATION.observe(duration_s)
-
-    def _check_alerts(self, log_entry: dict):
-        """Trigger PagerDuty alert if failure rate exceeds threshold."""
-        obs = log_entry.get("observations_processed", 0)
-        failures = log_entry.get("failures", 0)
-
-        if obs == 0:
-            return
-
-        failure_rate = (failures / obs) * 100
-
-        # Critical: > 10% failure rate
-        if failure_rate > 10.0:
-            self._trigger_pagerduty(
-                severity="critical",
-                summary=f"Normalization failure rate: {failure_rate:.1f}%",
-                details={
-                    "upload_id": log_entry["upload_id"],
-                    "observations": obs,
-                    "failures": failures,
-                    "failure_rate": failure_rate,
-                    "trace_id": log_entry.get("trace_id")
-                }
-            )
-
-        # Warning: > 5% failure rate
-        elif failure_rate > 5.0:
-            self._trigger_pagerduty(
-                severity="warning",
-                summary=f"Elevated normalization failure rate: {failure_rate:.1f}%",
-                details={
-                    "upload_id": log_entry["upload_id"],
-                    "failure_rate": failure_rate
-                }
-            )
-
-    def _trigger_pagerduty(self, severity: str, summary: str, details: dict):
-        """Send alert to PagerDuty."""
-        if not self.pagerduty_key:
-            return
-
-        import requests
-
-        payload = {
-            "routing_key": self.pagerduty_key,
-            "event_action": "trigger",
-            "payload": {
-                "summary": summary,
-                "severity": severity,
-                "source": "normalization-pipeline",
-                "custom_details": details
-            }
-        }
-
-        requests.post(
-            "https://events.pagerduty.com/v2/enqueue",
-            json=payload
-        )
-
-    def query_success_rate(self, hours: int = 24) -> Dict:
-        """Query success rate from Elasticsearch."""
-        query = {
-            "size": 0,
-            "query": {
-                "range": {
-                    "completed_at": {
-                        "gte": f"now-{hours}h"
+            body={
+                "index_patterns": ["normalization-logs-*"],
+                "template": {
+                    "mappings": {
+                        "properties": {
+                            "upload_id": {"type": "keyword"},
+                            "trace_id": {"type": "keyword"},
+                            "span_id": {"type": "keyword"},
+                            "normalizer_version": {"type": "keyword"},
+                            "observations_processed": {"type": "integer"},
+                            "canonicals_created": {"type": "integer"},
+                            "failures": {"type": "integer"},
+                            "warnings": {"type": "integer"},
+                            "duration_ms": {"type": "integer"},
+                            "started_at": {"type": "date"},
+                            "completed_at": {"type": "date"},
+                            "failure_details": {"type": "object", "enabled": False},
+                            "warning_details": {"type": "object", "enabled": False}
+                        }
                     }
                 }
-            },
-            "aggs": {
-                "avg_success_rate": {"avg": {"field": "success_rate"}},
-                "avg_warning_rate": {"avg": {"field": "warning_rate"}},
-                "p50_duration": {"percentiles": {"field": "duration_ms", "percents": [50]}},
-                "p95_duration": {"percentiles": {"field": "duration_ms", "percents": [95]}},
-                "p99_duration": {"percentiles": {"field": "duration_ms", "percents": [99]}}
             }
-        }
-
-        result = self.es.search(
-            index="logs.normalization-*",
-            body=query
         )
 
-        aggs = result["aggregations"]
+    def write(self, upload_id: str, log_entry: dict, trace_id: str = None):
+        """Write to Elasticsearch with distributed tracing."""
+        # Generate IDs
+        if not trace_id:
+            trace_id = str(uuid.uuid4())
+        span_id = str(uuid.uuid4())
 
-        return {
-            "avg_success_rate": round(aggs["avg_success_rate"]["value"], 2),
-            "avg_warning_rate": round(aggs["avg_warning_rate"]["value"], 2),
-            "p50_duration_ms": int(aggs["p50_duration"]["values"]["50.0"]),
-            "p95_duration_ms": int(aggs["p95_duration"]["values"]["95.0"]),
-            "p99_duration_ms": int(aggs["p99_duration"]["values"]["99.0"])
-        }
+        # Daily index (rotation)
+        today = datetime.now().strftime("%Y.%m.%d")
+        index = f"normalization-logs-{today}"
+
+        # Add trace context
+        log_entry["trace_id"] = trace_id
+        log_entry["span_id"] = span_id
+
+        # Write to Elasticsearch
+        self.es.index(index=index, id=upload_id, document=log_entry)
+
+    def get_success_rate(self, last_hours: int = 24) -> float:
+        """Real-time success rate from Elasticsearch."""
+        resp = self.es.search(
+            index="normalization-logs-*",
+            body={
+                "size": 0,
+                "query": {
+                    "range": {
+                        "started_at": {
+                            "gte": f"now-{last_hours}h"
+                        }
+                    }
+                },
+                "aggs": {
+                    "total_observations": {"sum": {"field": "observations_processed"}},
+                    "total_canonicals": {"sum": {"field": "canonicals_created"}}
+                }
+            }
+        )
+
+        total_obs = resp["aggregations"]["total_observations"]["value"]
+        total_can = resp["aggregations"]["total_canonicals"]["value"]
+        return (total_can / total_obs * 100) if total_obs > 0 else 0
+
+    def get_p95_latency(self, last_minutes: int = 60) -> float:
+        """P95 duration from Elasticsearch."""
+        resp = self.es.search(
+            index="normalization-logs-*",
+            body={
+                "size": 0,
+                "query": {
+                    "range": {
+                        "started_at": {
+                            "gte": f"now-{last_minutes}m"
+                        }
+                    }
+                },
+                "aggs": {
+                    "duration_percentiles": {
+                        "percentiles": {
+                            "field": "duration_ms",
+                            "percents": [95]
+                        }
+                    }
+                }
+            }
+        )
+
+        return resp["aggregations"]["duration_percentiles"]["values"]["95.0"]
+
+# Usage with distributed tracing
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
+log = NormalizationLog(es_hosts=["es-cluster:9200"])
+
+with tracer.start_as_current_span("normalize_observations") as span:
+    trace_id = format(span.get_span_context().trace_id, '032x')
+
+    # Normalize
+    results = process_all_observations(upload_id)
+
+    # Log with trace context
+    log.write(upload_id, {
+        "upload_id": upload_id,
+        "normalizer_version": "3.5.0",
+        "observations_processed": results["total"],
+        "canonicals_created": results["success"],
+        "failures": results["failures"],
+        "duration_ms": 450
+    }, trace_id=trace_id)
+
+# Real-time monitoring
+success_rate = log.get_success_rate(last_hours=1)
+p95_latency = log.get_p95_latency(last_minutes=60)
+
+if success_rate < 99.0:
+    send_pagerduty_alert(f"Normalization success rate: {success_rate:.1f}%")
 ```
 
-**Grafana Dashboard Queries:**
-```promql
-# Success rate (last 24h)
-100 - (
-  rate(normalization_failures_total[1h]) /
-  rate(normalization_observations_total[1h]) * 100
+**Prometheus Metrics:**
+```python
+from prometheus_client import Counter, Histogram
+
+normalization_observations_total = Counter(
+    'normalization_observations_total',
+    'Total observations processed',
+    ['normalizer_version', 'status']
 )
 
-# P95 latency
-histogram_quantile(0.95,
-  rate(normalization_duration_seconds_bucket[5m])
+normalization_duration_seconds = Histogram(
+    'normalization_duration_seconds',
+    'Normalization duration',
+    ['normalizer_version']
 )
 
-# Warning rate by flag
-rate(normalization_warnings_total[5m])
+# Usage
+normalization_observations_total.labels(
+    normalizer_version="3.5.0",
+    status="success"
+).inc(results["success"])
 
-# Low confidence normalizations (< 0.8)
-histogram_quantile(0.5,
-  normalization_confidence_score_bucket{le="0.8"}
-)
+normalization_duration_seconds.labels(
+    normalizer_version="3.5.0"
+).observe(results["duration_ms"] / 1000)
 ```
 
-**Testing:**
-- ✅ Unit tests for all metrics calculations
-- ✅ Integration tests with Elasticsearch test cluster
-- ✅ PagerDuty alert mock testing
-- ✅ Load testing (10K logs/minute ingestion)
-- ✅ Distributed tracing validation (trace_id propagation)
+**Características Incluidas:**
+- ✅ Elasticsearch with daily index rotation
+- ✅ Distributed tracing (trace_id, span_id)
+- ✅ Real-time aggregations (success rate, p95 latency)
+- ✅ Prometheus metrics + Grafana dashboards
+- ✅ PagerDuty alerts for failure rate >1%
+- ✅ 90-day retention (archived to S3)
 
-**Monitoring:**
-- Real-time Grafana dashboards (success rate, latency percentiles, error types)
-- PagerDuty alerts for critical failure rates
-- Weekly quality review (trend analysis over 30 days)
+**Características NO Incluidas:**
+- ❌ Custom ML anomaly detection (use standard alerts)
+
+**Configuración:**
+```yaml
+normalization_log:
+  elasticsearch:
+    hosts:
+      - "es-node-1:9200"
+      - "es-node-2:9200"
+      - "es-node-3:9200"
+    index_prefix: "normalization-logs"
+    retention_days: 90
+  tracing:
+    enabled: true
+    service_name: "normalization-service"
+  monitoring:
+    prometheus_port: 9090
+    pagerduty_integration_key: "xxx"
+```
+
+**Performance:**
+- Write latency: 15ms (Elasticsearch async bulk)
+- Query latency (24h aggregation): 200ms
+- Throughput: 10K logs/minute
+- Storage: 5M logs/day × 2KB = 10GB/day → 900GB/90 days
+
+**No Further Tiers:**
+- Scale horizontally (more Elasticsearch nodes)
+
+---
+
 - Elasticsearch retention (90 days, then archived to S3)
 
 **Decision Context:**
