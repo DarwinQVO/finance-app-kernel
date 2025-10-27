@@ -417,6 +417,14 @@ response = router.route(request, request.auth_context)
 
 ---
 
+## Simplicity Profiles
+
+**Personal - ~20 LOC:** if/elif route matching
+**Small Business - ~80 LOC:** Dict-based routing, middleware
+**Enterprise - ~400 LOC:** Tree-based routing, versioning, rate limits
+
+---
+
 ## Related Primitives
 
 - **APIGateway (OL):** Calls APIRouter after authentication/rate limiting

@@ -1733,6 +1733,14 @@ interface AccessControlMetrics {
 
 ---
 
+## Simplicity Profiles
+
+**Personal - 0 LOC:** Not needed (single user, full access)
+**Small Business - ~70 LOC:** Role-based (admin/viewer), hardcoded rules
+**Enterprise - ~400 LOC:** RBAC + resource-level permissions, PostgreSQL
+
+---
+
 ## Domain Validation
 
 ### ✅ Finance (Primary Instantiation)

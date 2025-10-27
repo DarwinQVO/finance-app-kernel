@@ -2247,6 +2247,14 @@ async function validateUser(data: any): Promise<boolean> {
 
 ---
 
+## Simplicity Profiles
+
+**Personal - ~20 LOC:** Hardcoded TypeScript interfaces, no validation
+**Small Business - ~90 LOC:** JSON Schema files, basic validation
+**Enterprise - ~450 LOC:** Schema versioning, backward compatibility checks, registry server
+
+---
+
 ## Related Primitives
 
 - **SchemaVersionManager**: Manages semantic versioning logic and version comparison

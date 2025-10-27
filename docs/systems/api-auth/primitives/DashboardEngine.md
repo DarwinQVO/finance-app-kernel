@@ -347,6 +347,14 @@ result = future.result(timeout=5.0)
 
 ---
 
+## Simplicity Profiles
+
+**Personal - ~30 LOC:** Hardcoded dashboard config, single user
+**Small Business - ~120 LOC:** YAML config, role-based widgets
+**Enterprise - ~600 LOC:** Database-backed configs, A/B testing, personalization
+
+---
+
 ## Related Primitives
 
 **Dependencies:**

@@ -386,6 +386,14 @@ oauth2_provider.revoke_token(
 
 ---
 
+## Simplicity Profiles
+
+**Personal - 0 LOC:** Not needed (single user)
+**Small Business - ~150 LOC:** Basic OAuth2 (authorization code flow)
+**Enterprise - ~800 LOC:** Full OAuth2 + OIDC + PKCE + refresh tokens
+
+---
+
 ## Related Primitives
 
 - **APIGateway (OL):** Uses OAuth2Provider to authenticate requests (alternative to APIKeyValidator)

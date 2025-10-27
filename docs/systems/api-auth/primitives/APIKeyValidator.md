@@ -339,6 +339,14 @@ new_api_key = validator.rotate_key(old_key_id, "tenant_acme", ["read", "write"])
 
 ---
 
+## Simplicity Profiles
+
+**Personal - ~15 LOC:** Single hardcoded API key check
+**Small Business - ~60 LOC:** SQLite key store, rate limiting
+**Enterprise - ~300 LOC:** PostgreSQL, key rotation, scopes, audit
+
+---
+
 ## Related Primitives
 
 - **APIGateway (OL):** Uses APIKeyValidator to authenticate requests

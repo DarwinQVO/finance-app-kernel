@@ -296,6 +296,14 @@ response = api_gateway.handle_request(request)
 
 ---
 
+## Simplicity Profiles
+
+**Personal - 0 LOC:** Direct function calls (no API needed)
+**Small Business - ~100 LOC:** Basic Flask/FastAPI server with auth middleware
+**Enterprise - ~500 LOC:** Full gateway with rate limiting, circuit breakers, metrics
+
+---
+
 ## Domain Validation
 
 ### ✅ Finance (Primary Instantiation)

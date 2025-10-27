@@ -2451,6 +2451,14 @@ class TracingMetricsCollector implements MetricsCollector {
 
 ---
 
+## Simplicity Profiles
+
+**Personal - ~15 LOC:** Print statements for debugging (no metrics)
+**Small Business - ~70 LOC:** Simple counters, log to file
+**Enterprise - ~350 LOC:** Prometheus metrics, Grafana dashboards, alerting
+
+---
+
 ## Future Enhancements
 
 ### Phase 1: Advanced Analytics (3 months)
