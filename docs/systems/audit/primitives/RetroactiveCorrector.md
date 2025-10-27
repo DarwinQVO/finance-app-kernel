@@ -1721,6 +1721,16 @@ await retroactiveCorrector.correct({
 
 ---
 
+## Simplicity Profiles
+
+**Personal (Darwin) - ~15 LOC:** Direct UPDATE with reason field, no retroactive support (corrections are "as of now")
+**Small Business - ~70 LOC:** Bitemporal correction (valid_time backdate) with validation
+**Enterprise - ~350 LOC:** Full retroactive workflow: validation → approval → cascade updates → audit trail → notification
+
+**Comparison:** Simple UPDATE (15 LOC) → Bitemporal (70 LOC) → Approval workflow + cascade (350 LOC)
+
+---
+
 ## Related Primitives
 
 - **ProvenanceLedger**: Stores correction events

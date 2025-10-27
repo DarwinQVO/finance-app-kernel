@@ -1674,6 +1674,16 @@ const timeline = await reconstructor.reconstructTimeline({
 
 ---
 
+## Simplicity Profiles
+
+**Personal (Darwin) - ~20 LOC:** Load all audit events for entity, replay chronologically to reconstruct state
+**Small Business - ~80 LOC:** Add caching of common reconstructions, temporal range queries
+**Enterprise - ~400 LOC:** Snapshot-based reconstruction (materialized views) + incremental replay for performance
+
+**Comparison:** Simple replay (20 LOC) → Cached (80 LOC) → Snapshot + incremental (400 LOC, handles 8.5M events)
+
+---
+
 ## Related Primitives
 
 - **ProvenanceLedger**: Source of bitemporal events

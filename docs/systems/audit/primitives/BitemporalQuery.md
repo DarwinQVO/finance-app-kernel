@@ -2156,6 +2156,16 @@ const entities = await bitemporalQuery.queryTransactionTime({
 
 ---
 
+## Simplicity Profiles
+
+**Personal (Darwin) - ~10 LOC:** Simple WHERE clause (no bitemporal needed - only transaction_time)
+**Small Business - ~60 LOC:** Bitemporal queries: get_value_at(valid_time), get_changes_in_range(start, end)
+**Enterprise - ~300 LOC:** Advanced bitemporal: as-of queries, temporal joins, versioned snapshots, GiST index optimization
+
+**Comparison:** Simple WHERE (10 LOC) → Basic bitemporal (60 LOC) → Advanced temporal joins + snapshots (300 LOC)
+
+---
+
 ## Related Primitives
 
 - **ProvenanceLedger**: Provides underlying bitemporal event storage
