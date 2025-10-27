@@ -36,7 +36,8 @@
     "as_of_transaction_time": {
       "type": ["string", "null"],
       "format": "date-time",
-      "description": "Transaction time query: 'What did we know on this date?' Returns data as it existed in the database at this timestamp. Null = current (latest).",
+      "pattern": ".*Z$",
+      "description": "Transaction time query: 'What did we know on this date?' Returns data as it existed in the database at this timestamp. Must be UTC (end with 'Z'). Null = current (latest).",
       "examples": [
         "2025-02-01T00:00:00Z",
         "2025-10-24T10:30:00Z",
@@ -60,12 +61,14 @@
         "start": {
           "type": "string",
           "format": "date-time",
-          "description": "Start of transaction time range (inclusive)"
+          "pattern": ".*Z$",
+          "description": "Start of transaction time range (inclusive). Must be UTC (end with 'Z')."
         },
         "end": {
           "type": "string",
           "format": "date-time",
-          "description": "End of transaction time range (inclusive)"
+          "pattern": ".*Z$",
+          "description": "End of transaction time range (inclusive). Must be UTC (end with 'Z')."
         }
       },
       "required": ["start", "end"],

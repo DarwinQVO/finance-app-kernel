@@ -54,7 +54,8 @@
     "transaction_time": {
       "type": "string",
       "format": "date-time",
-      "description": "When we recorded this change in the system (system time, immutable, monotonically increasing). ISO 8601 timestamp.",
+      "pattern": ".*Z$",
+      "description": "When we recorded this change in the system (system time, immutable, monotonically increasing). ISO 8601 timestamp in UTC. Must end with 'Z'.",
       "examples": ["2025-10-24T10:00:00Z", "2025-10-24T14:30:15.123Z"]
     },
     "valid_time_start": {

@@ -58,7 +58,8 @@
     "timestamp": {
       "type": "string",
       "format": "date-time",
-      "description": "Timestamp when action occurred (UTC, high precision)",
+      "pattern": ".*Z$",
+      "description": "Timestamp when action occurred (UTC, high precision). Must end with 'Z' to enforce UTC timezone.",
       "examples": ["2025-10-25T10:00:00.123Z"]
     },
     "ip_address": {

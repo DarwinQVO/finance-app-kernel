@@ -62,6 +62,46 @@ Note: "error" can occur at ANY stage
 | `normalized` | Normalizer succeeded, canonicals stored | (future: `categorizing`) |
 | `error` | Pipeline failed at some stage | (manual retry resets to previous state) |
 
+### State Transition Matrix
+
+The following matrix defines **all valid state transitions**. Any transition not listed here is **invalid** and must be rejected by the Coordinator:
+
+| From State | To States | Trigger | Notes |
+|------------|-----------|---------|-------|
+| `queued_for_parse` | `parsing` | Coordinator assigns to parser worker | Normal progression |
+| `queued_for_parse` | `error` | Parser unavailable, validation failure | Error state |
+| `parsing` | `parsed` | Parser completes successfully | Normal progression |
+| `parsing` | `error` | Parser crashes, timeout, invalid file format | Error state |
+| `parsed` | `normalizing` | Coordinator assigns to normalizer worker | Normal progression |
+| `parsed` | `error` | Normalizer unavailable | Error state |
+| `normalizing` | `normalized` | Normalizer completes successfully | Normal progression |
+| `normalizing` | `error` | Normalizer crashes, validation failure | Error state |
+| `normalized` | (future states) | Next pipeline stage | Extensibility point |
+| `error` | `queued_for_parse` | Manual retry from beginning | Recovery path |
+| `error` | `parsed` | Manual retry from normalization | Recovery path (skip re-parse) |
+
+**Invalid Transitions (Examples):**
+- ❌ `normalized` → `parsing` (cannot go backward except via error recovery)
+- ❌ `parsing` → `normalized` (cannot skip `parsed` state)
+- ❌ `error` → `parsing` (must go to `queued_for_parse` first)
+- ❌ `error` → `normalizing` (must go to `parsed` first)
+
+**Enforcement:**
+```python
+VALID_TRANSITIONS = {
+    'queued_for_parse': ['parsing', 'error'],
+    'parsing': ['parsed', 'error'],
+    'parsed': ['normalizing', 'error'],
+    'normalizing': ['normalized', 'error'],
+    'normalized': [],  # Terminal state (v1)
+    'error': ['queued_for_parse', 'parsed']  # Recovery only
+}
+
+def validate_transition(from_state: str, to_state: str) -> bool:
+    """Validate that state transition is allowed."""
+    return to_state in VALID_TRANSITIONS.get(from_state, [])
+```
+
 ---
 
 ## Rationale
@@ -418,20 +458,74 @@ reconciled
 indexed
 ```
 
-### State Metadata (Optional)
+### Retry Logic Fields (Required for Error Recovery)
+
+To support error recovery and prevent infinite retry loops, the following fields must be added to `UploadRecord`:
 
 ```json
 {
-  "status": "parsing",
-  "status_metadata": {
-    "started_at": "2025-10-22T14:35:00Z",
-    "worker_id": "parser-worker-3",
-    "retry_count": 0
-  }
+  "upload_id": "UL_abc123",
+  "status": "error",
+  "error_message": "Parser timeout after 60s",
+  "retry_count": 2,
+  "last_retry_at": "2025-10-22T14:45:00Z",
+  "max_retries": 3
 }
 ```
 
-Could be added without breaking existing API.
+**Field Specifications:**
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `retry_count` | integer | Yes | 0 | Number of retry attempts for current error |
+| `last_retry_at` | ISO 8601 timestamp | No | null | When last retry was attempted (null if never retried) |
+| `max_retries` | integer | Yes | 3 | Maximum retry attempts before marking as permanent failure |
+
+**Retry Behavior:**
+
+```python
+def attempt_retry(upload_id: str):
+    """Attempt to retry a failed upload."""
+    upload = get_upload(upload_id)
+
+    # Check retry limit
+    if upload.retry_count >= upload.max_retries:
+        raise MaxRetriesExceeded(
+            f"Upload {upload_id} has exceeded max retries ({upload.max_retries})"
+        )
+
+    # Determine retry target state
+    if upload.status == 'error':
+        # Determine which stage failed by checking conditional fields
+        if upload.parse_log_ref is None:
+            retry_state = 'queued_for_parse'  # Failed during parse
+        elif upload.normalization_log_ref is None:
+            retry_state = 'parsed'  # Failed during normalization
+        else:
+            raise InvalidRetryState("Cannot determine retry target")
+
+        # Update with optimistic locking
+        db.execute("""
+            UPDATE upload_records
+            SET status = :retry_state,
+                retry_count = retry_count + 1,
+                last_retry_at = NOW(),
+                version = version + 1
+            WHERE upload_id = :upload_id
+              AND version = :current_version
+        """, {
+            "upload_id": upload_id,
+            "retry_state": retry_state,
+            "current_version": upload.version
+        })
+```
+
+**Reset on Success:**
+When an upload successfully completes (reaches `normalized` state), reset retry counters:
+```python
+retry_count = 0
+last_retry_at = null
+```
 
 ---
 

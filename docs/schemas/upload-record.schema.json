@@ -32,6 +32,24 @@
       "type": ["string", "null"],
       "description": "Human-readable error message if status=error, otherwise null"
     },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of retry attempts for current error. Reset to 0 on successful completion. Used to prevent infinite retry loops (see ADR-0002)."
+    },
+    "last_retry_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "pattern": ".*Z$",
+      "description": "ISO 8601 timestamp (UTC) of last retry attempt. Null if never retried. Format: YYYY-MM-DDTHH:MM:SSZ"
+    },
+    "max_retries": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 3,
+      "description": "Maximum number of retry attempts before marking as permanent failure. Configurable per upload."
+    },
     "upload_log_ref": {
       "type": "string",
       "pattern": "^/logs/uploads/UL_[a-zA-Z0-9]+\\.log$",
@@ -58,7 +76,7 @@
       "description": "Number of CanonicalTransactions created. Present only if status = normalized"
     }
   },
-  "required": ["upload_id", "status", "version", "upload_log_ref"],
+  "required": ["upload_id", "status", "version", "retry_count", "max_retries", "upload_log_ref"],
   "additionalProperties": false,
   "examples": [
     {
@@ -66,6 +84,9 @@
       "status": "queued_for_parse",
       "version": 0,
       "error_message": null,
+      "retry_count": 0,
+      "last_retry_at": null,
+      "max_retries": 3,
       "upload_log_ref": "/logs/uploads/UL_abc123.log"
     },
     {
@@ -73,6 +94,9 @@
       "status": "normalized",
       "version": 4,
       "error_message": null,
+      "retry_count": 0,
+      "last_retry_at": null,
+      "max_retries": 3,
       "upload_log_ref": "/logs/uploads/UL_xyz789.log",
       "parse_log_ref": "/logs/parse/UL_xyz789.log.json",
       "observations_count": 42,
@@ -84,6 +108,9 @@
       "status": "error",
       "version": 2,
       "error_message": "PDF_CORRUPT: Unable to extract text from pages 3-5",
+      "retry_count": 2,
+      "last_retry_at": "2025-10-22T14:45:00Z",
+      "max_retries": 3,
       "upload_log_ref": "/logs/uploads/UL_err001.log",
       "parse_log_ref": "/logs/parse/UL_err001.log.json"
     }

@@ -44,7 +44,8 @@
     "date": {
       "type": "string",
       "format": "date-time",
-      "description": "Normalized transaction date in ISO 8601 format (UTC). Example: '2025-01-15T00:00:00Z'"
+      "pattern": ".*Z$",
+      "description": "Normalized transaction date in ISO 8601 format (UTC). Must end with 'Z' to enforce UTC timezone. Example: '2025-01-15T00:00:00Z'"
     },
     "amount": {
       "type": "string",
@@ -129,7 +130,8 @@
     "normalized_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Timestamp when this canonical was created/updated (ISO 8601 UTC)"
+      "pattern": ".*Z$",
+      "description": "Timestamp when this canonical was created/updated (ISO 8601 UTC). Must end with 'Z' to enforce UTC timezone."
     },
     "normalizer_version": {
       "type": "string",
