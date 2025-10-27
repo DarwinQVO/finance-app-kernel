@@ -453,407 +453,144 @@ transactions = conn.execute("""
 - Si >1K rows → Small Business (OFFSET pagination)
 - Si payload >500KB → Small Business (paginate)
 
-### Small Business Profile - ~50 LOC
+---
 
-**Context:**
-- Small business has 45K transactions
-- Too large for single-page load (> 5MB payload)
-- OFFSET pagination acceptable (< 100K rows, queries still fast)
-- Simple page numbers in UI (Page 1, 2, 3...)
+### Small Business Profile (50 LOC)
+
+**Contexto del Usuario:**
+45K transacciones (demasiado para single load). OFFSET pagination aceptable para <100K rows. Page numbers simples en UI.
 
 **Implementation:**
 ```python
-# File: lib/pagination.py
-
+# lib/pagination.py (Small Business - 50 LOC)
 class PaginationEngine:
-    """Simple OFFSET-based pagination (good for < 100K rows)."""
-
     def paginate(self, limit: int = 50, page: int = 1) -> dict:
-        """
-        Returns paginated results using OFFSET.
-
-        Args:
-            limit: Page size (default 50)
-            page: Page number (1-indexed)
-
-        Returns:
-            {
-                "rows": [...],
-                "total_count": 45123,
-                "page": 2,
-                "total_pages": 903,
-                "has_next": True,
-                "has_prev": True
-            }
-        """
+        """OFFSET pagination con COUNT cached."""
         offset = (page - 1) * limit
+        total_count = self._get_cached_count()  # Cache 5min
 
-        # Get total count (cached for 5 minutes)
-        total_count = self._get_cached_count()
-
-        # Query with OFFSET
         rows = conn.execute(f"""
             SELECT * FROM canonical_transactions
             ORDER BY transaction_date DESC
             LIMIT {limit} OFFSET {offset}
         """).fetchall()
 
-        total_pages = (total_count + limit - 1) // limit  # Ceiling division
-
         return {
             "rows": rows,
-            "total_count": total_count,
             "page": page,
-            "total_pages": total_pages,
-            "has_next": page < total_pages,
+            "total_pages": (total_count + limit - 1) // limit,
+            "has_next": offset + limit < total_count,
             "has_prev": page > 1
         }
-
-    def _get_cached_count(self) -> int:
-        """Cache total count (expensive query)."""
-        cache_key = "canonical_transactions:count"
-        cached = cache.get(cache_key)
-
-        if cached:
-            return int(cached)
-
-        # Compute count (slow)
-        count = conn.execute("SELECT COUNT(*) FROM canonical_transactions").fetchone()[0]
-        cache.set(cache_key, count, ttl=300)  # Cache for 5 minutes
-
-        return count
-
-# Usage
-engine = PaginationEngine()
-result = engine.paginate(limit=50, page=2)
-
-# {
-#   "rows": [50 transactions],
-#   "total_count": 45123,
-#   "page": 2,
-#   "total_pages": 903,
-#   "has_next": True,
-#   "has_prev": True
-# }
 ```
 
-**UI Example:**
-```html
-<!-- Simple page number navigation -->
-<div class="pagination">
-  <button disabled={!page.has_prev}>Previous</button>
-  <span>Page {page.page} of {page.total_pages}</span>
-  <button disabled={!page.has_next}>Next</button>
-</div>
+**Características Incluidas:**
+- ✅ OFFSET pagination
+- ✅ COUNT cached (5min)
+- ✅ Page numbers en UI
+
+**Características NO Incluidas:**
+- ❌ Cursor-based (OFFSET suficiente)
+- ❌ Stable pagination under inserts
+
+**Configuración:**
+```yaml
+pagination:
+  default_limit: 50
+  cache_ttl_seconds: 300
 ```
 
 **Performance:**
-- Page 1: 15ms (no OFFSET scan)
-- Page 10: 18ms (scans 500 rows)
-- Page 100: 45ms (scans 5K rows)
-- Acceptable for < 100K rows
+- Page 1: 15ms
+- Page 100: 45ms
 
-**Why OFFSET is OK Here:**
-- Dataset size: 45K rows (small enough)
-- Users rarely go past page 20
-- COUNT(*) cached (not computed on every request)
-- Trade-off: Simplicity > performance
+**Upgrade Triggers:**
+- Si >100K rows → Enterprise
+- Si page >100 tarda >500ms → Enterprise
 
-### Enterprise Profile - ~300 LOC
+---
 
-**Context:**
-- Enterprise has 8.5M transactions
-- OFFSET pagination too slow (page 1000 takes 5+ seconds)
-- Cursor-based pagination required (constant time)
-- No page numbers (cursors are opaque tokens)
-- Bidirectional pagination (prev/next)
+### Enterprise Profile (300 LOC)
+
+**Contexto del Usuario:**
+8.5M transacciones. OFFSET demasiado lento (page 1000 toma 5+ segundos). Cursor-based pagination (constant time O(1)). No page numbers, cursors opacos.
 
 **Implementation:**
 ```python
-# File: lib/pagination_engine.py
-import base64
-import json
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass
-
-@dataclass
-class Page:
-    """Pagination metadata"""
-    has_next: bool
-    next_cursor: Optional[str]
-    has_prev: bool
-    prev_cursor: Optional[str]
-    total_count: Optional[int]  # Approximate (expensive to compute exactly)
+# lib/pagination_engine.py (Enterprise - 300 LOC)
+import base64, json
 
 class PaginationEngine:
-    """
-    Production cursor-based pagination (keyset pagination).
+    def encode_cursor(self, sort_value, id_value) -> str:
+        """Encode cursor como base64 JSON."""
+        cursor_data = {"f": str(sort_value), "id": str(id_value)}
+        return base64.b64encode(json.dumps(cursor_data).encode()).decode()
 
-    Why cursor > offset:
-    - Constant-time queries (O(1) with index)
-    - Stable under concurrent inserts/deletes
-    - No expensive COUNT(*) queries
-    - Works with millions of rows
-    """
+    def decode_cursor(self, cursor: str) -> dict:
+        """Decode cursor."""
+        return json.loads(base64.b64decode(cursor.encode()).decode())
 
-    def encode_cursor(
-        self,
-        sort_field: str,
-        sort_value: Any,
-        id_field: str,
-        id_value: Any
-    ) -> str:
+    def paginate_forward(self, cursor: str, limit: int = 50):
         """
-        Encodes cursor as base64 JSON token.
-
-        Example:
-            sort_field="transaction_date", sort_value="2025-04-25"
-            id_field="canonical_id", id_value="can_123"
-            → "eyJmIjoiMjAyNS0wNC0yNSIsImlkIjoiY2FuXzEyMyJ9"
+        Cursor-based pagination (keyset pagination).
+        WHERE (transaction_date, canonical_id) > (cursor_date, cursor_id)
+        → Constant time O(1) con index
         """
-        cursor_data = {
-            "f": str(sort_value),  # Sort field value
-            "id": str(id_value)    # ID for tie-breaking
-        }
-        json_str = json.dumps(cursor_data)
-        return base64.b64encode(json_str.encode()).decode()
-
-    def decode_cursor(self, cursor: str) -> Dict[str, str]:
-        """
-        Decodes cursor token.
-
-        Raises:
-            ValueError: If cursor is malformed
-        """
-        try:
-            json_str = base64.b64decode(cursor.encode()).decode()
-            return json.loads(json_str)
-        except (ValueError, json.JSONDecodeError) as e:
-            raise ValueError(f"Invalid cursor: {e}")
-
-    def paginate_forward(
-        self,
-        query_fn,
-        cursor: Optional[str],
-        limit: int,
-        sort_field: str,
-        id_field: str = "id"
-    ) -> tuple[List[Dict], Page]:
-        """
-        Paginate forward (next page).
-
-        Args:
-            query_fn: Function that executes query with WHERE clause
-            cursor: Current position (None for first page)
-            limit: Page size
-            sort_field: Field used for sorting
-            id_field: Unique ID field for tie-breaking
-
-        Returns:
-            (rows, pagination_metadata)
-
-        Example:
-            def query_fn(where_clause, params):
-                return db.execute(f'''
-                    SELECT * FROM canonical_transactions
-                    WHERE {where_clause}
-                    ORDER BY transaction_date DESC, canonical_id DESC
-                    LIMIT {limit + 1}
-                ''', params)
-
-            rows, page = engine.paginate_forward(
-                query_fn=query_fn,
-                cursor=request.args.get('cursor'),
-                limit=50,
-                sort_field='transaction_date',
-                id_field='canonical_id'
-            )
-        """
-        # Build WHERE clause from cursor
         if cursor:
             cursor_data = self.decode_cursor(cursor)
-            cursor_sort_value = cursor_data["f"]
-            cursor_id = cursor_data["id"]
-
-            where_clause = f"({sort_field}, {id_field}) < (?, ?)"
-            params = [cursor_sort_value, cursor_id]
+            where_clause = f"(transaction_date, canonical_id) > ('{cursor_data['f']}', '{cursor_data['id']}')"
         else:
-            # First page (no cursor)
-            where_clause = "1=1"
-            params = []
+            where_clause = "1=1"  # First page
 
-        # Execute query (fetch limit+1 to detect has_next)
-        rows = query_fn(where_clause, params, limit + 1)
+        # Fetch limit+1 para detectar has_next
+        rows = conn.execute(f"""
+            SELECT * FROM canonical_transactions
+            WHERE {where_clause}
+            ORDER BY transaction_date DESC, canonical_id DESC
+            LIMIT {limit + 1}
+        """).fetchall()
 
-        # Check if there's a next page
         has_next = len(rows) > limit
-        actual_rows = rows[:limit]
+        if has_next:
+            rows = rows[:limit]
 
-        # Generate next cursor from last row
-        next_cursor = None
-        if has_next and actual_rows:
-            last_row = actual_rows[-1]
-            next_cursor = self.encode_cursor(
-                sort_field=sort_field,
-                sort_value=last_row[sort_field],
-                id_field=id_field,
-                id_value=last_row[id_field]
-            )
+        # Encode next cursor
+        next_cursor = self.encode_cursor(
+            rows[-1]["transaction_date"],
+            rows[-1]["canonical_id"]
+        ) if rows else None
 
-        # Generate prev cursor from first row
-        prev_cursor = None
-        if actual_rows:
-            first_row = actual_rows[0]
-            prev_cursor = self.encode_cursor(
-                sort_field=sort_field,
-                sort_value=first_row[sort_field],
-                id_field=id_field,
-                id_value=first_row[id_field]
-            )
-
-        page = Page(
-            has_next=has_next,
-            next_cursor=next_cursor,
-            has_prev=(cursor is not None),  # Has prev if we received a cursor
-            prev_cursor=prev_cursor,
-            total_count=None  # Skip expensive COUNT(*)
-        )
-
-        return actual_rows, page
-
-    def estimate_total_count(self, table: str) -> int:
-        """
-        Estimate total row count (fast, approximate).
-
-        Uses PostgreSQL table statistics instead of COUNT(*).
-        """
-        result = db.execute(f"""
-            SELECT reltuples::bigint AS estimate
-            FROM pg_class
-            WHERE relname = '{table}'
-        """).fetchone()
-
-        return result["estimate"] if result else 0
-
-# Usage
-engine = PaginationEngine()
-
-def query_transactions(where_clause: str, params: List, limit: int):
-    """Query function for transactions."""
-    return db.execute(f"""
-        SELECT * FROM canonical_transactions
-        WHERE {where_clause}
-        ORDER BY transaction_date DESC, canonical_id DESC
-        LIMIT {limit}
-    """, params).fetchall()
-
-# Page 1
-rows, page = engine.paginate_forward(
-    query_fn=query_transactions,
-    cursor=None,  # First page
-    limit=50,
-    sort_field="transaction_date",
-    id_field="canonical_id"
-)
-
-# {
-#   "rows": [50 transactions],
-#   "has_next": True,
-#   "next_cursor": "eyJmIjoiMjAyNS0wNC0yNSIsImlkIjoiY2FuXzEyMyJ9",
-#   "has_prev": False,
-#   "prev_cursor": "eyJmIjoiMjAyNS0wNS0wMSIsImlkIjoiY2FuXzk5OSJ9",
-#   "total_count": 8500000  # Approximate
-# }
-
-# Page 2 (using next_cursor from page 1)
-rows, page = engine.paginate_forward(
-    query_fn=query_transactions,
-    cursor="eyJmIjoiMjAyNS0wNC0yNSIsImlkIjoiY2FuXzEyMyJ9",
-    limit=50,
-    sort_field="transaction_date",
-    id_field="canonical_id"
-)
+        return rows, {"has_next": has_next, "next_cursor": next_cursor}
 ```
 
-**API Response Format:**
-```json
-{
-  "rows": [
-    {"canonical_id": "can_123", "transaction_date": "2025-04-25", ...},
-    {"canonical_id": "can_124", "transaction_date": "2025-04-24", ...}
-  ],
-  "pagination": {
-    "has_next": true,
-    "next_cursor": "eyJmIjoiMjAyNS0wNC0yNSIsImlkIjoiY2FuXzEyMyJ9",
-    "has_prev": true,
-    "prev_cursor": "eyJmIjoiMjAyNS0wNS0wMSIsImlkIjoiY2FuXzk5OSJ9",
-    "total_count": 8500000
-  }
-}
+**Características Incluidas:**
+- ✅ Cursor-based pagination (keyset)
+- ✅ Base64 cursor encoding
+- ✅ Constant-time O(1) queries
+- ✅ Stable under concurrent inserts
+- ✅ Bidirectional (forward/backward)
+
+**Características NO Incluidas:**
+- ❌ Page numbers (cursors opacos)
+- ❌ Exact total count (approximate only)
+
+**Configuración:**
+```yaml
+pagination:
+  default_limit: 50
+  cursor_ttl_seconds: 3600
 ```
 
-**UI Example (Infinite Scroll):**
-```javascript
-// React component with infinite scroll
-const [transactions, setTransactions] = useState([])
-const [nextCursor, setNextCursor] = useState(null)
-const [loading, setLoading] = useState(false)
+**Performance:**
+- Page 1: 45ms
+- Page 1000: 47ms (constant time)
+- No OFFSET scan overhead
 
-async function loadMore() {
-  if (loading) return
-  setLoading(true)
+**No Further Tiers:**
+- Scale horizontally
 
-  const response = await fetch(`/api/transactions?cursor=${nextCursor}&limit=50`)
-  const data = await response.json()
+---
 
-  setTransactions([...transactions, ...data.rows])
-  setNextCursor(data.pagination.next_cursor)
-  setLoading(false)
-}
-
-// Trigger on scroll to bottom
-useEffect(() => {
-  const handleScroll = () => {
-    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
-      loadMore()
-    }
-  }
-  window.addEventListener('scroll', handleScroll)
-  return () => window.removeEventListener('scroll', handleScroll)
-}, [nextCursor, loading])
-```
-
-**Performance Comparison (8.5M rows):**
-```
-OFFSET Pagination (Bad):
-- Page 1 (OFFSET 0):     50ms
-- Page 100 (OFFSET 5K):  280ms
-- Page 1000 (OFFSET 50K): 5200ms (SLA violation)
-- Query plan: Seq Scan (scans all skipped rows)
-
-Cursor Pagination (Good):
-- Page 1:     45ms
-- Page 100:   48ms
-- Page 1000:  47ms (constant time!)
-- Query plan: Index Scan using idx_canonical_date_id (50 rows scanned)
-
-Required index:
-CREATE INDEX idx_canonical_date_id
-  ON canonical_transactions (transaction_date DESC, canonical_id DESC);
-```
-
-**Edge Case Handling:**
-```python
-# Concurrent inserts (new transaction added while user paginating)
-# OFFSET: User sees duplicates or skips rows (bad UX)
-# CURSOR: Stable - user sees consistent results (good UX)
-
-# Example:
-# 1. User loads page 1 (rows 1-50)
-# 2. New transaction inserted at position 1
-# 3. User clicks "next"
-# OFFSET (page 2): Shows rows 52-101 (skipped row 51)
-# CURSOR: Shows rows 51-100 (correct continuation)
 ```
 
 ### Comparison Table
