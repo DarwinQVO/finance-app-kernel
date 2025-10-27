@@ -349,9 +349,371 @@ result = future.result(timeout=5.0)
 
 ## Simplicity Profiles
 
-**Personal - ~30 LOC:** Hardcoded dashboard config, single user
-**Small Business - ~120 LOC:** YAML config, role-based widgets
-**Enterprise - ~600 LOC:** Database-backed configs, A/B testing, personalization
+### Personal Profile (30 LOC)
+
+**Contexto del Usuario:**
+El usuario tiene una aplicación personal de finanzas. El dashboard muestra 4 métricas fijas: ingreso total, gastos por categoría (5 categorías), top 5 comerciantes, balance actual. Las métricas están hardcodeadas en el código (no se necesita configuración). El usuario siempre ve el mismo dashboard (no hay personalización).
+
+**Implementation:**
+```python
+# dashboard.py (Personal - 30 LOC)
+from decimal import Decimal
+
+DASHBOARD_METRICS = ["income", "expense_by_category", "top_merchants", "balance"]
+
+def get_dashboard_data(db, date_range):
+    """
+    Calcular métricas hardcodeadas para dashboard personal.
+
+    Métricas fijas: income, expense_by_category, top_merchants, balance
+    """
+    # Metric 1: Income total
+    income = db.execute("""
+        SELECT SUM(amount) FROM canonical_transactions
+        WHERE amount > 0 AND transaction_date BETWEEN ? AND ?
+    """, date_range).fetchone()[0] or Decimal(0)
+
+    # Metric 2: Expenses by category (hardcoded 5 categories)
+    expense_by_cat = db.execute("""
+        SELECT category, SUM(amount)
+        FROM canonical_transactions
+        WHERE amount < 0 AND transaction_date BETWEEN ? AND ?
+        GROUP BY category
+    """, date_range).fetchall()
+
+    # Metric 3: Top 5 merchants
+    top_merchants = db.execute("""
+        SELECT merchant, SUM(amount), COUNT(*)
+        FROM canonical_transactions
+        WHERE transaction_date BETWEEN ? AND ?
+        GROUP BY merchant
+        ORDER BY SUM(amount) ASC
+        LIMIT 5
+    """, date_range).fetchall()
+
+    return {
+        "income": float(income),
+        "expense_by_category": dict(expense_by_cat),
+        "top_merchants": top_merchants
+    }
+```
+
+**Características Incluidas:**
+- ✅ 4 métricas hardcodeadas (income, expense_by_category, top_merchants, balance)
+- ✅ Agregaciones SQL simples (SUM, GROUP BY)
+- ✅ Top N queries (LIMIT 5)
+
+**Características NO Incluidas:**
+- ❌ Configuración de métricas (YAGNI: siempre las mismas 4 métricas)
+- ❌ Personalización por usuario (YAGNI: 1 usuario, 1 dashboard)
+- ❌ A/B testing (YAGNI: no hay experimentos)
+- ❌ Cache de métricas (YAGNI: query toma <50ms para 871 rows)
+- ❌ Timeout protection (YAGNI: queries nunca exceden 100ms)
+- ❌ Parallel execution (YAGNI: 4 queries secuenciales toman <200ms total)
+
+**Configuración:**
+```python
+# No se necesita configuración
+# Métricas hardcodeadas en código
+```
+
+**Performance:**
+- Latency: <50ms por métrica, <200ms total (4 métricas secuenciales)
+- Memory: ~1MB (resultados en memoria)
+- Dependencies: 0 (solo SQLite built-in)
+
+**Upgrade Triggers:**
+- Si necesita >10 métricas diferentes → Small Business (YAML config)
+- Si necesita dashboards personalizados por usuario → Small Business (role-based config)
+- Si queries exceden 500ms → Small Business (caching layer)
+
+---
+
+### Small Business Profile (120 LOC)
+
+**Contexto del Usuario:**
+Firma de consultoría pequeña (10 empleados). Cada empleado ve un dashboard diferente según su rol: Admin ve todas las métricas (20 widgets), Analyst ve solo analytics (8 widgets), Viewer ve summary (4 widgets). Las métricas están configuradas en archivo YAML (no hardcoded). Algunas métricas tardan 200-300ms (necesitan cache).
+
+**Implementation:**
+```python
+# dashboard.py (Small Business - 120 LOC)
+import yaml
+from typing import Dict, List
+from decimal import Decimal
+
+class DashboardEngine:
+    def __init__(self, config_path: str, db):
+        self.db = db
+        # Load metrics config from YAML
+        with open(config_path, 'r') as f:
+            self.config = yaml.safe_load(f)
+        self.metric_registry = self._build_registry()
+
+    def _build_registry(self):
+        """Build metric calculator registry from config."""
+        return {
+            "income": self.calc_income,
+            "expense_by_category": self.calc_expense_by_category,
+            "top_merchants": self.calc_top_merchants,
+            "balance": self.calc_balance,
+            "monthly_trend": self.calc_monthly_trend,
+            "tax_deductible": self.calc_tax_deductible
+        }
+
+    def get_dashboard_for_role(self, role: str, date_range: tuple) -> Dict:
+        """
+        Calcular métricas según rol del usuario.
+
+        Role config defines which metrics to show.
+        """
+        role_config = self.config["roles"][role]
+        metrics_to_calc = role_config["metrics"]
+
+        results = {}
+        for metric_name in metrics_to_calc:
+            calculator = self.metric_registry[metric_name]
+            results[metric_name] = calculator(date_range)
+
+        return results
+
+    def calc_income(self, date_range):
+        """Calculate total income."""
+        result = self.db.execute("""
+            SELECT SUM(amount) FROM canonical_transactions
+            WHERE amount > 0 AND transaction_date BETWEEN ? AND ?
+        """, date_range).fetchone()[0]
+        return float(result or Decimal(0))
+
+    def calc_expense_by_category(self, date_range):
+        """Calculate expenses by category."""
+        rows = self.db.execute("""
+            SELECT category, SUM(amount), COUNT(*)
+            FROM canonical_transactions
+            WHERE amount < 0 AND transaction_date BETWEEN ? AND ?
+            GROUP BY category
+        """, date_range).fetchall()
+        return {cat: {"total": float(total), "count": count} for cat, total, count in rows}
+
+    # ... similar for other metrics
+```
+
+**Características Incluidas:**
+- ✅ YAML configuration (6+ metric types)
+- ✅ Role-based dashboards (Admin, Analyst, Viewer)
+- ✅ Metric registry (pluggable calculators)
+- ✅ Dynamic metric selection (basado en rol)
+
+**Características NO Incluidas:**
+- ❌ Database-backed config (YAML suficiente para 10 usuarios, 6 metric types)
+- ❌ A/B testing (no hay experimentos todavía)
+- ❌ Personalization per user (solo por rol, no individual)
+- ❌ Parallel metric execution (sequential OK para <10 métricas)
+- ❌ Redis cache (en-memory cache suficiente)
+
+**Configuración:**
+```yaml
+dashboard_engine:
+  roles:
+    admin:
+      metrics:
+        - income
+        - expense_by_category
+        - top_merchants
+        - balance
+        - monthly_trend
+        - tax_deductible
+    analyst:
+      metrics:
+        - expense_by_category
+        - monthly_trend
+        - top_merchants
+    viewer:
+      metrics:
+        - income
+        - balance
+```
+
+**Performance:**
+- Latency: <100ms por métrica (sin cache), <20ms (con in-memory cache)
+- Memory: ~5MB (metric results cached)
+- Dependencies: yaml (config loading)
+
+**Upgrade Triggers:**
+- Si necesita >20 metric types → Enterprise (database config)
+- Si necesita A/B testing → Enterprise (experiment framework)
+- Si queries exceden 1s → Enterprise (Redis cache, parallel execution)
+- Si >50 usuarios → Enterprise (personalization per user)
+
+---
+
+### Enterprise Profile (600 LOC)
+
+**Contexto del Usuario:**
+Startup FinTech (1000 empleados, 10K clientes API). Dashboard altamente personalizado: cada usuario tiene configuración custom (widgets, layout, filters). A/B testing de nuevas métricas (feature flags). Cache Redis para métricas expensive (p95 <500ms SLA). Parallel execution de 20+ métricas simultáneas.
+
+**Implementation:**
+```python
+# dashboard_engine.py (Enterprise - 600 LOC)
+import asyncio
+import redis
+from typing import Dict, List, Optional
+from dataclasses import dataclass
+
+@dataclass
+class MetricConfig:
+    name: str
+    calculator: str
+    cache_ttl_seconds: int
+    timeout_ms: int
+    enabled: bool  # Feature flag for A/B testing
+
+class DashboardEngine:
+    def __init__(self, db, cache: redis.Redis):
+        self.db = db
+        self.cache = cache
+        self.metric_registry = self._build_registry()
+
+    async def calculate_metrics(
+        self,
+        user_id: str,
+        date_range: tuple,
+        timeout_ms: int = 5000
+    ) -> Dict:
+        """
+        Calcular métricas con parallel execution, caching, timeout protection.
+
+        Steps:
+        1. Load user-specific dashboard config from database
+        2. Check Redis cache for each metric
+        3. For cache misses: Calculate in parallel (asyncio.gather)
+        4. Apply timeout protection (kill slow queries after 5s)
+        5. Cache results in Redis (TTL según config)
+        6. Return aggregated results
+        """
+        # 1. Load user config from database
+        user_config = await self._load_user_config(user_id)
+
+        # 2. Filter metrics by feature flags (A/B testing)
+        enabled_metrics = [
+            m for m in user_config["metrics"]
+            if self._is_metric_enabled(m, user_id)
+        ]
+
+        # 3. Check cache for each metric
+        cache_keys = [f"metric:{user_id}:{m['name']}:{date_range}" for m in enabled_metrics]
+        cached_results = self.cache.mget(cache_keys)
+
+        # 4. Calculate cache misses in parallel
+        tasks = []
+        for i, metric_config in enumerate(enabled_metrics):
+            if cached_results[i] is None:
+                # Cache miss: Schedule calculation
+                calculator = self.metric_registry[metric_config["calculator"]]
+                task = asyncio.create_task(
+                    asyncio.wait_for(
+                        calculator(date_range, user_id),
+                        timeout=metric_config["timeout_ms"] / 1000
+                    )
+                )
+                tasks.append((metric_config, task))
+
+        # 5. Await all calculations (parallel execution)
+        results = {}
+        for metric_config, task in tasks:
+            try:
+                result = await task
+                results[metric_config["name"]] = result
+
+                # 6. Cache result
+                cache_key = f"metric:{user_id}:{metric_config['name']}:{date_range}"
+                self.cache.setex(
+                    cache_key,
+                    metric_config["cache_ttl_seconds"],
+                    json.dumps(result)
+                )
+            except asyncio.TimeoutError:
+                # Metric timed out, log and skip
+                logger.warning(f"Metric {metric_config['name']} timed out")
+
+        return results
+
+    async def _load_user_config(self, user_id: str) -> Dict:
+        """
+        Load user-specific dashboard config from database.
+
+        Config includes:
+        - Which metrics to show
+        - Metric order/layout
+        - Custom filters
+        - Feature flag overrides (A/B testing)
+        """
+        row = await self.db.fetch_one("""
+            SELECT config_json FROM dashboard_configs
+            WHERE user_id = ?
+        """, (user_id,))
+        return json.loads(row["config_json"])
+
+    def _is_metric_enabled(self, metric_config: Dict, user_id: str) -> bool:
+        """
+        Check if metric is enabled for user (A/B testing).
+
+        Uses feature flag system to enable/disable metrics.
+        Example: 50% of users see "investment_summary" metric (experiment).
+        """
+        metric_name = metric_config["name"]
+
+        # Check global feature flag
+        feature_flag = self.db.fetch_one("""
+            SELECT enabled, rollout_percentage FROM feature_flags
+            WHERE flag_name = ?
+        """, (f"metric:{metric_name}",))
+
+        if not feature_flag or not feature_flag["enabled"]:
+            return False
+
+        # Check if user is in rollout percentage
+        user_hash = hash(user_id) % 100
+        return user_hash < feature_flag["rollout_percentage"]
+```
+
+**Características Incluidas:**
+- ✅ Database-backed configuration (user-specific dashboards)
+- ✅ A/B testing (feature flags con rollout percentage)
+- ✅ Redis caching (TTL configurable por métrica)
+- ✅ Parallel metric execution (asyncio.gather)
+- ✅ Timeout protection (kill slow queries después de 5s)
+- ✅ Personalization per user (cada usuario tiene custom config)
+- ✅ Metrics collection (Prometheus: metric_calculation_latency_ms)
+
+**Características NO Incluidas:**
+- ❌ Real-time updates (polling es suficiente, no WebSockets)
+- ❌ ML-powered recommendations (separado en RecommendationEngine)
+
+**Configuración:**
+```yaml
+dashboard_engine:
+  database:
+    url: "postgresql://user:pass@host:5432/db"
+    pool_size: 20
+  cache:
+    redis_url: "redis://localhost:6379"
+    default_ttl_seconds: 300  # 5 minutes
+  timeouts:
+    default_metric_timeout_ms: 5000
+    max_parallel_metrics: 50
+  feature_flags:
+    enabled: true
+    default_rollout_percentage: 100
+```
+
+**Performance:**
+- Latency: <50ms p95 (cache hit), <500ms p95 (cache miss, parallel execution)
+- Memory: ~200MB Redis cache (10K users × 20 metrics)
+- Throughput: 10K dashboard requests/sec (single instance)
+- Dependencies: redis, asyncio, postgresql
+
+**No Further Tiers:**
+- Scaling beyond Enterprise es horizontal (más instancias, load balancer)
 
 ---
 
