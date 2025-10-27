@@ -1,14 +1,14 @@
-# UI Flows
+# Flujos de Interfaz de Usuario
 
-> **Purpose:** Define user interface screens and interactions (wireframes + user actions)
+> **Propósito:** Definir pantallas de interfaz de usuario e interacciones (wireframes + acciones del usuario)
 
 ---
 
-## Screen 1: File Upload
+## Pantalla 1: Subir Archivo
 
-**One Button Philosophy:** User shouldn't need a manual
+**Filosofía de Un Botón:** El usuario no debería necesitar un manual
 
-**Desktop Wireframe:**
+**Wireframe para Escritorio:**
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -38,7 +38,7 @@
 └────────────────────────────────────────────────────────────────┘
 ```
 
-**Mobile Wireframe:**
+**Wireframe para Móvil:**
 
 ```
 ┌──────────────────────┐
@@ -66,44 +66,44 @@
 └──────────────────────┘
 ```
 
-**User Actions:**
+**Acciones del Usuario:**
 
-1. **Drop file or click Browse**
-   - File picker opens (desktop: native, mobile: camera/files)
-   - User selects `bofa-statement-october.pdf`
+1. **Soltar archivo o hacer clic en Explorar**
+   - Se abre el selector de archivos (escritorio: nativo, móvil: cámara/archivos)
+   - El usuario selecciona `bofa-statement-october.pdf`
 
-2. **Upload begins**
+2. **Comienza la subida**
    ```
    ┌──────────────────────────────────────────┐
-   │ Uploading bofa-statement-october.pdf     │
+   │ Subiendo bofa-statement-october.pdf      │
    │ ████████████░░░░░░░░░░░░░░░ 45%  1.2 MB │
    └──────────────────────────────────────────┘
    ```
 
-3. **Processing status**
+3. **Estado de procesamiento**
    ```
    ┌──────────────────────────────────────────┐
-   │ ✓ Upload complete                        │
-   │ ⏳ Processing statement... ~30 seconds   │
+   │ ✓ Subida completa                        │
+   │ ⏳ Procesando estado de cuenta... ~30 seg│
    │                                          │
-   │ [View Dashboard]  [Upload Another]      │
+   │ [Ver Dashboard]  [Subir Otro]           │
    └──────────────────────────────────────────┘
    ```
 
-4. **Error states**
+4. **Estados de error**
    ```
-   ❌ Upload Failed: File is not a PDF
-   ❌ Processing Error: Could not read PDF - file may be corrupted
-   ⚠️  Duplicate: This file was uploaded on Oct 15
+   ❌ Subida Fallida: El archivo no es un PDF
+   ❌ Error de Procesamiento: No se pudo leer el PDF - el archivo puede estar corrupto
+   ⚠️  Duplicado: Este archivo fue subido el 15 de octubre
    ```
 
 ---
 
-## Screen 2: Transaction List (Main Screen)
+## Pantalla 2: Lista de Transacciones (Pantalla Principal)
 
-**Table with Filters:** Classic financial app layout
+**Tabla con Filtros:** Diseño clásico de aplicación financiera
 
-**Desktop Wireframe:**
+**Wireframe para Escritorio:**
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -132,7 +132,7 @@
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Mobile Wireframe:**
+**Wireframe para Móvil:**
 
 ```
 ┌────────────────────────┐
@@ -161,43 +161,43 @@
 └────────────────────────┘
 ```
 
-**User Actions:**
+**Acciones del Usuario:**
 
-1. **Filter by date**
-   - Click "[Last 30 days ▼]" → Dropdown opens
-   - Options: This Month, Last Month, Last 3 Months, Custom Range, All Time
-   - Select "This Month" → Table refreshes
+1. **Filtrar por fecha**
+   - Clic en "[Últimos 30 días ▼]" → Se abre el menú desplegable
+   - Opciones: Este Mes, Mes Pasado, Últimos 3 Meses, Rango Personalizado, Todo el Tiempo
+   - Seleccionar "Este Mes" → La tabla se actualiza
 
-2. **Filter by account**
-   - Click "[All Accounts ▼]" → Dropdown opens
-   - Options: All Accounts, Chase Checking, Chase Savings, BoFA Credit Card, etc.
-   - Select "Chase Checking" → Table shows only checking transactions
+2. **Filtrar por cuenta**
+   - Clic en "[Todas las Cuentas ▼]" → Se abre el menú desplegable
+   - Opciones: Todas las Cuentas, Chase Checking, Chase Savings, BoFA Credit Card, etc.
+   - Seleccionar "Chase Checking" → La tabla muestra solo transacciones de cuenta corriente
 
-3. **Search**
-   - Type "starbucks" in search box
-   - Table filters to show only Starbucks transactions
-   - Clear search → Shows all transactions again
+3. **Buscar**
+   - Escribir "starbucks" en el cuadro de búsqueda
+   - La tabla filtra para mostrar solo transacciones de Starbucks
+   - Limpiar búsqueda → Muestra todas las transacciones nuevamente
 
-4. **Click transaction**
-   - Modal opens showing transaction details (see Screen 3)
+4. **Hacer clic en transacción**
+   - Se abre un modal mostrando detalles de la transacción (ver Pantalla 3)
 
-5. **Sort columns**
-   - Click "Date" column header → Sort by date descending
-   - Click "Amount" column header → Sort by amount descending
-   - Arrow indicator shows sort direction ▼ ▲
+5. **Ordenar columnas**
+   - Clic en encabezado de columna "Date" → Ordenar por fecha descendente
+   - Clic en encabezado de columna "Amount" → Ordenar por monto descendente
+   - El indicador de flecha muestra la dirección de ordenamiento ▼ ▲
 
-6. **Pagination**
-   - Click "Next >" → Shows transactions 51-100
-   - Click page number "2" → Jumps to page 2
-   - Simple offset pagination (not cursor-based for simplicity)
+6. **Paginación**
+   - Clic en "Next >" → Muestra transacciones 51-100
+   - Clic en número de página "2" → Salta a la página 2
+   - Paginación simple por offset (no basada en cursor por simplicidad)
 
 ---
 
-## Screen 3: Transaction Detail Modal
+## Pantalla 3: Modal de Detalle de Transacción
 
-**Full Transparency:** Show everything about this transaction
+**Transparencia Total:** Mostrar todo sobre esta transacción
 
-**Desktop Wireframe:**
+**Wireframe para Escritorio:**
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -229,7 +229,7 @@
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**Tab 2: Raw Data (what PDF said):**
+**Pestaña 2: Datos Crudos (lo que decía el PDF):**
 
 ```
 ┌──────────────────────────────────────────┐
@@ -246,7 +246,7 @@
 └──────────────────────────────────────────┘
 ```
 
-**Tab 3: Normalization Decisions:**
+**Pestaña 3: Decisiones de Normalización:**
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -283,7 +283,7 @@
 └─────────────────────────────────────────────────────┘
 ```
 
-**Tab 4: Source PDF:**
+**Pestaña 4: PDF Fuente:**
 
 ```
 ┌──────────────────────────────────────────┐
@@ -300,40 +300,40 @@
 └──────────────────────────────────────────┘
 ```
 
-**User Actions:**
+**Acciones del Usuario:**
 
-1. **Edit category**
-   - Click [Edit] next to Category
-   - Dropdown opens with category list
-   - Select new category → Saves immediately
-   - Toast notification: "Category updated to Books & Education"
-   - Audit log entry created
+1. **Editar categoría**
+   - Clic en [Editar] junto a Categoría
+   - Se abre menú desplegable con lista de categorías
+   - Seleccionar nueva categoría → Se guarda inmediatamente
+   - Notificación toast: "Categoría actualizada a Libros y Educación"
+   - Se crea entrada en registro de auditoría
 
-2. **Add note**
-   - Click in Notes field
-   - Type "Split with roommate - owe me $43.71"
-   - Click outside field → Auto-saves
-   - Note appears immediately
+2. **Agregar nota**
+   - Clic en campo de Notas
+   - Escribir "Dividido con compañero de cuarto - me debe $43.71"
+   - Clic fuera del campo → Se auto-guarda
+   - La nota aparece inmediatamente
 
-3. **Add tag**
-   - Click "[+ Add tag]"
-   - Type "reimbursable"
-   - Press Enter → Tag added
-   - Can add multiple tags
+3. **Agregar etiqueta**
+   - Clic en "[+ Agregar etiqueta]"
+   - Escribir "reembolsable"
+   - Presionar Enter → Etiqueta agregada
+   - Se pueden agregar múltiples etiquetas
 
-4. **Delete transaction**
-   - Click [Delete Transaction]
-   - Confirmation dialog: "Are you sure? This cannot be undone."
-   - User confirms → Transaction soft-deleted (active=false)
-   - Removed from list view
+4. **Eliminar transacción**
+   - Clic en [Eliminar Transacción]
+   - Diálogo de confirmación: "¿Estás seguro? Esto no se puede deshacer."
+   - El usuario confirma → Transacción eliminada suavemente (active=false)
+   - Removida de la vista de lista
 
 ---
 
-## Screen 4: Category Manager
+## Pantalla 4: Gestor de Categorías
 
-**Simple CRUD:** Create, read, update, delete categories
+**CRUD Simple:** Crear, leer, actualizar, eliminar categorías
 
-**Desktop Wireframe:**
+**Wireframe para Escritorio:**
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -366,7 +366,7 @@
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Create New Category Dialog:**
+**Diálogo para Crear Nueva Categoría:**
 
 ```
 ┌──────────────────────────────────────────┐
@@ -389,41 +389,41 @@
 └──────────────────────────────────────────┘
 ```
 
-**User Actions:**
+**Acciones del Usuario:**
 
-1. **Create subcategory**
-   - Click [+ New Category]
-   - Name: "Coffee Shops"
-   - Parent: "Food & Dining"
-   - Color: Orange
-   - Click [Create] → Category added to tree
+1. **Crear subcategoría**
+   - Clic en [+ Nueva Categoría]
+   - Nombre: "Cafeterías"
+   - Padre: "Comida y Restaurantes"
+   - Color: Naranja
+   - Clic en [Crear] → Categoría agregada al árbol
 
-2. **Edit category**
-   - Click [Edit] next to "Groceries"
-   - Change name, color, or parent
-   - Click [Save] → Updates immediately
+2. **Editar categoría**
+   - Clic en [Editar] junto a "Supermercado"
+   - Cambiar nombre, color o categoría padre
+   - Clic en [Guardar] → Se actualiza inmediatamente
 
-3. **Delete category**
-   - Click [Delete] next to "Coffee Shops"
-   - Warning: "This category is used by 10 transactions. What should we do?"
-   - Options:
-     - Move transactions to parent category (Food & Dining)
-     - Assign to different category
-     - Leave uncategorized
-   - User selects option → Category deleted, transactions updated
+3. **Eliminar categoría**
+   - Clic en [Eliminar] junto a "Cafeterías"
+   - Advertencia: "Esta categoría es usada por 10 transacciones. ¿Qué debemos hacer?"
+   - Opciones:
+     - Mover transacciones a categoría padre (Comida y Restaurantes)
+     - Asignar a categoría diferente
+     - Dejar sin categorizar
+   - El usuario selecciona opción → Categoría eliminada, transacciones actualizadas
 
-4. **Archive category**
-   - For categories no longer used but with historical data
-   - Click [Archive] → Hidden from dropdowns but preserved
-   - Toggle [Show Archived] to view
+4. **Archivar categoría**
+   - Para categorías ya no usadas pero con datos históricos
+   - Clic en [Archivar] → Oculta de menús desplegables pero preservada
+   - Alternar [Mostrar Archivadas] para ver
 
 ---
 
-## Screen 5: Dashboard (3 Charts)
+## Pantalla 5: Dashboard (3 Gráficos)
 
-**At-a-Glance Summary:** Monthly spending overview
+**Resumen de Un Vistazo:** Resumen mensual de gastos
 
-**Desktop Wireframe:**
+**Wireframe para Escritorio:**
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
@@ -466,7 +466,7 @@
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-**Mobile Wireframe:**
+**Wireframe para Móvil:**
 
 ```
 ┌──────────────────────────┐
@@ -501,87 +501,87 @@
 └──────────────────────────┘
 ```
 
-**User Actions:**
+**Acciones del Usuario:**
 
-1. **Change time period**
-   - Click "[This Month ▼]"
-   - Options: This Month, Last Month, Last 3 Months, Last 6 Months, This Year, Custom
-   - Select "Last 3 Months" → All charts refresh
+1. **Cambiar período de tiempo**
+   - Clic en "[Este Mes ▼]"
+   - Opciones: Este Mes, Mes Pasado, Últimos 3 Meses, Últimos 6 Meses, Este Año, Personalizado
+   - Seleccionar "Últimos 3 Meses" → Todos los gráficos se actualizan
 
-2. **Drill into category**
-   - Click "Groceries $520" bar
-   - Opens filtered transaction list showing only grocery transactions
-   - Breadcrumb: Dashboard > Groceries > October 2024
+2. **Profundizar en categoría**
+   - Clic en barra "Supermercado $520"
+   - Abre lista de transacciones filtrada mostrando solo transacciones de supermercado
+   - Breadcrumb: Dashboard > Supermercado > Octubre 2024
 
-3. **Export PDF**
-   - Click [Export PDF]
-   - Generates PDF snapshot of dashboard with all charts
-   - Downloads: `finance-dashboard-october-2024.pdf`
+3. **Exportar PDF**
+   - Clic en [Exportar PDF]
+   - Genera instantánea en PDF del dashboard con todos los gráficos
+   - Descarga: `finance-dashboard-octubre-2024.pdf`
 
-4. **View all categories**
-   - Click [View All Categories]
-   - Opens full category breakdown with subcategories
+4. **Ver todas las categorías**
+   - Clic en [Ver Todas las Categorías]
+   - Abre desglose completo de categorías con subcategorías
 
 ---
 
-## Navigation Flow
+## Flujo de Navegación
 
 ```
-Home/Dashboard
-  ├─ Upload Statement → Processing → Success → Dashboard
-  ├─ Transactions
-  │    └─ Click Transaction → Detail Modal
-  │         ├─ Edit Category → Category Manager
-  │         ├─ View Raw Data → Raw Data Tab
-  │         └─ View Source PDF → PDF Viewer
-  ├─ Categories → Category Manager
-  │    └─ Create/Edit/Delete Categories
-  └─ Settings
-       ├─ Accounts
-       ├─ Rules (categorization)
-       └─ Profile
+Inicio/Dashboard
+  ├─ Subir Estado de Cuenta → Procesando → Éxito → Dashboard
+  ├─ Transacciones
+  │    └─ Clic en Transacción → Modal de Detalle
+  │         ├─ Editar Categoría → Gestor de Categorías
+  │         ├─ Ver Datos Crudos → Pestaña de Datos Crudos
+  │         └─ Ver PDF Fuente → Visor de PDF
+  ├─ Categorías → Gestor de Categorías
+  │    └─ Crear/Editar/Eliminar Categorías
+  └─ Configuración
+       ├─ Cuentas
+       ├─ Reglas (categorización)
+       └─ Perfil
 ```
 
 ---
 
-## Key UI Principles
+## Principios Clave de Interfaz de Usuario
 
-**1. One-Click Actions**
-- Upload should be one click, not a wizard
-- Category changes save immediately (no "Save" button)
-- Minimal confirmations (only for destructive actions)
+**1. Acciones de Un Clic**
+- La subida debe ser de un clic, no un asistente
+- Los cambios de categoría se guardan inmediatamente (sin botón "Guardar")
+- Confirmaciones mínimas (solo para acciones destructivas)
 
-**2. Contextual Actions**
-- Actions appear where needed (edit button next to category)
-- Hide advanced features until user needs them
+**2. Acciones Contextuales**
+- Las acciones aparecen donde se necesitan (botón editar junto a categoría)
+- Ocultar características avanzadas hasta que el usuario las necesite
 
-**3. Progressive Disclosure**
-- Show canonical data first (what user cares about)
-- Raw data and decisions available via tabs (for power users)
+**3. Divulgación Progresiva**
+- Mostrar datos canónicos primero (lo que le importa al usuario)
+- Datos crudos y decisiones disponibles via pestañas (para usuarios avanzados)
 
-**4. Responsive**
-- Desktop: Table view (more data visible)
-- Mobile: Card view (easier to scroll)
-- Touch-friendly hit targets (44px minimum)
+**4. Responsivo**
+- Escritorio: Vista de tabla (más datos visibles)
+- Móvil: Vista de tarjetas (más fácil de desplazar)
+- Objetivos táctiles amigables (mínimo 44px)
 
-**5. Immediate Feedback**
-- Changes appear instantly (optimistic UI)
-- Background sync (don't block user)
-- Toast notifications for confirmations
+**5. Retroalimentación Inmediata**
+- Los cambios aparecen instantáneamente (UI optimista)
+- Sincronización en segundo plano (no bloquear al usuario)
+- Notificaciones toast para confirmaciones
 
 ---
 
-## Loading States
+## Estados de Carga
 
-**Initial Page Load:**
+**Carga Inicial de Página:**
 ```
 ┌──────────────────────────────────────┐
-│ Loading transactions...              │
+│ Cargando transacciones...            │
 │ ▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░ 35%       │
 └──────────────────────────────────────┘
 ```
 
-**Skeleton Loaders (preferred over spinners):**
+**Skeleton Loaders (preferidos sobre spinners):**
 ```
 ┌────────────────────────────────────────┐
 │ ▓▓▓▓▓  ▓▓▓▓▓▓▓▓▓▓▓▓   ▓▓▓▓▓  ▓▓▓▓▓   │
@@ -592,49 +592,50 @@ Home/Dashboard
 
 ---
 
-## Empty States
+## Estados Vacíos
 
-**No Transactions:**
+**Sin Transacciones:**
 ```
 ┌────────────────────────────────────────┐
 │                                        │
 │           📄                           │
-│     No transactions yet                │
+│     Sin transacciones aún              │
 │                                        │
-│  Upload your first bank statement      │
-│  to get started.                       │
+│  Sube tu primer estado de cuenta       │
+│  para comenzar.                        │
 │                                        │
-│       [Upload Statement]               │
+│       [Subir Estado de Cuenta]         │
 │                                        │
 └────────────────────────────────────────┘
 ```
 
-**No Search Results:**
+**Sin Resultados de Búsqueda:**
 ```
 ┌────────────────────────────────────────┐
-│ No transactions match "starbuck"       │
+│ No hay transacciones que coincidan    │
+│ con "starbuck"                         │
 │                                        │
-│ Try:                                   │
-│ • Checking your spelling               │
-│ • Using different keywords             │
-│ • Clearing filters                     │
+│ Intenta:                               │
+│ • Revisar tu ortografía                │
+│ • Usar palabras clave diferentes       │
+│ • Limpiar filtros                      │
 │                                        │
-│       [Reset Filters]                  │
+│       [Restablecer Filtros]            │
 └────────────────────────────────────────┘
 ```
 
 ---
 
-## Summary
+## Resumen
 
-**This UI is:**
-- ✅ Simple (5 main screens)
-- ✅ Intuitive (standard patterns)
-- ✅ Responsive (desktop + mobile)
-- ✅ Fast (optimistic updates)
+**Esta interfaz de usuario es:**
+- ✅ Simple (5 pantallas principales)
+- ✅ Intuitiva (patrones estándar)
+- ✅ Responsiva (escritorio + móvil)
+- ✅ Rápida (actualizaciones optimistas)
 
-**This UI avoids:**
-- ❌ Complex wizards (multi-step forms)
-- ❌ Excessive modals (only for details)
-- ❌ Hidden features (everything discoverable)
-- ❌ Jargon (plain English)
+**Esta interfaz de usuario evita:**
+- ❌ Asistentes complejos (formularios de múltiples pasos)
+- ❌ Modales excesivos (solo para detalles)
+- ❌ Características ocultas (todo es descubrible)
+- ❌ Jerga (lenguaje claro)
