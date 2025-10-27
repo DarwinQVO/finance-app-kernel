@@ -416,61 +416,42 @@ WHERE relname = 'canonical_transactions';
 
 ## Simplicity Profiles
 
-The same PaginationEngine interface scales from "load everything" to "cursor-based keyset pagination":
+### Personal Profile (0 LOC)
 
-### Personal Profile (Darwin) - 0 LOC (Not Needed)
-
-**Context:**
-- Darwin has 871 transactions (< 1K total)
-- Loads all transactions at once (< 100KB payload)
-- No pagination needed in UI (single page shows all)
-- Optional: Client-side array slicing if UI needs pages
+**Contexto del Usuario:**
+871 transacciones (<1K total). Carga todas en single query (87KB payload). No necesita paginación backend, opcionalmente usa array slicing en frontend.
 
 **Implementation:**
 ```python
-# Darwin: No PaginationEngine needed
-# Load all transactions in single query
+# No implementation needed (0 LOC)
+# Load all rows in single query
 transactions = conn.execute("""
     SELECT * FROM canonical_transactions
     ORDER BY transaction_date DESC
 """).fetchall()
-
-# Return all 871 rows (< 100KB JSON payload)
-# UI displays all rows in table (or client-side virtual scroll)
+# Return 871 rows (~87KB JSON) - UI shows all
 ```
 
-**Decision Context:**
-- **YAGNI Applied**: Darwin skips PaginationEngine entirely
-- **Why Skip**: < 1000 rows fit in single HTTP response (< 100KB)
-- **Client-side Pagination**: If UI needs pages, use array slicing (no backend complexity)
-- **Threshold**: Consider pagination when dataset exceeds 1K rows or 500KB payload
+**Características Incluidas:**
+- ✅ Single-page load (fetchall)
 
-**Client-side Pagination (Optional):**
-```javascript
-// Frontend: Slice array for display (no backend changes)
-const transactions = await fetch('/api/transactions').then(r => r.json())  // All 871 rows
+**Características NO Incluidas:**
+- ❌ PaginationEngine (YAGNI: <1K rows, 87KB payload)
+- ❌ Cursor encoding (YAGNI: no pagination needed)
+- ❌ COUNT queries (YAGNI: all rows loaded)
 
-// Display page 2 (50 rows per page)
-const page = 2
-const limit = 50
-const offset = (page - 1) * limit
-const displayRows = transactions.slice(offset, offset + limit)
-// [50 rows from position 50-99]
-```
-
-**Evidence:**
+**Configuración:**
 ```python
-# Load all transactions
-import json
-import sys
-
-rows = conn.execute("SELECT * FROM canonical_transactions").fetchall()
-json_payload = json.dumps([dict(r) for r in rows])
-payload_size_kb = sys.getsizeof(json_payload) / 1024
-
-print(f"Rows: {len(rows)}")          # 871
-print(f"Payload: {payload_size_kb:.1f} KB")  # 87.3 KB (acceptable)
+# No config needed
 ```
+
+**Performance:**
+- Query time: 8ms (load all 871 rows)
+- Payload: 87KB JSON
+
+**Upgrade Triggers:**
+- Si >1K rows → Small Business (OFFSET pagination)
+- Si payload >500KB → Small Business (paginate)
 
 ### Small Business Profile - ~50 LOC
 
