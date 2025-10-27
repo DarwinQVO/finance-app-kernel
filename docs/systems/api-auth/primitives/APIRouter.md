@@ -419,9 +419,164 @@ response = router.route(request, request.auth_context)
 
 ## Simplicity Profiles
 
-**Personal - ~20 LOC:** if/elif route matching
-**Small Business - ~80 LOC:** Dict-based routing, middleware
-**Enterprise - ~400 LOC:** Tree-based routing, versioning, rate limits
+### Personal Profile (20 LOC)
+
+**Contexto del Usuario:**
+Aplicación personal con 3 endpoints fijos: upload PDF, get transactions, get dashboard. Hardcoded if/elif routing (no framework needed).
+
+**Implementation:**
+```python
+def handle_request(method, path, body):
+    if method == "POST" and path == "/upload":
+        return create_upload(body)
+    elif method == "GET" and path == "/transactions":
+        return get_transactions()
+    elif method == "GET" and path == "/dashboard":
+        return get_dashboard()
+    else:
+        return {"error": "Not found"}, 404
+```
+
+**Características Incluidas:**
+- ✅ Route matching básico (if/elif)
+- ✅ 3 endpoints hardcoded
+
+**Características NO Incluidas:**
+- ❌ OpenAPI schema validation (YAGNI: inputs trusted)
+- ❌ Content negotiation (solo JSON)
+- ❌ Middleware (no authentication layer needed)
+
+**Configuración:**
+```python
+# No config needed - routes hardcoded
+```
+
+**Performance:**
+- Latency: <1ms (if/elif comparison)
+
+**Upgrade Triggers:**
+- Si necesita >10 endpoints → Small Business (dict-based routing)
+- Si necesita validación → Small Business (schema validation)
+
+---
+
+### Small Business Profile (80 LOC)
+
+**Contexto del Usuario:**
+Firma con 15 endpoints. Usa dict para routing + basic middleware (auth, logging).
+
+**Implementation:**
+```python
+ROUTES = {
+    ("GET", "/v1/transactions"): get_transactions_handler,
+    ("POST", "/v1/uploads"): create_upload_handler,
+    ("GET", "/v1/dashboard"): get_dashboard_handler,
+    # ... 12 more endpoints
+}
+
+def route_request(method, path, headers, body):
+    # Middleware: Auth
+    auth_context = validate_api_key(headers.get("Authorization"))
+    if not auth_context:
+        return {"error": "Unauthorized"}, 401
+
+    # Route lookup
+    handler = ROUTES.get((method, path))
+    if not handler:
+        return {"error": "Not found"}, 404
+
+    # Call handler
+    try:
+        result = handler(body, auth_context)
+        return result, 200
+    except ValueError as e:
+        return {"error": str(e)}, 400
+```
+
+**Características Incluidas:**
+- ✅ Dict-based routing (O(1) lookup)
+- ✅ Basic middleware (auth, error handling)
+- ✅ 15+ endpoints
+
+**Características NO Incluidas:**
+- ❌ OpenAPI validation (manual validation in handlers)
+- ❌ Versioning (no /v2 paths yet)
+
+**Configuración:**
+```yaml
+api_router:
+  routes_file: "routes.py"
+```
+
+**Performance:**
+- Latency: <2ms (dict lookup)
+
+**Upgrade Triggers:**
+- Si >50 endpoints → Enterprise (OpenAPI spec)
+- Si necesita versioning (/v1, /v2) → Enterprise
+
+---
+
+### Enterprise Profile (400 LOC)
+
+**Contexto del Usuario:**
+FinTech con 100+ endpoints, API versioning (/v1, /v2), OpenAPI schema validation, rate limiting per endpoint.
+
+**Implementation:**
+```python
+from fastapi import FastAPI, Request
+from pydantic import ValidationError
+
+app = FastAPI()
+
+@app.post("/v1/uploads")
+async def create_upload(request: UploadRequest, auth: AuthContext = Depends(validate_token)):
+    """
+    OpenAPI-driven routing with automatic validation.
+    FastAPI validates UploadRequest against Pydantic model.
+    """
+    result = await upload_manager.create(request, auth)
+    return result
+
+@app.get("/v2/transactions")
+@rate_limit(max_requests=100, window_seconds=60)
+async def get_transactions_v2(
+    filters: TransactionFilters = Query(),
+    auth: AuthContext = Depends(validate_token)
+):
+    """
+    Versioned endpoint (/v2) with rate limiting.
+    """
+    result = await transaction_query.search(filters, auth)
+    return result
+```
+
+**Características Incluidas:**
+- ✅ OpenAPI schema validation (FastAPI/Pydantic)
+- ✅ API versioning (/v1, /v2 paths)
+- ✅ Rate limiting per endpoint
+- ✅ Auto-generated OpenAPI docs
+
+**Características NO Incluidas:**
+- ❌ GraphQL (REST-only)
+
+**Configuración:**
+```yaml
+api_router:
+  framework: "fastapi"
+  openapi_version: "3.1.0"
+  rate_limits:
+    default: 1000
+    endpoints:
+      POST /v1/uploads: 100
+```
+
+**Performance:**
+- Latency: <5ms (FastAPI overhead)
+- Throughput: 10K req/sec
+
+**No Further Tiers:**
+- Scale horizontally (load balancer)
 
 ---
 
