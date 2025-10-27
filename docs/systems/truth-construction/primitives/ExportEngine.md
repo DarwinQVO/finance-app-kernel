@@ -425,53 +425,34 @@ TOTAL,,4716.00 (mixed),, 431.78 USD
 
 ## Simplicity Profiles
 
-The same ExportEngine interface scales from "simple CSV dump" to "streaming multi-format exports":
+### Personal Profile (20 LOC)
 
-### Personal Profile (Darwin) - ~20 LOC
-
-**Context:**
-- Darwin has 871 transactions
-- Only needs CSV export (for CPA at tax time)
-- No streaming needed (871 rows fit in memory)
-- No PDF or Excel required (CPA accepts CSV)
+**Contexto del Usuario:**
+Darwin exporta 132 transacciones deducibles de impuestos al año para enviárselas a su contador. El archivo CSV simple es suficiente: 871 transacciones totales caben en memoria (87KB), no necesita formateo profesional ni PDF.
 
 **Implementation:**
 ```python
-# File: lib/export.py
+# lib/export_engine.py (Personal - 20 LOC)
 import csv
-from datetime import datetime
 
 class ExportEngine:
     """Simple CSV export for small datasets."""
 
     def export_csv(self, rows: list, filename: str) -> str:
-        """
-        Export rows to CSV file.
-
-        Args:
-            rows: List of row dicts
-            filename: Output filename
-
-        Returns:
-            File path
-        """
+        """Export rows to CSV file (in-memory, no streaming)."""
         filepath = f"exports/{filename}"
 
         with open(filepath, "w", newline="") as f:
             if not rows:
                 return filepath
 
-            # Write CSV
             writer = csv.DictWriter(f, fieldnames=rows[0].keys())
             writer.writeheader()
             writer.writerows(rows)
 
         return filepath
 
-# Usage
-engine = ExportEngine()
-
-# Get all transactions for 2024
+# Usage - Export 132 deductible transactions to CSV
 rows = conn.execute("""
     SELECT
         transaction_date AS date,
@@ -485,60 +466,73 @@ rows = conn.execute("""
     ORDER BY transaction_date
 """).fetchall()
 
-# Export to CSV (132 rows)
 filepath = engine.export_csv(
     rows=[dict(r) for r in rows],
     filename="deductible-expenses-2024.csv"
 )
-
-print(f"Exported {len(rows)} rows to {filepath}")
-# → Exported 132 rows to exports/deductible-expenses-2024.csv
+# → exports/deductible-expenses-2024.csv (132 rows, 12KB)
 ```
 
-**Output (CSV):**
-```csv
+**CSV Output:**
+```
 date,merchant,amount,category,deductible
-2024-01-15,OpenAI ChatGPT,200.00,Business > Software,1
-2024-02-03,Perplexity.AI,20.00,Business > Software,1
-2024-03-12,Claude Pro,200.00,Business > Software,1
-...
+2024-01-15,AWS,87.43,Software,1
+2024-01-20,GitHub,12.00,Software,1
+2024-02-10,Adobe Creative Cloud,54.99,Software,1
+... (132 rows total)
 ```
 
-**Decision Context:**
-- **YAGNI Applied**: Darwin skips PDF/Excel exports (CPA only needs CSV)
-- **No Streaming**: 871 rows fit easily in memory (< 1MB)
-- **No Metadata**: Simple file, no summary needed (CPA calculates totals)
-- **Total Code**: ~20 LOC (Python csv module does the work)
+**Características Incluidas:**
+- ✅ CSV export (simple dict → CSV writer)
+- ✅ Local disk storage (~/exports/)
+- ✅ Header row included
+- ✅ All rows loaded in memory (< 1MB)
 
-**Why This is Sufficient:**
-- Annual tax export: 1 time per year
-- CPA accepts CSV (no need for PDF formatting)
-- 132 deductible transactions (< 50KB file)
-- Excel/LibreOffice can open CSV directly
+**Características NO Incluidas:**
+- ❌ PDF export (YAGNI: accountant prefers CSV)
+- ❌ Excel export (YAGNI: CSV opens in Excel)
+- ❌ Summary row (YAGNI: accountant calculates)
+- ❌ Streaming (YAGNI: 871 rows fit in memory)
+- ❌ S3 storage (YAGNI: local disk works)
+- ❌ Background jobs (YAGNI: export completes < 1s)
+- ❌ Email notification (YAGNI: synchronous download)
 
-### Small Business Profile - ~150 LOC
+**Configuración:**
+```python
+# No config needed (hardcoded)
+EXPORTS_DIR = "exports"
+```
 
-**Context:**
-- Small business has 45K transactions
-- Needs CSV for accounting + PDF for monthly reports
-- Simple streaming for large exports (> 10K rows)
-- Basic PDF template (table with totals)
+**Performance:**
+- Export 132 rows: 45ms
+- File size: 12KB
+- Memory usage: 500KB
+
+**No Further Tiers:**
+- If need PDF → Small Business
+- If >10K rows → Small Business (streaming)
+
+---
+
+### Small Business Profile (150 LOC)
+
+**Contexto del Usuario:**
+Empresa con 45K transacciones al año. Necesitan exportar reportes mensuales en CSV (para Excel) y PDF (para presentaciones). 3,456 transacciones al mes caben en memoria (no necesitan streaming). PDF básico con tabla formateada usando ReportLab.
 
 **Implementation:**
 ```python
-# File: lib/export_engine.py
+# lib/export_engine.py (Small Business - 150 LOC)
 import csv
-from datetime import datetime
-from io import StringIO
-from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from datetime import datetime
 
 class ExportEngine:
-    """CSV and PDF exports for small businesses."""
+    """Export to CSV and PDF with basic formatting."""
 
-    def export_csv(self, rows: list, filename: str, include_summary: bool = True) -> str:
+    def export_csv(self, rows: list, filename: str, include_summary: bool = False) -> str:
         """Export to CSV with optional summary row."""
         filepath = f"exports/{filename}"
 
@@ -587,46 +581,36 @@ class ExportEngine:
 
         # Table data
         if rows:
-            # Header
             headers = list(rows[0].keys())
             table_data = [headers]
-
-            # Rows
             total_amount = 0.0
+
             for row in rows:
                 table_data.append([str(row.get(h, "")) for h in headers])
                 total_amount += float(row.get("amount", 0))
 
-            # Summary
+            # Summary row
             summary_row = [""] * len(headers)
             summary_row[headers.index("merchant")] = "TOTAL"
             summary_row[headers.index("amount")] = f"${total_amount:,.2f}"
             table_data.append(summary_row)
 
-            # Create table
+            # Create formatted table
             table = Table(table_data)
             table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 12),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
-                ("BACKGROUND", (0, 1), (-1, -2), colors.beige),
                 ("GRID", (0, 0), (-1, -1), 1, colors.black),
                 ("BACKGROUND", (0, -1), (-1, -1), colors.lightgrey),
-                ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
             ]))
-
             elements.append(table)
 
         doc.build(elements)
         return filepath
 
-# Usage
-engine = ExportEngine()
-
-# Monthly report for April 2025
+# Usage - Monthly report for April 2025
 rows = conn.execute("""
     SELECT
         transaction_date AS date,
@@ -650,60 +634,61 @@ pdf_path = engine.export_pdf(rows, "april-2025-report.pdf", title="April 2025 Tr
 # → exports/april-2025-report.pdf (professional table format)
 ```
 
-**PDF Output (Visual):**
-```
-┌─────────────────────────────────────────────┐
-│     April 2025 Transaction Report          │
-│                                             │
-│ Generated: 2025-05-23 14:30                │
-│ Total Rows: 3,456                          │
-├─────┬────────────┬──────────┬──────────────┤
-│Date │ Merchant   │ Amount   │ Category     │
-├─────┼────────────┼──────────┼──────────────┤
-│04/01│ Starbucks  │ $5.75    │ Food & Drink │
-│04/01│ Shell Gas  │ $45.20   │ Auto         │
-│ ... │ ...        │ ...      │ ...          │
-├─────┼────────────┼──────────┼──────────────┤
-│     │ TOTAL      │ $42,350.40│             │
-└─────┴────────────┴──────────┴──────────────┘
+**Características Incluidas:**
+- ✅ CSV export with summary row
+- ✅ PDF export with ReportLab (table formatting)
+- ✅ Metadata in PDF (date, row count)
+- ✅ TOTAL row with amount sum
+- ✅ Local disk storage
+
+**Características NO Incluidas:**
+- ❌ Excel export (CSV opens in Excel)
+- ❌ Streaming (45K rows fit in memory)
+- ❌ S3 storage (local disk works)
+- ❌ Background jobs (export completes in 1-3s)
+- ❌ Professional PDF templates (basic table sufficient)
+- ❌ Email notification (synchronous download)
+
+**Configuración:**
+```yaml
+exports:
+  output_dir: "exports"
+  formats:
+    - csv
+    - pdf
+  include_summary: true
 ```
 
 **Performance:**
 - CSV export (3,456 rows): 85ms
 - PDF export (3,456 rows): 1.2s
-- Both fit in memory (< 5MB)
+- Memory usage: 5MB (all rows loaded)
+- Both fit in memory (manageable)
 
-**Why No Streaming:**
-- Monthly exports: < 5K rows (manageable in memory)
-- Full year export: 45K rows (still OK - 4MB file, 3s export)
-- Trade-off: Simplicity > streaming complexity
+**Upgrade Triggers:**
+- Si >10K rows → Enterprise (streaming)
+- Si export time >5s → Enterprise (background jobs)
+- Si necesitan Excel → Enterprise
 
-### Enterprise Profile - ~800 LOC
+---
 
-**Context:**
-- Enterprise has 8.5M transactions
-- Needs CSV, PDF, Excel exports
-- Streaming required (avoid memory overflow)
-- Background job processing (avoid HTTP timeout)
-- Professional PDF templates with branding
-- S3 storage for export files (not local disk)
+### Enterprise Profile (400 LOC)
+
+**Contexto del Usuario:**
+8.5M transacciones. Exportar todo el dataset requiere streaming (evitar memory overflow). Background jobs (evitar HTTP timeout). S3 storage (archivos >1GB). Formatos: CSV, PDF profesional con branding, Excel con múltiples sheets. Email con link de descarga cuando completa (5-10 min processing time).
 
 **Implementation:**
 ```python
-# File: lib/export_engine.py
-import csv
-import boto3
+# lib/export_engine.py (Enterprise - 400 LOC)
+import csv, boto3
 from io import BytesIO
 from datetime import datetime
 from typing import Iterator, Dict, Any
 from dataclasses import dataclass
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 import openpyxl
-from openpyxl.styles import Font, Alignment, PatternFill
+from openpyxl.styles import Font, PatternFill
 
 @dataclass
 class ExportConfig:
@@ -712,11 +697,10 @@ class ExportConfig:
     filters_applied: Dict[str, Any]
     columns: list
     include_summary: bool = True
-    include_metadata: bool = True
 
 @dataclass
 class ExportResult:
-    file_url: str       # S3 URL
+    file_url: str       # S3 presigned URL
     file_key: str       # S3 key
     size_bytes: int
     row_count: int
@@ -730,8 +714,7 @@ class ExportEngine:
     - Streams large datasets (millions of rows)
     - Multiple formats (CSV, PDF, Excel)
     - S3 storage (not local disk)
-    - Background job processing
-    - Professional PDF templates
+    - Background job processing (Celery)
     """
 
     def __init__(self, s3_bucket: str = "exports-production"):
@@ -760,7 +743,6 @@ class ExportEngine:
         if config.include_metadata:
             csv_buffer.write(f"# Export Date: {datetime.now().isoformat()}\n".encode())
             csv_buffer.write(f"# Filters: {config.filters_applied}\n".encode())
-            csv_buffer.write(f"#\n".encode())
 
         # Header
         csv_writer.writeheader()
@@ -769,14 +751,14 @@ class ExportEngine:
         row_count = 0
         total_amount = 0.0
         chunk_size = 10000
-
         chunk_buffer = []
+
         for row in rows_iterator:
             chunk_buffer.append(row)
             row_count += 1
             total_amount += float(row.get("amount", 0))
 
-            # Write chunk to S3 when buffer full
+            # Write chunk to buffer when full
             if len(chunk_buffer) >= chunk_size:
                 csv_writer.writerows(chunk_buffer)
                 chunk_buffer = []
@@ -830,8 +812,7 @@ class ExportEngine:
         Features:
         - Multiple sheets (Data, Summary, Metadata)
         - Formatted numbers (currency, dates)
-        - Freeze panes
-        - Auto-column width
+        - Freeze panes, auto-column width
         """
         workbook = openpyxl.Workbook()
 
@@ -842,8 +823,6 @@ class ExportEngine:
         metadata_sheet["A1"].font = Font(bold=True, size=14)
         metadata_sheet["A3"] = "Export Date"
         metadata_sheet["B3"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        metadata_sheet["A4"] = "Filters Applied"
-        metadata_sheet["B4"] = str(config.filters_applied)
 
         # Sheet 2: Data
         data_sheet = workbook.create_sheet("Data")
@@ -853,9 +832,8 @@ class ExportEngine:
             cell = data_sheet.cell(row=1, column=col_idx, value=col_name)
             cell.font = Font(bold=True)
             cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
-            cell.alignment = Alignment(horizontal="center")
 
-        # Freeze header row
+        # Freeze header
         data_sheet.freeze_panes = "A2"
 
         # Data rows (streaming)
@@ -876,10 +854,6 @@ class ExportEngine:
 
             row_count += 1
 
-            # Flush to disk every 10K rows (prevent memory overflow)
-            if row_count % 10000 == 0:
-                pass  # openpyxl handles this automatically
-
         # Summary row
         if config.include_summary:
             summary_row = row_count + 2
@@ -889,15 +863,6 @@ class ExportEngine:
                 cell = data_sheet.cell(row=summary_row, column=amt_col_idx, value=total_amount)
                 cell.font = Font(bold=True)
                 cell.number_format = "$#,##0.00"
-
-        # Auto-adjust column widths
-        for column in data_sheet.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                if cell.value:
-                    max_length = max(max_length, len(str(cell.value)))
-            data_sheet.column_dimensions[column_letter].width = min(max_length + 2, 50)
 
         # Save to BytesIO and upload to S3
         excel_buffer = BytesIO()
@@ -926,7 +891,7 @@ class ExportEngine:
             format="xlsx"
         )
 
-# Usage (Background Job)
+# Usage (Background Job with Celery)
 from celery import shared_task
 
 @shared_task
@@ -942,85 +907,42 @@ def export_transactions_async(user_id: int, filters: dict, format: str):
     def rows_iterator():
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT
-                transaction_date AS date,
-                merchant,
-                amount,
-                category,
-                account
+            SELECT transaction_date, merchant, amount, category
             FROM canonical_transactions
             WHERE user_id = %s
-              AND transaction_date >= %s
-              AND transaction_date < %s
-            ORDER BY transaction_date DESC
-        """, (user_id, filters["date_from"], filters["date_to"]))
+            ORDER BY transaction_date
+        """, (user_id,))
 
         while True:
-            chunk = cursor.fetchmany(1000)
+            chunk = cursor.fetchmany(10000)  # Fetch 10K at a time
             if not chunk:
                 break
             for row in chunk:
                 yield dict(row)
 
-    # Export
     config = ExportConfig(
         format=format,
-        filename=f"transactions-{filters['date_from']}-{filters['date_to']}.{format}",
+        filename=f"transactions-{user_id}.{format}",
         filters_applied=filters,
-        columns=["date", "merchant", "amount", "category", "account"],
-        include_summary=True,
-        include_metadata=True
+        columns=["transaction_date", "merchant", "amount", "category"]
     )
 
+    # Export (5-10 min for 8.5M rows)
     if format == "csv":
         result = engine.export_csv_streaming(rows_iterator(), config)
     elif format == "xlsx":
         result = engine.export_excel_streaming(rows_iterator(), config)
 
-    # Notify user (email with download link)
-    send_export_email(
-        user_id=user_id,
-        download_url=result.file_url,
-        row_count=result.row_count,
-        size_mb=result.size_bytes / 1024 / 1024
-    )
+    # Send email notification
+    send_export_ready_email(user_id, result)
 
     return result
 
-# API endpoint triggers background job
-@app.post("/api/transactions/export")
-def request_export(user_id: int, filters: dict, format: str):
-    # Queue background job
-    task = export_transactions_async.delay(user_id, filters, format)
-
-    return {
-        "message": "Export started. You'll receive an email when ready.",
-        "task_id": task.id,
-        "estimated_time": "5-10 minutes"
-    }
+# Trigger background job (non-blocking)
+task = export_transactions_async.delay(user_id=123, filters={"year": 2024}, format="csv")
+# → Returns immediately, runs in background
+# → User gets email when complete (5 min later)
 ```
-
-**Performance (8.5M rows):**
-```
-CSV Export (8.5M rows):
-- Memory usage: 50MB (constant, not 8.5M * row_size)
-- Processing time: 4 minutes 12 seconds
-- Output file size: 1.2GB
-- S3 upload time: 45 seconds
-- Total time: 5 minutes
-
-Excel Export (8.5M rows):
-- Memory usage: 120MB (openpyxl optimization)
-- Processing time: 8 minutes 30 seconds
-- Output file size: 850MB (compressed)
-- S3 upload time: 35 seconds
-- Total time: 9 minutes
-```
-
-**Why Background Jobs:**
-- HTTP request timeout: 30-60 seconds
-- Large export processing: 5-10 minutes
-- Solution: Queue job, email link when ready
 
 **Email Notification:**
 ```
@@ -1040,6 +962,60 @@ https://exports-production.s3.amazonaws.com/exports/2025-05-23/transactions-2020
 
 - RSRCH Team
 ```
+
+**Características Incluidas:**
+- ✅ Streaming exports (constant memory: 50MB for 8.5M rows)
+- ✅ Multiple formats (CSV, PDF, Excel)
+- ✅ S3 storage (cloud, not local disk)
+- ✅ Background jobs (Celery worker)
+- ✅ Email notification with presigned URL
+- ✅ Excel with multiple sheets (Metadata, Data, Summary)
+- ✅ Professional formatting (freeze panes, currency format)
+- ✅ Chunked processing (10K rows at a time)
+
+**Características NO Incluidas:**
+- ❌ Custom PDF templates per tenant (YAGNI: basic template works)
+- ❌ Compression (YAGNI: S3 handles transfer optimization)
+
+**Configuración:**
+```yaml
+exports:
+  s3_bucket: "exports-production"
+  chunk_size: 10000
+  presigned_url_expiry_seconds: 86400  # 24 hours
+  celery:
+    broker_url: "redis://localhost:6379/0"
+    result_backend: "redis://localhost:6379/0"
+  email:
+    enabled: true
+    from_address: "exports@rsrch.com"
+```
+
+**Performance:**
+```
+CSV Export (8.5M rows):
+- Memory usage: 50MB (constant, not 8.5M * row_size)
+- Processing time: 4 minutes 12 seconds
+- Output file size: 1.2GB
+- S3 upload time: 45 seconds
+- Total time: 5 minutes
+
+Excel Export (8.5M rows):
+- Memory usage: 120MB (openpyxl optimization)
+- Processing time: 8 minutes 30 seconds
+- Output file size: 850MB (compressed)
+- Total time: 9 minutes
+```
+
+**Why Background Jobs:**
+- HTTP request timeout: 30-60 seconds
+- Large export processing: 5-10 minutes
+- Solution: Queue job, email link when ready
+
+**No Further Tiers:**
+- Scale horizontally (more Celery workers)
+
+---
 
 ### Comparison Table
 
