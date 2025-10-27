@@ -13,6 +13,184 @@ Internal metadata wrapper for uploaded files. Bridges StorageEngine (content) wi
 
 ---
 
+## Simplicity Profiles
+
+**This section shows how the same universal metadata wrapper is configured differently based on usage scale.**
+
+### Profile 1: Personal Use (Finance App - Simple Metadata, No GC)
+
+**Context:** Darwin uploads 1-2 bank statements per month, never deletes uploads (keeps all history)
+
+**Configuration:**
+```yaml
+file_artifact:
+  reference_counting: false  # Never delete files (history kept forever)
+  virus_scanning: false  # Local files from trusted source (bank website)
+  thumbnail_generation: false  # PDFs don't need thumbnails
+  metadata_extensions: false  # No custom fields needed
+```
+
+**What's Used:**
+- ✅ Core metadata - `file_name`, `file_size_bytes`, `mime_type`, `file_hash`
+- ✅ Upload context - `uploaded_at`, `source_type`
+- ✅ Dedupe by hash - Same statement uploaded twice → Same `file_id`
+- ✅ Storage reference - `storage_ref` to retrieve content from StorageEngine
+
+**What's NOT Used:**
+- ❌ `ref_count` - Never delete files (no GC needed)
+- ❌ `last_accessed_at` - Not tracking access patterns
+- ❌ Virus scanning - Trusts files from bank website
+- ❌ Thumbnail generation - No image previews
+- ❌ OCR text extraction - Not searching PDF content
+- ❌ Extended metadata (tags, categories) - Keep it simple
+
+**Implementation Complexity:** **LOW**
+- ~50 lines Python
+- SQLite table with basic fields
+- UNIQUE index on `file_hash` for dedupe
+- No background jobs (no GC, no scanning)
+
+**Narrative Example:**
+> Darwin uploads "BoFA_Oct2024.pdf" (2.3MB). API calculates hash `sha256:abc123...`. Check FileArtifact table: No existing record with this hash. Create: `{"file_id": "FILE_001", "file_hash": "sha256:abc123...", "storage_ref": "sha256:abc123...", "file_name": "BoFA_Oct2024.pdf", "file_size_bytes": 2300000, "mime_type": "application/pdf", "source_type": "bofa_pdf", "uploaded_at": "2024-10-27T10:00:00Z"}`. UploadRecord references `file_id: "FILE_001"`. Week later, Darwin accidentally re-uploads same PDF → Hash calculated (`sha256:abc123...`) → FileArtifact query finds existing `FILE_001` → Return same artifact → UploadRecord links to same `file_id` (dedupe worked). Files never deleted (no ref_count tracking, user keeps all statements forever).
+
+---
+
+### Profile 2: Small Business (Accounting Firm - Reference Counting, GC)
+
+**Context:** 10 accountants upload client docs, delete old uploads after tax season (7-year retention)
+
+**Configuration:**
+```yaml
+file_artifact:
+  reference_counting: true  # Track refs for GC
+  gc_policy:
+    enabled: true
+    orphan_threshold_days: 90  # Delete if unreferenced for 90 days
+    check_interval_hours: 24  # Run daily GC check
+  virus_scanning:
+    enabled: true
+    engine: "clamav"  # Open-source virus scanner
+    scan_on_upload: true
+  metadata_extensions:
+    tags: true  # Allow custom tags per file
+    client_id: true  # Associate with client
+```
+
+**What's Used:**
+- ✅ Core metadata - `file_name`, `file_size_bytes`, `mime_type`, `file_hash`
+- ✅ Reference counting - `ref_count` tracks how many UploadRecords reference this file
+- ✅ Garbage collection - Delete FileArtifact if `ref_count=0` for >90 days
+- ✅ Virus scanning - Scan uploads with ClamAV before storage
+- ✅ Extended metadata - `client_id`, `tags` for organizing files
+- ✅ Access tracking - `last_accessed_at` for audit logs
+
+**What's NOT Used:**
+- ❌ Thumbnail generation - Not needed for PDFs/CSVs
+- ❌ OCR text extraction - Not searching file content
+- ❌ Advanced audit - Just basic access timestamps
+
+**Implementation Complexity:** **MEDIUM**
+- ~200 lines Python
+- SQLite table + extended fields (`ref_count`, `client_id`, `tags`, `scan_status`)
+- ClamAV integration for virus scanning
+- Background GC job (runs daily, deletes orphaned files)
+- Email notifications when virus detected
+
+**Narrative Example:**
+> Accountant uploads client receipt "Target_receipt.pdf" (450KB). Hash calculated → No existing file → ClamAV scan triggered → Clean ✅ → FileArtifact created `{"file_id": "FILE_123", "file_hash": "sha256:def456...", "scan_status": "clean", "ref_count": 1, "client_id": "CLIENT_ABC"}`. UploadRecord created linking to `FILE_123`. Tax season ends, accountant deletes upload → `ref_count` decremented to 0 → GC job (runs daily) checks: `ref_count=0` AND `last_accessed_at` > 90 days ago? No (only 30 days) → Keep file. 90 days later → GC checks again → `ref_count=0` AND 90+ days → Delete FileArtifact → StorageEngine deletes underlying file (7-year retention met).
+>
+> Alternative: Different client uploads same receipt → Hash calculated (`sha256:def456...`) → FileArtifact found (`FILE_123`) → `ref_count` incremented to 2 → Now 2 UploadRecords reference same file → Even if Client A deletes upload, `ref_count=1` → File not GC'd (Client B still needs it).
+
+---
+
+### Profile 3: Enterprise (Bank - Virus Scanning, Audit Trails, Extended Metadata)
+
+**Context:** Bank processes 10,000 uploads/day, strict security (virus scanning mandatory), regulatory audit trails required
+
+**Configuration:**
+```yaml
+file_artifact:
+  reference_counting: true
+  gc_policy:
+    enabled: true
+    orphan_threshold_days: 3650  # 10 years (regulatory retention)
+    check_interval_hours: 6  # Run GC 4x/day
+  virus_scanning:
+    enabled: true
+    engines: ["clamav", "virustotal"]  # Multi-engine scanning
+    scan_on_upload: true
+    quarantine_infected: true  # Move to separate S3 bucket
+    rescan_interval_days: 30  # Re-scan periodically (detect new signatures)
+  thumbnail_generation:
+    enabled: true  # Generate previews for images/PDFs
+    sizes: [128, 256, 512]  # Multiple thumbnail sizes
+  ocr:
+    enabled: true  # Extract text from PDFs for search
+    language: "en"
+  metadata_extensions:
+    customer_id: true
+    document_type: true  # "statement", "loan_doc", "kyc_form"
+    compliance_flags: true  # PII detected, sensitive content
+  audit:
+    track_access: true
+    track_downloads: true
+    log_to: "audit_log_table"
+  metrics:
+    enabled: true
+    backend: "prometheus"
+    labels:
+      - source_type
+      - scan_status
+      - document_type
+```
+
+**What's Used:**
+- ✅ Core metadata - Full suite
+- ✅ Reference counting - Track refs for complex GC (10-year retention)
+- ✅ Multi-engine virus scanning - ClamAV + VirusTotal API
+- ✅ Quarantine infected files - Move to `s3://bank-quarantine/`
+- ✅ Periodic re-scanning - Detect new malware signatures
+- ✅ Thumbnail generation - Preview PDFs/images in UI
+- ✅ OCR text extraction - Enable full-text search
+- ✅ Extended metadata - `customer_id`, `document_type`, `compliance_flags`
+- ✅ Audit trails - Log every access, download, scan
+- ✅ Prometheus metrics - Track scan rates, file sizes, document types
+- ✅ Compliance flags - Auto-detect PII (SSN, credit card numbers)
+
+**What's NOT Used:**
+- (All features enabled at enterprise scale)
+
+**Implementation Complexity:** **HIGH**
+- ~1000 lines TypeScript/Python
+- PostgreSQL table with extensive metadata fields
+- ClamAV + VirusTotal API integration
+- S3 quarantine bucket with lifecycle policies
+- Background workers: GC (runs 4x/day), re-scanning (runs weekly), thumbnail gen (async queue)
+- OCR pipeline (Tesseract or AWS Textract)
+- Comprehensive audit logging (every access logged to AuditLog table)
+- Monitoring dashboards: Virus detection rate, scan latency, storage growth by document_type
+
+**Narrative Example:**
+> Customer uploads mortgage deed PDF (200MB). Hash calculated → No existing file → FileArtifact record created with `scan_status="pending"` → Async virus scan job triggered:
+> 1. ClamAV scan (2s) → Clean ✅
+> 2. VirusTotal API upload (15s) → 0/60 engines detected malware ✅
+> 3. Update FileArtifact: `{"scan_status": "clean", "scan_timestamp": "2024-10-27T10:05:00Z"}`
+> 4. OCR extraction job triggered → Extract text from PDF (45s) → Store in `ocr_text` field (enables search)
+> 5. Thumbnail generation → Create 3 sizes (128px, 256px, 512px) → Store refs in `thumbnail_refs`
+> 6. PII detection → Scan OCR text for SSNs, credit card numbers → Found SSN → Set `compliance_flags: ["pii_detected"]`
+> 7. Audit log: `{"event": "file_uploaded", "file_id": "FILE_VIP_999", "customer_id": "CUST_12345", "scan_status": "clean", "pii_detected": true}`
+> 8. Prometheus metrics: `file_uploads_total{source_type="mortgage_deed",scan_status="clean"}++`, `file_size_bytes{document_type="deed"} 200000000`
+>
+> 30 days later, automated re-scan job runs → Re-scan with updated virus signatures → Still clean ✅. 10 years later, mortgage closed → UploadRecord deleted → `ref_count` decremented to 0 → GC job (runs 4x/day) waits 10 years (regulatory retention) → `ref_count=0` AND 10+ years → Delete FileArtifact → Delete from S3 → Delete thumbnails → Delete OCR text → Audit log: `{"event": "file_deleted_gc", "file_id": "FILE_VIP_999", "retention_met": true}`.
+>
+> Alternative: Infected file uploaded → ClamAV detects malware → `scan_status="infected"` → Move to quarantine bucket `s3://bank-quarantine/FILE_VIRUS_001` → Alert fired: "P1: Malware detected in upload (file_id: FILE_VIRUS_001, customer_id: CUST_12345)" → Security team investigates → Customer device compromised → Contact customer, remediate.
+
+---
+
+**Key Insight:** The same `FileArtifact` metadata structure works across all 3 profiles. Personal use tracks bare minimum (hash, name, size); Small business adds reference counting for GC and virus scanning; Enterprise adds multi-engine scanning, OCR, thumbnails, compliance flags, and audit trails for regulatory requirements.
+
+---
+
 ## Schema
 
 ```typescript

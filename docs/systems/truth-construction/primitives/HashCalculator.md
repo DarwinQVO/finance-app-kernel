@@ -13,6 +13,151 @@ Streaming hash calculation for large files without loading entire content into m
 
 ---
 
+## Simplicity Profiles
+
+**This section shows how the same universal primitive is configured differently based on usage scale.**
+
+### Profile 1: Personal Use (Finance App - Small PDFs, ~2MB)
+
+**Context:** Darwin uploads 1-2 bank statements per month (PDFs, ~2MB each) to personal finance app
+
+**Configuration:**
+```yaml
+hash_calculator:
+  algorithm: "sha256"
+  chunk_size_kb: 8
+  verify_on_retrieve: false  # Trust filesystem integrity
+```
+
+**What's Used:**
+- ✅ `calculateHash()` - In-memory hashing for small PDFs (<10MB)
+- ✅ SHA-256 algorithm - Standard, well-tested
+- ✅ Basic deduplication - Same hash = same file
+
+**What's NOT Used:**
+- ❌ `calculateHashStreaming()` - Files fit in memory (<10MB)
+- ❌ `verifyHash()` on retrieval - Filesystem trusted (no corruption expected)
+- ❌ Multi-algorithm support - SHA-256 sufficient
+- ❌ Chunk size tuning - Default 8KB works fine
+- ❌ Performance metrics - No latency tracking
+- ❌ Integrity verification - No re-hashing on retrieval
+
+**Implementation Complexity:** **LOW**
+- ~30 lines Python
+- Uses stdlib `hashlib.sha256()` only
+- No configuration file (hardcoded algorithm)
+- No tests (verify manually that dedupe works)
+
+**Narrative Example:**
+> Darwin selects "BoFA_Oct2024.pdf" (2.3MB) in upload dialog. The app reads file into memory (2.3MB RAM), calls `HashCalculator.calculateHash(file_bytes)`. The calculator iterates once with `hasher.update(file_bytes)`, returns `sha256:abc123...` in 25ms. Later, Darwin accidentally re-uploads same file. Hash calculated again (`sha256:abc123...`), matches existing → "Already uploaded" message shown. No streaming needed (file fits in RAM).
+
+---
+
+### Profile 2: Small Business (Accounting Firm - Mixed File Sizes, up to 100MB)
+
+**Context:** Accounting firm processes client documents (receipts, tax forms, large scanned PDFs) with files ranging 100KB-100MB
+
+**Configuration:**
+```yaml
+hash_calculator:
+  algorithm: "sha256"
+  chunk_size_kb: 16  # Larger chunks for efficiency
+  verify_on_retrieve: true  # Detect corruption
+  streaming_threshold_mb: 10  # Use streaming for files >10MB
+```
+
+**What's Used:**
+- ✅ `calculateHash()` - For small files (<10MB)
+- ✅ `calculateHashStreaming()` - For large scanned PDFs (>10MB)
+- ✅ `verifyHash()` - Re-hash on retrieval to detect corruption
+- ✅ Automatic selection - Switch to streaming when file >10MB
+- ✅ SHA-256 standard - No custom algorithms needed
+
+**What's NOT Used:**
+- ❌ Multi-algorithm support - SHA-256 only
+- ❌ Advanced metrics - No Prometheus, just basic logging
+- ❌ Custom chunk sizes per file type - Fixed 16KB
+
+**Implementation Complexity:** **MEDIUM**
+- ~100 lines Python
+- Auto-detects file size, routes to in-memory or streaming
+- Basic logging: "Hashing file (streaming=true, size=45MB, latency=450ms)"
+- Unit tests: Verify streaming matches in-memory for same file
+
+**Narrative Example:**
+> Client uploads tax return PDF (850KB). HashCalculator checks size (< 10MB), uses `calculateHash()` in-memory (5ms). Next client uploads scanned binder (78MB). HashCalculator checks size (> 10MB), uses `calculateHashStreaming()` with 16KB chunks (780ms, O(16KB) memory). Both files stored with hashes. Week later, accountant retrieves 78MB binder. `verifyHash()` re-hashes file → Matches stored hash → No corruption. If mismatch detected → Alert "File corrupted, re-upload needed".
+
+---
+
+### Profile 3: Enterprise (Bank - Large Files, Regulatory Compliance)
+
+**Context:** Bank processes mortgage applications (loan docs, deed scans, appraisals) with files ranging 1MB-500MB, GLBA/SOX compliance requires integrity verification
+
+**Configuration:**
+```yaml
+hash_calculator:
+  algorithm: "sha256"
+  fallback_algorithm: "blake2b"  # Future-proofing if SHA-256 broken
+  chunk_size_kb: 64  # Optimized for network transfer
+  verify_on_retrieve: true  # Always verify (regulatory requirement)
+  verify_on_storage: true  # Double-check hash after write
+  streaming_threshold_mb: 1  # Always stream (even small files, for consistency)
+  metrics:
+    enabled: true
+    backend: "prometheus"
+    labels:
+      - document_type
+      - file_size_bucket
+  logging:
+    structured: true
+    format: "json"
+    level: "info"
+    include_hash_prefix: true  # Log first 8 chars for debugging
+  integrity_checks:
+    detect_known_malware_hashes: true  # Block known malicious files
+    quarantine_on_mismatch: true  # Move corrupted files to quarantine
+```
+
+**What's Used:**
+- ✅ `calculateHashStreaming()` - Always streaming (even 1MB files, for consistency)
+- ✅ `verifyHash()` on storage AND retrieval - Double verification (regulatory compliance)
+- ✅ Multi-algorithm support - SHA-256 + BLAKE2b fallback (future-proofing)
+- ✅ Large chunk size (64KB) - Optimized for S3 network transfer
+- ✅ Prometheus metrics - Track p95 latency, hash mismatch rate, malware detections
+- ✅ Structured logging - JSON logs with trace IDs, hash prefixes for debugging
+- ✅ Malware detection - Check hash against known-bad hash database
+- ✅ Quarantine on mismatch - Move corrupted files to separate S3 bucket
+- ✅ Integrity verification required - SOX/GLBA compliance (prove file integrity)
+
+**What's NOT Used:**
+- ❌ In-memory hashing - Always stream (regulatory requirement for audit trail)
+
+**Implementation Complexity:** **HIGH**
+- ~800 lines TypeScript/Python
+- Dependencies: Prometheus client, Winston (logging), AWS SDK (S3 integrity checks)
+- Malware hash database (updated daily from threat intel feeds)
+- Comprehensive test suite: Unit tests, integrity mismatch scenarios, corruption detection
+- Monitoring dashboards: Hash calculation latency (p50/p95/p99), mismatch rate (alert if >0.1%), malware detection count
+- On-call runbook: P1 incident (integrity check failures spike → investigate S3 corruption/attack)
+
+**Narrative Example:**
+> Customer submits mortgage app with 200MB deed scan. API receives upload, streams to `HashCalculator.calculateHashStreaming()`. As 64KB chunks arrive:
+> 1. Update SHA-256 hash incrementally (64KB × 3125 iterations = 200MB)
+> 2. Log progress every 10%: `{"trace_id":"abc-123","progress":"30%","bytes_hashed":60000000}`
+> 3. After final chunk, finalize hash: `sha256:def456...` (calculation took 2.1s)
+> 4. Check malware database: Hash not in known-bad list ✅
+> 5. Write file to S3, immediately verify: Re-hash from S3 → Matches `sha256:def456...` ✅ (storage integrity confirmed)
+> 6. Record Prometheus metrics: `hash_calculation_latency{document_type="deed",file_size_bucket="100-500MB"} 2.1`, `hash_verifications_total{status="success"}++`
+> 7. Log structured JSON: `{"trace_id":"abc-123","operation":"hash_calculate","hash":"sha256:def456...","size_bytes":209715200,"latency_ms":2100,"verification":"passed"}`
+>
+> 10 years later, compliance audit retrieves deed. `verifyHash()` re-hashes from S3 → Hash mismatch! (`sha256:def456...` expected, got `sha256:xyz999...`) → File quarantined to `s3://bank-quarantine/corrupted/`, alert fired: "P1: Integrity failure on deed #12345, possible bit rot or tampering". Compliance officer investigates → S3 bit rot detected → Restores from backup → Re-verifies hash → Passes.
+
+---
+
+**Key Insight:** The same `HashCalculator` interface (`calculateHash`, `verifyHash`) works across all 3 profiles. Personal use stays in-memory for simplicity; Small business adds streaming for large files; Enterprise always streams with double verification and malware checks for compliance.
+
+---
+
 ## Interface Contract
 
 ```typescript

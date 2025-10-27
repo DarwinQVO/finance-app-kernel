@@ -13,6 +13,207 @@ Content-addressable storage engine for immutable artifacts (files, documents, bi
 
 ---
 
+## Simplicity Profiles
+
+**This section shows how the same universal primitive is configured differently based on usage scale.**
+
+### Profile 1: Personal Use (Finance App - 500 transactions/month)
+
+**Context:** Darwin's personal finance app uploads 1-2 bank statements per month (PDFs, ~2MB each)
+
+**Configuration:**
+```yaml
+storage_engine:
+  backend: "filesystem"
+  base_path: "/Users/darwin/.finance-app/storage"
+  hash_algorithm: "sha256"
+  chunk_size_kb: 8
+  max_file_size_mb: 50
+  compression: false
+  gc_policy:
+    enabled: false  # No GC needed (storage grows ~24MB/year)
+    retention_days: null
+    orphan_check_enabled: false
+```
+
+**What's Used:**
+- ✅ `store()` - Upload bank statement PDFs
+- ✅ `exists()` - Check if statement already uploaded (dedupe protection)
+- ✅ `retrieve()` - Fetch PDF for viewing/re-parsing
+- ✅ `calculateHash()` - Generate unique ID for uploads
+- ✅ Filesystem backend - Simple, local, no cloud dependencies
+- ✅ Immutability - Statements never change once uploaded
+
+**What's NOT Used:**
+- ❌ Streaming hash calculation - Files < 50MB (fit in memory)
+- ❌ S3 backend - No need for cloud storage
+- ❌ Compression - PDFs already compressed
+- ❌ Encryption at rest - Files stored locally on user's machine
+- ❌ GC policy - Storage footprint tiny (24MB/year negligible)
+- ❌ Metrics/logging - No Prometheus, no structured logs
+- ❌ Access control - Single user app (no multi-tenancy)
+- ❌ Versioning - Upload once, never update
+- ❌ Quota enforcement - Disk space not a constraint
+
+**Implementation Complexity:** **LOW**
+- Single Python file (~150 lines)
+- No external dependencies (uses stdlib `hashlib`, `os`, `shutil`)
+- No configuration file (hardcoded paths)
+- No tests (user verifies uploads work)
+
+**Narrative Example:**
+> Darwin opens the app, clicks "Upload Statement", selects BoFA_Oct2024.pdf (2.3MB). The `FilesystemStorageEngine` calculates hash `sha256:abc123...`, checks if it exists (it doesn't), writes the file to `/Users/darwin/.finance-app/storage/content/ab/c1/23...`, and returns ref `sha256:abc123...`. The ProvenanceLedger records `UPLOAD_xyz → sha256:abc123...`. If Darwin accidentally uploads the same file again, `exists()` returns true, and the system shows "Already uploaded on Oct 22, 2024" without storing duplicate.
+
+---
+
+### Profile 2: Small Business (Accounting Firm - 50 clients, 600 documents/month)
+
+**Context:** Accounting firm ingests client receipts, invoices, tax forms for 50 small businesses
+
+**Configuration:**
+```yaml
+storage_engine:
+  backend: "filesystem"
+  base_path: "/var/accounting-data/storage"
+  hash_algorithm: "sha256"
+  chunk_size_kb: 8
+  max_file_size_mb: 100
+  compression: true  # Enable gzip for text-heavy PDFs
+  gc_policy:
+    enabled: true
+    retention_days: 2555  # 7 years (IRS requirement)
+    orphan_check_enabled: true  # Clean up test uploads
+  metrics:
+    enabled: true  # Track storage growth
+    backend: "statsd"  # Simple metrics (no Prometheus needed)
+```
+
+**What's Used:**
+- ✅ `store()` - Upload client documents
+- ✅ `exists()` - Dedupe when same receipt uploaded by multiple users
+- ✅ `retrieve()` - Fetch for tax prep, audits
+- ✅ `calculateHash()` - Unique IDs
+- ✅ `delete()` - Remove documents after 7-year retention
+- ✅ Filesystem backend - On-premise server (no cloud for compliance)
+- ✅ Compression - Text-heavy PDFs compress 50% (save storage)
+- ✅ GC policy - Auto-delete after 7 years (IRS compliance)
+- ✅ Deduplication - Same vendor invoice from multiple clients → store once
+- ✅ Basic metrics - Track storage growth (StatsD + Grafana dashboard)
+
+**What's NOT Used:**
+- ❌ Streaming hash - Files < 100MB
+- ❌ S3 backend - On-premise requirement (client data privacy)
+- ❌ Encryption at rest - Handled by disk-level encryption (BitLocker)
+- ❌ Advanced observability - No Prometheus, no trace IDs
+- ❌ Access control in StorageEngine - Handled at API layer
+- ❌ Versioning - Documents immutable (new versions = new uploads)
+
+**Implementation Complexity:** **MEDIUM**
+- ~300 lines Python
+- Dependencies: `gzip`, `statsd` client
+- YAML config file
+- Basic unit tests (dedupe, GC, compression)
+- Automated GC cron job (runs weekly)
+
+**Narrative Example:**
+> Client Alice uploads receipt "Target_Jan15.pdf" (450KB). `FilesystemStorageEngine` compresses it to 220KB (gzip), stores as `sha256:def456...`. Week later, Client Bob uploads identical receipt (shared expense). `exists()` returns true, returns same ref `sha256:def456...` (saves 220KB storage). After 7 years, GC job runs, checks if `sha256:def456...` has any references in `ProvenanceLedger`. If no active clients reference it, deletes file (IRS retention met).
+
+---
+
+### Profile 3: Enterprise (Financial Institution - 1M customers, 10M documents/month)
+
+**Context:** Bank processes credit card statements, loan documents, KYC files for 1M customers
+
+**Configuration:**
+```yaml
+storage_engine:
+  backend: "s3"
+  bucket: "bank-document-storage-prod"
+  region: "us-east-1"
+  hash_algorithm: "sha256"
+  chunk_size_kb: 8
+  max_file_size_mb: 500
+  compression: true
+  encryption:
+    enabled: true
+    algorithm: "AES-256-GCM"
+    key_management: "aws-kms"  # Envelope encryption
+  gc_policy:
+    enabled: true
+    retention_days: 3650  # 10 years (banking regulation)
+    orphan_check_enabled: true
+  streaming:
+    enabled: true  # Required for files >50MB
+    chunk_size_kb: 64  # Larger chunks for network efficiency
+  metrics:
+    enabled: true
+    backend: "prometheus"
+    labels:
+      - region
+      - document_type
+  logging:
+    structured: true
+    format: "json"
+    level: "info"
+    trace_id: true  # Distributed tracing
+  access_control:
+    enabled: true
+    acl_backend: "database"  # Per-document ACLs
+  quota:
+    enabled: true
+    per_tenant_gb: 1000  # 1TB per banking division
+```
+
+**What's Used:**
+- ✅ `store()` with streaming - Handle large loan agreements (200MB PDFs)
+- ✅ `exists()` - Dedupe across 1M customers (same template → 1 copy)
+- ✅ `retrieveStream()` - Stream large files to customer portal (P1 fix)
+- ✅ `delete()` with policy - Retention enforcement
+- ✅ `streamToResponse()` - Serve documents via HTTPS
+- ✅ S3 backend - Distributed, durable (99.999999999% durability)
+- ✅ Encryption at rest - Regulatory requirement (GLBA, SOX)
+- ✅ Encryption in transit - TLS 1.3
+- ✅ Streaming hash - Calculate hash during upload (no temp files)
+- ✅ GC policy - Auto-delete after 10 years (compliance)
+- ✅ Deduplication - Same statement template → 1 storage copy
+- ✅ Prometheus metrics - Track p95 latency, error rates, dedupe hit rate
+- ✅ Structured logging - JSON logs with trace IDs (distributed tracing)
+- ✅ Access control - Per-document ACLs (customer can only see their docs)
+- ✅ Quota enforcement - Prevent storage abuse (1TB per division)
+- ✅ Compression - Save 40% storage costs on text-heavy PDFs
+- ✅ Versioning - Track document updates (re-upload = new version)
+
+**What's NOT Used:**
+- ❌ Filesystem backend - Not scalable to 10M docs/month
+- ❌ Custom hash algorithms - SHA-256 sufficient (no blake2b needed)
+
+**Implementation Complexity:** **HIGH**
+- ~1500 lines TypeScript/Python
+- Dependencies: AWS SDK, KMS client, Prometheus client, Winston (logging)
+- Multi-region config (active-active for HA)
+- Comprehensive test suite (unit, integration, load tests)
+- Automated GC job (runs daily, processes 100K docs)
+- Monitoring dashboards (Grafana: latency, dedupe rate, storage growth)
+- On-call runbook (P1 incident: storage full, S3 outage)
+
+**Narrative Example:**
+> Customer submits mortgage application with 200MB PDF (deed, appraisal, title report). API receives upload, streams to `S3StorageEngine.store()`. As chunks arrive (64KB each), StorageEngine:
+> 1. Updates SHA-256 hash incrementally (no temp file)
+> 2. Encrypts each chunk with AES-256-GCM (KMS-managed key)
+> 3. Uploads to S3 bucket `s3://bank-document-storage-prod/content/ab/c1/23...`
+> 4. Checks `exists()` → finds same deed template from 50 other applications → returns existing ref (saves 200MB × 49 = 9.8GB storage via dedupe)
+> 5. Records Prometheus metrics: `storage_operations_total{operation="store", status="success"}++`, `storage_dedupe_hits_total++`
+> 6. Logs structured JSON: `{"trace_id":"abc-123","operation":"store","hash":"sha256:abc123...","size_bytes":209715200,"dedupe_hit":true,"latency_ms":3200}`
+> 7. Returns ref `sha256:abc123...` to API → ProvenanceLedger records `UPLOAD_mortgage_app_456 → sha256:abc123...`
+>
+> 10 years later, GC job runs, queries `ProvenanceLedger` for refs to `sha256:abc123...`, finds 50 active mortgages, keeps file. Year 11, last mortgage closed, GC deletes from S3 (retention met), logs deletion audit trail.
+
+---
+
+**Key Insight:** The same `StorageEngine` interface (`store`, `exists`, `retrieve`) works across all 3 profiles. Complexity lives in **configuration** and **optional features**, not in the core abstraction. Personal use ignores 90% of features; Enterprise enables all.
+
+---
+
 ## Interface Contract
 
 ### Core Methods
