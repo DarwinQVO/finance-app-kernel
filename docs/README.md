@@ -4,7 +4,42 @@
 
 ---
 
+## ⚡ Quick Start
+
+**If you're building a simple personal finance app:**
+→ Start with [Finance App Requirements](finance-app-requirements/) (simple, practical, 500 tx/month scale)
+
+**If you're designing universal abstractions:**
+→ Explore [Systems](systems/) (enterprise-ready, reusable, 10M+ tx/month scale)
+
+**If you're validating the architecture:**
+→ Read [Validation](validation/simple-app-uses-complex-abstractions.md) (can simple apps use complex abstractions?)
+
+---
+
 ## 🏗️ Architecture Overview
+
+This repository separates **simple requirements** from **universal abstractions**:
+
+```
+┌─────────────────────────────────────────────────┐
+│     FINANCE APP REQUIREMENTS (Simple)           │
+│     • Upload 10 PDFs/month                      │
+│     • View 500 transactions/month               │
+│     • Categorize spending                       │
+│     • Monthly reports                           │
+│     Scale: SQLite, filesystem, single user      │
+└─────────────────────────────────────────────────┘
+                    ▼ uses
+┌─────────────────────────────────────────────────┐
+│     UNIVERSAL ABSTRACTIONS (Complex)            │
+│     • 3 Systems (Truth Construction, Audit, API)│
+│     • 1 Library (Interface components)          │
+│     Scale: PostgreSQL, S3, 1000+ users          │
+└─────────────────────────────────────────────────┘
+```
+
+**Key Principle:** The simple app should be buildable using the complex abstractions without forcing enterprise complexity.
 
 This repository documents **3 independent systems + 1 reusable library** that work together to construct verifiable truth from raw artifacts. The finance application is used as a concrete example to demonstrate universal patterns.
 
@@ -81,11 +116,13 @@ Complete personal finance application showing how universal systems compose into
 
 | If you want to... | Start here |
 |-------------------|------------|
+| **Build a simple personal finance app** | [Finance App Requirements](finance-app-requirements/) (simple, 500 tx/month) |
+| **Validate architecture decisions** | [Validation: Simple → Complex](validation/simple-app-uses-complex-abstractions.md) |
 | **Understand the core data processing pipeline** | [Truth Construction System](systems/truth-construction/README.md) |
 | **Learn about audit trail and temporal queries** | [Audit System](systems/audit/README.md) |
 | **Set up authentication and API security** | [API/Auth System](systems/api-auth/README.md) |
 | **Build UIs with reusable components** | [Interface Library](libraries/interface/README.md) |
-| **See a complete application example** | [Finance App Verticals](#finance-app-example-23-verticals) |
+| **See enterprise-scale vertical specs** | [Finance App Verticals](#finance-app-example-23-verticals) (reference only) |
 
 ---
 
