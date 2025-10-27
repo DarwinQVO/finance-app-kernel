@@ -1735,9 +1735,151 @@ interface AccessControlMetrics {
 
 ## Simplicity Profiles
 
-**Personal - 0 LOC:** Not needed (single user, full access)
-**Small Business - ~70 LOC:** Role-based (admin/viewer), hardcoded rules
-**Enterprise - ~400 LOC:** RBAC + resource-level permissions, PostgreSQL
+### Personal Profile (0 LOC)
+
+**Contexto del Usuario:**
+Single-user app running locally. No multi-user access, no roles needed. User tiene acceso completo a todos sus datos.
+
+**Implementation:**
+```python
+# No implementation needed (0 LOC)
+# Single user = full access to all data
+```
+
+**Características Incluidas:**
+- ✅ Ninguna (access control no necesario)
+
+**Características NO Incluidas:**
+- ❌ Roles (YAGNI: 1 usuario)
+- ❌ Permissions (YAGNI: full access)
+- ❌ Resource-level ACL (YAGNI: all data belongs to user)
+
+**Configuración:**
+```python
+# No config needed
+```
+
+**Performance:**
+- Latency: N/A
+
+**Upgrade Triggers:**
+- Si necesita compartir con contador → Small Business (viewer role)
+- Si >2 usuarios → Small Business (role-based access)
+
+---
+
+### Small Business Profile (70 LOC)
+
+**Contexto del Usuario:**
+Firma con 10 empleados. Roles hardcoded: Admin (full access), Viewer (read-only). Simple permission checks basados en role.
+
+**Implementation:**
+```python
+ROLES = {
+    "admin": ["read", "write", "delete", "export"],
+    "viewer": ["read"]
+}
+
+def check_permission(user_id, action):
+    user = get_user(user_id)
+    role = user["role"]  # "admin" or "viewer"
+    return action in ROLES[role]
+```
+
+**Características Incluidas:**
+- ✅ 2 roles (admin, viewer)
+- ✅ 4 actions (read, write, delete, export)
+- ✅ Hardcoded permission matrix
+
+**Características NO Incluidas:**
+- ❌ Resource-level permissions (permisos aplican a todo)
+- ❌ PostgreSQL RLS (query-level checks)
+- ❌ Hierarchical roles
+
+**Configuración:**
+```yaml
+access_control:
+  roles:
+    admin: [read, write, delete, export]
+    viewer: [read]
+```
+
+**Performance:**
+- Latency: <1ms (dict lookup)
+
+**Upgrade Triggers:**
+- Si necesita permisos per-resource → Enterprise (resource-level ACL)
+- Si >3 roles → Enterprise (RBAC system)
+
+---
+
+### Enterprise Profile (400 LOC)
+
+**Contexto del Usuario:**
+FinTech con 5 roles (owner, editor, viewer, accountant, auditor), permissions per-resource, PostgreSQL RLS para enforcement automático.
+
+**Implementation:**
+```python
+# Permission matrix (5 roles × 7 actions)
+PERMISSION_MATRIX = {
+    "owner": ["read", "write", "delete", "export", "share", "unmask_pii", "admin"],
+    "editor": ["read", "write", "export"],
+    "viewer": ["read"],
+    "accountant_readonly": ["read", "export"],  # No PII unmasking
+    "auditor": ["read", "export", "unmask_pii"]  # Compliance audit
+}
+
+def check_permission(user_id, resource_id, action, tenant_id):
+    # 1. Get user role for this tenant
+    role = get_user_role(user_id, tenant_id)
+
+    # 2. Check global permission matrix
+    if action not in PERMISSION_MATRIX[role]:
+        return False
+
+    # 3. Check resource-level override (specific transactions)
+    resource_acl = get_resource_acl(resource_id)
+    if user_id in resource_acl.get("deny_list", []):
+        return False
+
+    return True
+
+# PostgreSQL RLS policy (automatic enforcement)
+CREATE POLICY tenant_isolation ON canonical_transactions
+    USING (tenant_id = current_setting('app.tenant_id')::uuid);
+
+CREATE POLICY viewer_readonly ON canonical_transactions
+    FOR DELETE
+    USING (get_user_role(current_user_id()) IN ('owner', 'editor'));
+```
+
+**Características Incluidas:**
+- ✅ 5 roles con permission matrix
+- ✅ Resource-level ACL overrides
+- ✅ PostgreSQL RLS (database-enforced)
+- ✅ Hierarchical permissions (tenant → upload → transaction)
+
+**Características NO Incluidas:**
+- ❌ Attribute-based access control (ABAC) - role-based sufficient
+
+**Configuración:**
+```yaml
+access_control:
+  postgres_rls: true
+  roles:
+    owner: [read, write, delete, export, share, unmask_pii, admin]
+    editor: [read, write, export]
+    viewer: [read]
+    accountant_readonly: [read, export]
+    auditor: [read, export, unmask_pii]
+```
+
+**Performance:**
+- Latency: <2ms p95 (Redis cache)
+- RLS overhead: ~10% query latency
+
+**No Further Tiers:**
+- Scale horizontally
 
 ---
 
