@@ -341,9 +341,293 @@ new_api_key = validator.rotate_key(old_key_id, "tenant_acme", ["read", "write"])
 
 ## Simplicity Profiles
 
-**Personal - ~15 LOC:** Single hardcoded API key check
-**Small Business - ~60 LOC:** SQLite key store, rate limiting
-**Enterprise - ~300 LOC:** PostgreSQL, key rotation, scopes, audit
+### Personal Profile (15 LOC)
+
+**Contexto del Usuario:**
+El usuario tiene una aplicación personal de finanzas. Genera 1 API key para su script de subida automática de estados de cuenta bancarios. El key nunca expira, no hay multi-tenancy (solo 1 usuario), no hay scopes (acceso completo). El key está hardcodeado en el script de Python que corre en su MacBook.
+
+**Implementation:**
+```python
+# api_auth.py (Personal - 15 LOC)
+API_KEY = "my_secret_key_abc123"  # Hardcoded (YAGNI: 1 key, nunca cambia)
+
+def validate_key(request_key: str) -> bool:
+    """
+    Validación simple de API key (comparación de strings).
+
+    Returns True si el key es válido, False si no.
+    """
+    return request_key == API_KEY  # Comparación directa de strings
+```
+
+**Características Incluidas:**
+- ✅ Validación de key (comparación de strings)
+- ✅ Constante hardcoded (1 key, no se necesita base de datos)
+
+**Características NO Incluidas:**
+- ❌ Bcrypt hashing (YAGNI: 1 key, filesystem local es trusted)
+- ❌ Expiración (YAGNI: el key nunca cambia)
+- ❌ Scopes (YAGNI: 1 usuario, acceso completo)
+- ❌ Revocación (YAGNI: simplemente borrar constante hardcoded)
+- ❌ Multi-tenancy (YAGNI: 1 usuario)
+- ❌ Redis cache (YAGNI: comparación de strings toma <1ms)
+
+**Configuración:**
+```python
+# No se necesita archivo de configuración
+# Simplemente editar constante API_KEY en el código
+```
+
+**Performance:**
+- Latency: <1ms (comparación de strings en memoria)
+- Memory: 0 bytes (sin base de datos, sin cache)
+- Dependencies: 0 (sin bcrypt, sin SQLite, sin Redis)
+
+**Upgrade Triggers:**
+- Si necesita >5 API keys → Small Business (tabla SQLite)
+- Si necesita multi-usuario → Small Business (campo tenant_id)
+- Si necesita expiración → Small Business (campo expires_at)
+
+---
+
+### Small Business Profile (60 LOC)
+
+**Contexto del Usuario:**
+Firma de consultoría pequeña (10 empleados). Cada empleado tiene un API key para sus scripts de automatización. Los keys expiran después de 90 días (política de seguridad). Necesitan rastrear quién creó cada key (audit trail).
+
+**Implementation:**
+```python
+# api_auth.py (Small Business - 60 LOC)
+import sqlite3
+import hashlib
+from datetime import datetime, timedelta
+
+class APIKeyValidator:
+    def __init__(self, db_path: str):
+        self.conn = sqlite3.connect(db_path)
+        self._create_table()
+
+    def _create_table(self):
+        """Crear tabla api_keys si no existe."""
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS api_keys (
+                key_id TEXT PRIMARY KEY,
+                key_hash TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                expires_at DATETIME NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+        """)
+
+    def validate_key(self, request_key: str) -> bool:
+        """
+        Validar API key (SHA-256 hash comparison).
+
+        Checks:
+        1. Key hash exists in database
+        2. Key no ha expirado (expires_at > now)
+
+        Returns True si válido, False si inválido o expirado.
+        """
+        key_hash = hashlib.sha256(request_key.encode()).hexdigest()
+        cursor = self.conn.execute("""
+            SELECT expires_at FROM api_keys
+            WHERE key_hash = ? AND expires_at > ?
+        """, (key_hash, datetime.now()))
+        return cursor.fetchone() is not None
+```
+
+**Características Incluidas:**
+- ✅ Múltiples keys (tabla SQLite)
+- ✅ Expiración (columna expires_at)
+- ✅ Basic hashing (SHA-256, no bcrypt)
+- ✅ Audit trail (campos user_id, created_at)
+
+**Características NO Incluidas:**
+- ❌ Bcrypt hashing (SHA-256 es suficiente para escala pequeña)
+- ❌ Redis caching (SQLite es rápido para <100 req/sec)
+- ❌ Scopes (todos tienen acceso completo)
+- ❌ Key rotation (manual: generar nuevo, borrar viejo)
+
+**Configuración:**
+```yaml
+api_auth:
+  db_path: "./api_keys.db"
+  default_expiration_days: 90
+```
+
+**Performance:**
+- Latency: <10ms (query SQLite)
+- Memory: ~1MB (SQLite in-memory cache)
+- Dependencies: sqlite3 (built-in Python), hashlib (built-in)
+
+**Upgrade Triggers:**
+- Si req/sec >100 → Enterprise (cache Redis)
+- Si necesita scopes → Enterprise (columna scopes)
+- Si compliance (SOC 2) → Enterprise (bcrypt + audit log completo)
+
+---
+
+### Enterprise Profile (300 LOC)
+
+**Contexto del Usuario:**
+Startup FinTech (1000 empleados, 10K clientes API). Necesitan bcrypt hashing (bcrypt cost 12), Redis caching (95% hit rate), scopes (separación read/write), key rotation (política trimestral), audit trail completo (HIPAA/SOC 2).
+
+**Implementation:**
+```python
+# api_auth.py (Enterprise - 300 LOC)
+import bcrypt
+import redis
+from datetime import datetime, timedelta
+from typing import Optional
+from dataclasses import dataclass
+
+@dataclass
+class AuthContext:
+    tenant_id: str
+    scopes: list[str]
+    api_key_id: str
+
+class APIKeyValidator:
+    def __init__(self, db: PostgreSQL, cache: Redis):
+        self.db = db
+        self.cache = cache
+        self.bcrypt_cost = 12
+
+    def validate_key(self, request_key: str) -> Optional[AuthContext]:
+        """
+        Validar API key con bcrypt y cache Redis.
+
+        Steps:
+        1. Check Redis cache (95% hit rate, <5ms)
+        2. Si cache miss: Query PostgreSQL (bcrypt comparison, <20ms)
+        3. Check expiration (expires_at < now?)
+        4. Check revocation (revoked_at != null?)
+        5. Update last_used_at (async, no bloquea request)
+        6. Cache result (TTL 5 minutos)
+        7. Return AuthContext (tenant_id, scopes, api_key_id)
+
+        Returns None si key inválido, expirado, o revocado.
+        """
+        # 1. Check Redis cache (95% hit rate, <5ms)
+        cached = self.cache.get(f"key:{request_key}")
+        if cached:
+            return AuthContext.from_json(cached)
+
+        # 2. Query PostgreSQL (cache miss, <20ms)
+        key_record = self.db.execute("""
+            SELECT key_hash, tenant_id, scopes, expires_at
+            FROM api_keys
+            WHERE key_hash = crypt(?, key_hash)
+              AND expires_at > NOW()
+              AND revoked_at IS NULL
+        """, (request_key,))
+
+        if not key_record:
+            return None
+
+        # 3. Verify bcrypt (constant-time comparison)
+        if not bcrypt.checkpw(request_key.encode(), key_record.key_hash):
+            return None
+
+        # 4. Cache result (TTL 5 minutos)
+        auth_context = AuthContext(
+            tenant_id=key_record.tenant_id,
+            scopes=key_record.scopes
+        )
+        self.cache.setex(
+            f"key:{request_key}",
+            300,  # 5 minutos
+            auth_context.to_json()
+        )
+
+        return auth_context
+
+    def generate_key(self, tenant_id: str, scopes: list[str], expires_at: datetime = None) -> str:
+        """
+        Generar API key cryptographically secure.
+
+        Steps:
+        1. Generate 32 random bytes (256 bits entropy)
+        2. Base64 encode
+        3. Format: sk_live_{b64_random}
+        4. Hash con bcrypt (cost factor 12)
+        5. Store hash en database (NUNCA plaintext)
+        6. Return plaintext key ONCE (usuario debe guardarlo)
+        """
+        import secrets, base64
+
+        key_bytes = secrets.token_bytes(32)  # 256 bits entropy
+        key_b64 = base64.urlsafe_b64encode(key_bytes).decode('utf-8')
+        api_key = f"sk_live_{key_b64}"
+
+        # Hash for storage (NEVER store plaintext)
+        key_hash = bcrypt.hashpw(api_key.encode('utf-8'), bcrypt.gensalt(rounds=12))
+
+        # Store hash
+        self.db.execute("""
+            INSERT INTO api_keys (api_key_id, tenant_id, key_hash, scopes, expires_at, created_at)
+            VALUES (gen_random_uuid(), ?, ?, ?, ?, NOW())
+        """, (tenant_id, key_hash, scopes, expires_at))
+
+        return api_key  # Return ONCE, user must save it
+
+    def revoke_key(self, api_key_id: str, revoked_by: str, revocation_reason: str):
+        """
+        Revocar API key (soft delete para audit trail).
+
+        Steps:
+        1. UPDATE api_keys SET revoked_at = NOW(), revoked_by = ?, ...
+        2. Invalidate cache (remove from Redis)
+        3. Log revocation event (AuditLogger)
+        """
+        self.db.execute("""
+            UPDATE api_keys
+            SET revoked_at = NOW(), revoked_by = ?, revocation_reason = ?
+            WHERE api_key_id = ?
+        """, (revoked_by, revocation_reason, api_key_id))
+
+        # Invalidate cache (keys expire within 5 minutes max)
+        self.cache.delete(f"key:{api_key_id}")
+```
+
+**Características Incluidas:**
+- ✅ Bcrypt hashing (cost 12, resistant a timing attacks)
+- ✅ Redis caching (95% hit rate, <5ms p95)
+- ✅ Scopes (separación read/write)
+- ✅ Key rotation (revoke old, generate new)
+- ✅ Audit trail completo (integración con AuditLogger)
+- ✅ Multi-tenancy (aislamiento tenant_id)
+- ✅ Metrics (Prometheus: validation_latency_ms)
+
+**Características NO Incluidas:**
+- ❌ Rate limiting por key (primitivo RateLimiter separado)
+- ❌ IP whitelisting (primitivo AccessControl separado)
+
+**Configuración:**
+```yaml
+api_auth:
+  database:
+    url: "postgresql://user:pass@host:5432/db"
+    pool_size: 20
+  cache:
+    redis_url: "redis://localhost:6379"
+    ttl_seconds: 300
+  bcrypt:
+    cost: 12
+  key_rotation:
+    policy: "quarterly"
+    warn_before_days: 30
+```
+
+**Performance:**
+- Latency: <5ms p95 (cache hit), <20ms p99 (cache miss)
+- Memory: ~50MB Redis cache
+- Throughput: 10K req/sec (single instance)
+- Dependencies: bcrypt, redis, postgresql
+
+**No Further Tiers:**
+- Scaling beyond Enterprise es horizontal (más instancias, no arquitectura diferente)
 
 ---
 
