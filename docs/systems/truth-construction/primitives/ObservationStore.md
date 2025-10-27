@@ -14,6 +14,306 @@ Persistent storage for raw extracted observations (unvalidated, AS-IS from parse
 
 ---
 
+## Simplicity Profiles
+
+**This section shows how the same universal storage primitive is configured differently based on usage scale.**
+
+### Profile 1: Personal Use (Finance App - Simple SQLite Storage)
+
+**Context:** Darwin uploads 1-2 bank statements per month, parser extracts ~40-50 transactions per statement
+
+**Configuration:**
+```yaml
+observation_store:
+  backend: "sqlite"
+  db_path: "~/.finance-app/data.db"
+  table_name: "observations"
+  indexes:
+    - upload_id  # Basic index for queries
+  bitemporal: false  # No version tracking
+  partitioning: false  # Single table
+  compression: false  # Data too small to compress
+```
+
+**What's Used:**
+- ✅ `upsert()` - Idempotent storage (upload_id, row_id) = composite key
+- ✅ `get_by_upload()` - Retrieve all observations for a statement
+- ✅ `count_by_upload()` - Show "42 transactions extracted"
+- ✅ SQLite backend - Simple, embedded, no server
+- ✅ Single table - observations stored as JSON TEXT blob
+- ✅ Basic index on `upload_id`
+
+**What's NOT Used:**
+- ❌ Bitemporal tracking - No `valid_from`/`valid_to` fields
+- ❌ Version history - Re-parsing overwrites (acceptable)
+- ❌ Partitioning - All observations in single table (~500 rows/year)
+- ❌ Compression - Data footprint tiny (~50KB/month)
+- ❌ JSON indexes - No querying inside `raw_data` blob
+- ❌ Replication - Local SQLite file
+- ❌ Metrics - No Prometheus tracking
+
+**Database Schema (SQLite):**
+```sql
+CREATE TABLE observations (
+    upload_id TEXT NOT NULL,
+    row_id INTEGER NOT NULL,
+    raw_data TEXT NOT NULL,  -- JSON blob: {"date": "10/15/2024", "amount": "-$87.43", ...}
+    parser_id TEXT NOT NULL,
+    parser_version TEXT NOT NULL,
+    extracted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (upload_id, row_id)
+);
+
+CREATE INDEX idx_upload_id ON observations(upload_id);
+```
+
+**Implementation Complexity:** **LOW**
+- ~80 lines Python
+- Uses sqlite3 stdlib
+- No ORM (direct SQL)
+- No connection pooling (single user)
+- No tests (manual verification)
+
+**Narrative Example:**
+> Darwin uploads "BoFA_Oct2024.pdf". Parser extracts 42 transactions. For each transaction (row_id 0-41), parser calls:
+> ```python
+> observation_store.upsert(Observation(
+>     upload_id="UL_abc123",
+>     row_id=0,
+>     raw_data={"date": "10/15/2024", "description": "WHOLE FOODS", "amount": "-$87.43"},
+>     parser_id="bofa_pdf_parser",
+>     parser_version="1.0.0",
+>     extracted_at="2024-10-27T10:00:03Z"
+> ))
+> ```
+> SQLite executes: `INSERT INTO observations (...) ON CONFLICT (upload_id, row_id) DO UPDATE ...`
+>
+> Week later, Darwin re-uploads same PDF (accidentally). Parser extracts same 42 transactions. Each `upsert()` call finds existing `(UL_abc123, row_id)` → Updates `raw_data`, `extracted_at` → No duplicates. Result: Still 42 observations (idempotent ✅).
+>
+> Darwin clicks "View Transactions" → UI calls `get_by_upload("UL_abc123")` → Returns 42 observations ordered by row_id → Display in table.
+
+---
+
+### Profile 2: Small Business (Accounting Firm - Multiple Uploads, Basic Optimization)
+
+**Context:** 10 accountants upload 50-100 client documents per day (~2,000 observations/day), need faster queries
+
+**Configuration:**
+```yaml
+observation_store:
+  backend: "sqlite"  # Still SQLite (sufficient for 730K rows/year)
+  db_path: "/var/accounting-data/observations.db"
+  table_name: "observations"
+  indexes:
+    - upload_id
+    - extracted_at  # Query "recent uploads"
+    - parser_id  # Filter by parser type
+  bitemporal: false
+  partitioning: false
+  compression: false
+  query_optimization:
+    analyze_on_startup: true  # SQLite ANALYZE for query planning
+    cache_size_mb: 100  # Increase SQLite cache
+  connection_pooling:
+    enabled: true
+    max_connections: 5  # 10 accountants, some concurrent
+```
+
+**What's Used:**
+- ✅ `upsert()` - Idempotent storage
+- ✅ `get_by_upload()` - Retrieve observations
+- ✅ `count_by_upload()` - Show extraction counts
+- ✅ `delete_by_upload()` - Remove old uploads (7-year retention)
+- ✅ Additional indexes - `extracted_at`, `parser_id` for filtering
+- ✅ Connection pooling - Handle concurrent uploads
+- ✅ Query optimization - ANALYZE for better query plans
+- ✅ Increased cache - 100MB SQLite page cache
+
+**What's NOT Used:**
+- ❌ Bitemporal - No version history
+- ❌ Partitioning - 730K rows/year manageable in single table
+- ❌ Compression - Data footprint acceptable (~50MB/year)
+- ❌ Replication - Single server
+- ❌ Advanced metrics - Just basic logging
+
+**Database Schema (SQLite):**
+```sql
+CREATE TABLE observations (
+    upload_id TEXT NOT NULL,
+    row_id INTEGER NOT NULL,
+    raw_data TEXT NOT NULL,
+    parser_id TEXT NOT NULL,
+    parser_version TEXT NOT NULL,
+    extracted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    client_id TEXT,  -- Extended: Link to client
+    PRIMARY KEY (upload_id, row_id)
+);
+
+CREATE INDEX idx_upload_id ON observations(upload_id);
+CREATE INDEX idx_extracted_at ON observations(extracted_at DESC);
+CREATE INDEX idx_parser_id ON observations(parser_id);
+CREATE INDEX idx_client_id ON observations(client_id);
+```
+
+**Implementation Complexity:** **MEDIUM**
+- ~200 lines Python
+- SQLite with connection pooling (sqlalchemy)
+- Query optimization (ANALYZE on startup)
+- Unit tests (test idempotent upsert, order guarantees)
+- Background job: Delete observations older than 7 years
+
+**Narrative Example:**
+> Accountant Alice uploads client tax return (85 line items). Parser extracts 85 observations → 85 `upsert()` calls → SQLite inserts 85 rows (300ms total, ~3.5ms per row). Same day, Accountant Bob uploads different client (120 line items) → 120 `upsert()` calls → Connection pool handles concurrent writes (no blocking).
+>
+> 7 years later, retention job runs: `DELETE FROM observations WHERE extracted_at < date('now', '-7 years')` → Removes 500K old observations (7 years × 730K/year) → Frees 30MB disk space.
+>
+> Query: "Show all uploads from last 7 days" → `SELECT DISTINCT upload_id FROM observations WHERE extracted_at > date('now', '-7 days')` → Index on `extracted_at` scans ~14K rows (2K/day × 7 days) in 50ms.
+
+---
+
+### Profile 3: Enterprise (Bank - High Volume, Partitioning, Replication)
+
+**Context:** Bank processes 10,000 statements/day (credit cards, checking accounts) = ~1.2M observations/day = 438M observations/year
+
+**Configuration:**
+```yaml
+observation_store:
+  backend: "postgresql"
+  connection:
+    host: "observations-primary.internal"
+    port: 5432
+    database: "observations"
+    pool_size: 50
+    max_overflow: 100
+  table_name: "observations"
+  partitioning:
+    enabled: true
+    strategy: "range"
+    partition_by: "extracted_at"
+    partition_interval: "1 month"  # Monthly partitions
+    retention_months: 36  # Keep 3 years online
+    archive_strategy: "s3_glacier"  # Archive to Glacier after 3 years
+  indexes:
+    - upload_id
+    - extracted_at
+    - parser_id
+    - document_type  # Filter by statement type
+  compression:
+    enabled: true
+    algorithm: "zstd"  # Compress raw_data JSON
+    level: 3
+  bitemporal: false  # Still no versioning (observations immutable)
+  replication:
+    enabled: true
+    replicas: 2  # Read replicas for analytics
+    sync_mode: "async"
+  query_optimization:
+    vacuum_schedule: "daily"
+    analyze_schedule: "hourly"
+    parallel_workers: 8
+  metrics:
+    enabled: true
+    backend: "prometheus"
+    labels:
+      - parser_id
+      - document_type
+      - partition
+  audit:
+    log_all_writes: true
+    log_destination: "audit_log_table"
+```
+
+**What's Used:**
+- ✅ All core methods - upsert, get, count, delete
+- ✅ PostgreSQL backend - Scalable, handles 438M rows/year
+- ✅ Monthly partitioning - 36 partitions × ~12M rows = manageable
+- ✅ Compression - zstd on `raw_data` JSON (40% savings)
+- ✅ Read replicas - 2 replicas for analytics queries (no impact on writes)
+- ✅ Connection pooling - 50 base + 100 overflow = 150 concurrent connections
+- ✅ Comprehensive indexes - Fast queries on upload_id, date, parser, document type
+- ✅ Prometheus metrics - Track upsert latency, partition size, compression ratio
+- ✅ Audit logging - Log every write for compliance
+- ✅ Retention + archival - Delete after 3 years, archive to Glacier
+- ✅ Query optimization - Daily VACUUM, hourly ANALYZE, parallel query execution
+
+**What's NOT Used:**
+- ❌ Bitemporal tracking - Observations still immutable (no version history needed)
+
+**Database Schema (PostgreSQL with Partitioning):**
+```sql
+-- Parent table
+CREATE TABLE observations (
+    upload_id TEXT NOT NULL,
+    row_id INTEGER NOT NULL,
+    raw_data JSONB NOT NULL,  -- JSONB for compression + JSON indexes
+    parser_id TEXT NOT NULL,
+    parser_version TEXT NOT NULL,
+    document_type TEXT NOT NULL,
+    extracted_at TIMESTAMPTZ NOT NULL,
+    client_id TEXT,
+    PRIMARY KEY (upload_id, row_id, extracted_at)  -- Partition key included
+) PARTITION BY RANGE (extracted_at);
+
+-- Monthly partitions (created automatically)
+CREATE TABLE observations_2024_10 PARTITION OF observations
+    FOR VALUES FROM ('2024-10-01') TO ('2024-11-01');
+
+CREATE TABLE observations_2024_11 PARTITION OF observations
+    FOR VALUES FROM ('2024-11-01') TO ('2024-12-01');
+-- ... 36 partitions total
+
+-- Indexes (created on each partition)
+CREATE INDEX idx_observations_2024_10_upload ON observations_2024_10(upload_id);
+CREATE INDEX idx_observations_2024_10_parser ON observations_2024_10(parser_id);
+CREATE INDEX idx_observations_2024_10_doctype ON observations_2024_10(document_type);
+
+-- GIN index for JSONB queries
+CREATE INDEX idx_observations_2024_10_raw_data ON observations_2024_10 USING GIN (raw_data);
+```
+
+**Implementation Complexity:** **HIGH**
+- ~1200 lines Python/TypeScript
+- SQLAlchemy ORM with PostgreSQL dialect
+- Partition manager (auto-create new monthly partitions, drop old ones)
+- Compression layer (zstd on write, decompress on read)
+- Connection pool monitoring (track active connections, alert on exhaustion)
+- Comprehensive test suite (idempotency, partition boundaries, compression)
+- Monitoring dashboards: Partition size, compression ratio, upsert p95 latency
+- Archival job: Export partitions >3 years to S3 Glacier, drop from PostgreSQL
+
+**Narrative Example:**
+> Customer's credit card statement processed (1,200 transactions). Parser extracts observations → 1,200 `upsert()` calls:
+> 1. Connection pool assigns connection from pool (currently 35/50 active)
+> 2. PostgreSQL determines partition: `extracted_at='2024-10-27'` → Routes to `observations_2024_10` partition
+> 3. Compress `raw_data` JSON with zstd level 3: 450 bytes → 180 bytes (60% compression)
+> 4. Execute: `INSERT INTO observations_2024_10 (...) ON CONFLICT (upload_id, row_id, extracted_at) DO UPDATE ...`
+> 5. Write to audit log: `{"event":"observation_upserted","upload_id":"UL_12345","row_id":0,"timestamp":"2024-10-27T10:00:00Z"}`
+> 6. Prometheus metrics: `observation_upserts_total{parser_id="credit_card_parser",document_type="statement"} ++`, `observation_upsert_duration_seconds{partition="2024_10"} 0.003`
+>
+> Total: 1,200 observations inserted in 3.6 seconds (3ms per row average, parallelized across 8 workers).
+>
+> **Analytics query** (runs on read replica to avoid impacting writes):
+> ```sql
+> SELECT parser_id, COUNT(*) as total, AVG(jsonb_array_length(raw_data->'transactions')) as avg_transactions
+> FROM observations
+> WHERE extracted_at >= '2024-10-01' AND document_type = 'credit_card_statement'
+> GROUP BY parser_id;
+> ```
+> Query planner: Scans only `observations_2024_10` partition (partition pruning) → 12M rows → Parallel scan (8 workers) → Result in 8 seconds.
+>
+> **Retention job** (runs monthly):
+> - Identify partitions older than 3 years: `observations_2021_10`
+> - Export to S3 Glacier: `pg_dump observations_2021_10 | gzip | aws s3 cp - s3://bank-archives/observations/2021_10.sql.gz --storage-class GLACIER`
+> - Drop partition: `DROP TABLE observations_2021_10;`
+> - Prometheus metric: `observation_partitions_archived_total ++`
+> - Audit log: `{"event":"partition_archived","partition":"2021_10","row_count":12150000,"archive_location":"s3://bank-archives/observations/2021_10.sql.gz"}`
+
+---
+
+**Key Insight:** The same `ObservationStore` interface works across all 3 profiles. Personal uses SQLite single table (80 lines); Small business adds indexes + connection pooling (200 lines); Enterprise uses PostgreSQL with partitioning, compression, replication, and archival (1200 lines). All use the same `upsert(upload_id, row_id)` idempotency guarantee.
+
+---
+
 ## Interface Contract
 
 ### Core Methods
