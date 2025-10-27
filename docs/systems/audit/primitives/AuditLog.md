@@ -2031,6 +2031,34 @@ def test_full_correction_flow():
 
 ---
 
+## Simplicity Profiles
+
+### Personal Profile (Darwin) - ~25 LOC
+**Context:** Simple change tracking for 871 transactions
+
+```python
+class AuditLog:
+    def log(self, entity_id, field, old_val, new_val, user="darwin"):
+        conn.execute("""INSERT INTO audit_log (entity_id, field_name, old_value, new_value, timestamp, user_id)
+                        VALUES (?, ?, ?, ?, ?, ?)""", (entity_id, field, str(old_val), str(new_val), datetime.now().isoformat(), user))
+        conn.commit()
+    def get_history(self, entity_id):
+        return conn.execute("SELECT * FROM audit_log WHERE entity_id = ? ORDER BY timestamp", (entity_id,)).fetchall()
+```
+
+### Small Business Profile - ~100 LOC
+**Context:** Add search/filter, reason tracking, JSON export (45K transactions)
+
+### Enterprise Profile - ~500 LOC
+**Context:** PostgreSQL + retention policies + immutability + automated archiving (8.5M logs)
+- REVOKE UPDATE/DELETE enforcement
+- Partition by month (automatic archiving)
+- Compliance exports (GDPR, SOX)
+
+**Comparison:** Darwin (25 LOC, SQLite) → Small Business (100 LOC, filters) → Enterprise (500 LOC, PostgreSQL + partitioning + compliance)
+
+---
+
 ## Related Primitives
 
 - **FieldOverrideStore** (OL) - Stores current field overrides, references audit_log
