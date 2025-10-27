@@ -1,24 +1,24 @@
-# Parsing Logic (Bank of America Specific)
+# Lógica de Parsing (Específico de Bank of America)
 
-> **Purpose:** Define how to extract transactions from Bank of America PDF statements
-
----
-
-## Bank of America Statement Format
-
-**What we're parsing:** Monthly checking/savings account statements in PDF format
-
-**Typical file characteristics:**
-- **File size:** 100 KB - 2 MB
-- **Pages:** 2-4 pages typically
-- **Format:** Digital PDF (not scanned - has selectable text)
-- **Encoding:** UTF-8
+> **Propósito:** Definir cómo extraer transacciones de estados de cuenta PDF de Bank of America
 
 ---
 
-## PDF Structure
+## Formato de Estado de Cuenta de Bank of America
 
-**Page 1: Account Summary**
+**Lo que estamos parseando:** Estados de cuenta mensuales de cuentas corrientes/ahorro en formato PDF
+
+**Características típicas del archivo:**
+- **Tamaño del archivo:** 100 KB - 2 MB
+- **Páginas:** 2-4 páginas típicamente
+- **Formato:** PDF digital (no escaneado - tiene texto seleccionable)
+- **Codificación:** UTF-8
+
+---
+
+## Estructura del PDF
+
+**Página 1: Resumen de Cuenta**
 ```
 BANK OF AMERICA
 Checking Account Statement
@@ -33,7 +33,7 @@ Deposits/Credits:   $4,200.00
 Withdrawals/Debits: $4,777.13
 ```
 
-**Page 2+: Transaction Details**
+**Página 2+: Detalles de Transacciones**
 ```
 Date        Description                           Amount     Balance
 10/01/2024  Beginning Balance                                $2,450.32
@@ -47,21 +47,21 @@ Date        Description                           Amount     Balance
 
 ---
 
-## Parsing Strategy
+## Estrategia de Parsing
 
-### Step 1: Identify Transaction Table
+### Paso 1: Identificar Tabla de Transacciones
 
-**Look for table header:**
+**Buscar encabezado de tabla:**
 ```
 Date        Description                           Amount     Balance
 ```
 
-**Characteristics:**
-- Usually starts on page 2
-- Header row has 4 columns: Date, Description, Amount, Balance
-- May have slight variations: "Transaction Date" vs "Date"
+**Características:**
+- Usualmente comienza en la página 2
+- La fila de encabezado tiene 4 columnas: Date, Description, Amount, Balance
+- Puede tener ligeras variaciones: "Transaction Date" vs "Date"
 
-**PyPDF2 approach:**
+**Enfoque con PyPDF2:**
 ```python
 import PyPDF2
 
@@ -79,16 +79,16 @@ def find_transaction_table(pdf_path):
     raise ValueError("Transaction table not found in PDF")
 ```
 
-### Step 2: Extract Transaction Rows
+### Paso 2: Extraer Filas de Transacciones
 
-**Pattern matching:**
+**Coincidencia de patrones:**
 
-Each transaction line follows this format:
+Cada línea de transacción sigue este formato:
 ```
 MM/DD/YYYY  DESCRIPTION (variable length)  $XXX.XX  $XXX.XX
 ```
 
-**Regex pattern:**
+**Patrón regex:**
 ```python
 import re
 
@@ -118,9 +118,9 @@ def extract_transactions(text):
     return transactions
 ```
 
-### Step 3: Clean and Validate
+### Paso 3: Limpiar y Validar
 
-**Date cleaning:**
+**Limpieza de fechas:**
 ```python
 from datetime import datetime
 
@@ -133,7 +133,7 @@ def parse_date(date_raw):
         raise ValueError(f"Invalid date format: {date_raw}")
 ```
 
-**Amount parsing:**
+**Parsing de montos:**
 ```python
 def parse_amount(amount_raw):
     """Convert '-$87.43' to -87.43 (float)"""
@@ -142,7 +142,7 @@ def parse_amount(amount_raw):
     return float(amount_str)
 ```
 
-**Description cleaning:**
+**Limpieza de descripción:**
 ```python
 def clean_description(desc_raw):
     """Remove excessive whitespace, keep original text"""
@@ -151,19 +151,19 @@ def clean_description(desc_raw):
 
 ---
 
-## Edge Cases
+## Casos Especiales
 
-### 1. Pending Transactions
+### 1. Transacciones Pendientes
 
-**What they look like:**
+**Cómo se ven:**
 ```
 10/31/2024  PENDING: UBER TRIP #ABC123         -$18.50*   $1,854.69
 ```
 
-**Handling:**
-- Asterisk (*) indicates pending
-- Include in observations with flag: `pending=true`
-- User can filter pending vs. settled transactions
+**Manejo:**
+- El asterisco (*) indica pendiente
+- Incluir en observaciones con bandera: `pending=true`
+- El usuario puede filtrar transacciones pendientes vs. liquidadas
 
 ```python
 def is_pending(desc_raw, amount_raw):
@@ -174,30 +174,30 @@ def is_pending(desc_raw, amount_raw):
     )
 ```
 
-### 2. Refunds/Credits
+### 2. Reembolsos/Créditos
 
-**What they look like:**
+**Cómo se ven:**
 ```
 10/15/2024  REFUND: AMAZON.COM ORDER #123      $45.99     $4,508.88
 ```
 
-**Handling:**
-- Positive amount = credit/refund
-- Keep as separate transaction (don't try to match with original purchase)
-- User can manually link refund to original transaction if desired
+**Manejo:**
+- Monto positivo = crédito/reembolso
+- Mantener como transacción separada (no intentar emparejar con compra original)
+- El usuario puede vincular manualmente el reembolso a la transacción original si lo desea
 
-### 3. Multi-Line Descriptions
+### 3. Descripciones Multi-Línea
 
-**What they look like:**
+**Cómo se ven:**
 ```
 10/15/2024  TRANSFER FROM SAVINGS
             ACCOUNT ****5678                   $500.00    $5,008.88
 ```
 
-**Handling:**
-- Description spans multiple lines
-- Parse as single transaction with concatenated description
-- Remove extra whitespace
+**Manejo:**
+- La descripción abarca múltiples líneas
+- Parsear como transacción única con descripción concatenada
+- Remover espacios en blanco extra
 
 ```python
 def handle_multiline(text):
@@ -224,42 +224,42 @@ def handle_multiline(text):
     return transactions
 ```
 
-### 4. Fees and Charges
+### 4. Cargos y Comisiones
 
-**What they look like:**
+**Cómo se ven:**
 ```
 10/31/2024  MONTHLY SERVICE FEE                -$12.00    $1,861.19
 10/31/2024  OVERDRAFT FEE                      -$35.00    $1,826.19
 ```
 
-**Handling:**
-- Parse like regular transactions
-- Auto-categorize as "Fees" or "Bank Charges"
-- User can dispute fees (note field)
+**Manejo:**
+- Parsear como transacciones regulares
+- Auto-categorizar como "Cargos" o "Comisiones Bancarias"
+- El usuario puede disputar cargos (campo de notas)
 
-### 5. Interest Earned
+### 5. Intereses Ganados
 
-**What they look like:**
+**Cómo se ven:**
 ```
 10/31/2024  INTEREST EARNED THIS PERIOD        $0.12      $1,873.31
 ```
 
-**Handling:**
-- Small positive amount (< $1 typically)
-- Auto-categorize as "Interest Income"
-- Include in income totals
+**Manejo:**
+- Monto positivo pequeño (< $1 típicamente)
+- Auto-categorizar como "Ingresos por Intereses"
+- Incluir en totales de ingresos
 
-### 6. Beginning/Ending Balance Rows
+### 6. Filas de Saldo Inicial/Final
 
-**What they look like:**
+**Cómo se ven:**
 ```
 10/01/2024  Beginning Balance                             $2,450.32
 10/31/2024  Ending Balance                                $1,873.19
 ```
 
-**Handling:**
-- **Skip these rows** - they're not transactions
-- Use for validation (last transaction balance should match ending balance)
+**Manejo:**
+- **Omitir estas filas** - no son transacciones
+- Usar para validación (el saldo de la última transacción debe coincidir con el saldo final)
 
 ```python
 def should_skip_row(desc_raw):
@@ -274,21 +274,21 @@ def should_skip_row(desc_raw):
     return any(kw in desc_raw.upper() for kw in skip_keywords)
 ```
 
-### 7. Foreign Currency Transactions
+### 7. Transacciones en Moneda Extranjera
 
-**What they look like:**
+**Cómo se ven:**
 ```
 10/15/2024  RESTAURANT PARIS EUR 45.00
             EXCHANGE RATE 1.10                -$49.50    $4,413.39
 10/15/2024  FOREIGN TRANSACTION FEE            -$2.50    $4,410.89
 ```
 
-**Handling:**
-- Two separate transactions:
-  1. Primary charge (EUR 45.00 converted to $49.50)
-  2. FX fee ($2.50)
-- Parse both, link later in relationship detection (see user journey #12)
-- Extract foreign currency amount from description if present
+**Manejo:**
+- Dos transacciones separadas:
+  1. Cargo principal (EUR 45.00 convertido a $49.50)
+  2. Comisión FX ($2.50)
+- Parsear ambas, vincular más tarde en detección de relaciones (ver user journey #12)
+- Extraer monto en moneda extranjera de la descripción si está presente
 
 ```python
 def extract_fx_info(desc_raw):
@@ -304,52 +304,52 @@ def extract_fx_info(desc_raw):
     }
 ```
 
-### 8. Truncated Descriptions
+### 8. Descripciones Truncadas
 
-**What they look like:**
+**Cómo se ven:**
 ```
 10/15/2024  AMAZON MKTPLACE PMTS AMZN.COM/BI...  -$45.99   $4,418.90
 ```
 
-**Handling:**
-- BoFA truncates long descriptions with "..."
-- Store as-is (raw observation)
-- Normalize merchant name during counterparty resolution
-- Original untruncated description is lost (not in PDF)
+**Manejo:**
+- BoFA trunca descripciones largas con "..."
+- Almacenar tal cual (observación cruda)
+- Normalizar nombre del comerciante durante resolución de contraparte
+- La descripción original no truncada se pierde (no está en el PDF)
 
-### 9. Check Transactions
+### 9. Transacciones de Cheques
 
-**What they look like:**
+**Cómo se ven:**
 ```
 10/15/2024  CHECK #1234                        -$150.00   $4,268.90
 ```
 
-**Handling:**
-- Extract check number from description
-- Store as transaction with type: "check"
-- User can add payee manually in notes field
+**Manejo:**
+- Extraer número de cheque de la descripción
+- Almacenar como transacción con tipo: "cheque"
+- El usuario puede agregar beneficiario manualmente en campo de notas
 
-### 10. ATM Withdrawals
+### 10. Retiros de Cajero Automático
 
-**What they look like:**
+**Cómo se ven:**
 ```
 10/15/2024  ATM WITHDRAWAL
             7-ELEVEN #5678 SAN FRANCISCO CA    -$40.00    $4,228.90
 10/15/2024  ATM FEE                            -$2.50     $4,226.40
 ```
 
-**Handling:**
-- Two transactions: withdrawal + fee
-- Parse both separately
-- Link via relationship detection (same date, "ATM FEE" in description)
+**Manejo:**
+- Dos transacciones: retiro + comisión
+- Parsear ambas por separado
+- Vincular via detección de relaciones (misma fecha, "ATM FEE" en descripción)
 
 ---
 
-## Validation Rules
+## Reglas de Validación
 
-### Transaction-Level Validation
+### Validación a Nivel de Transacción
 
-**Required fields:**
+**Campos requeridos:**
 ```python
 def validate_transaction(tx):
     errors = []
@@ -369,9 +369,9 @@ def validate_transaction(tx):
     return errors
 ```
 
-### Statement-Level Validation
+### Validación a Nivel de Estado de Cuenta
 
-**Balance reconciliation:**
+**Reconciliación de saldo:**
 ```python
 def validate_statement(transactions, beginning_balance, ending_balance):
     """Verify transactions add up to ending balance"""
@@ -390,7 +390,7 @@ def validate_statement(transactions, beginning_balance, ending_balance):
         )
 ```
 
-**Transaction count check:**
+**Verificación de conteo de transacciones:**
 ```python
 def validate_count(transactions, min_expected=0, max_expected=1000):
     """Sanity check on transaction count"""
@@ -405,9 +405,9 @@ def validate_count(transactions, min_expected=0, max_expected=1000):
 
 ---
 
-## Parser Implementation
+## Implementación del Parser
 
-**Complete parser function:**
+**Función completa del parser:**
 
 ```python
 def parse_bofa_statement(pdf_path):
@@ -487,40 +487,40 @@ def parse_bofa_statement(pdf_path):
 
 ---
 
-## Performance Characteristics
+## Características de Rendimiento
 
-**Typical statement (2 pages, 42 transactions):**
-- Parse time: 0.5 - 2 seconds
-- Memory usage: < 10 MB
-- No external API calls
+**Estado de cuenta típico (2 páginas, 42 transacciones):**
+- Tiempo de parsing: 0.5 - 2 segundos
+- Uso de memoria: < 10 MB
+- Sin llamadas a APIs externas
 
-**Large statement (4 pages, 200 transactions):**
-- Parse time: 2 - 5 seconds
-- Memory usage: < 20 MB
+**Estado de cuenta grande (4 páginas, 200 transacciones):**
+- Tiempo de parsing: 2 - 5 segundos
+- Uso de memoria: < 20 MB
 
-**Edge case: Corrupted PDF:**
-- PyPDF2 raises exception
-- Return user-friendly error: "Could not read PDF - file may be corrupted"
-
----
-
-## Error Handling
-
-**Error types and user-facing messages:**
-
-| Error | User Message | Suggested Action |
-|-------|-------------|------------------|
-| PDF file corrupted | "Could not read PDF - file may be corrupted" | "Try downloading the statement again from your bank" |
-| Transaction table not found | "This doesn't look like a Bank of America statement" | "Make sure you uploaded a BoFA checking/savings statement" |
-| Balance mismatch | "Statement balance doesn't match transactions" | "This might be a partial statement - contact support" |
-| No transactions found | "No transactions found in this statement" | "This statement period may have no activity" |
-| Date parsing error | "Found invalid date in statement" | "Contact support with the file name" |
+**Caso especial: PDF corrupto:**
+- PyPDF2 lanza excepción
+- Retornar error amigable: "No se pudo leer el PDF - el archivo puede estar corrupto"
 
 ---
 
-## Testing Strategy
+## Manejo de Errores
 
-**Golden file approach:**
+**Tipos de error y mensajes para el usuario:**
+
+| Error | Mensaje al Usuario | Acción Sugerida |
+|-------|-------------------|-----------------|
+| PDF file corrupted | "No se pudo leer el PDF - el archivo puede estar corrupto" | "Intenta descargar el estado de cuenta nuevamente desde tu banco" |
+| Transaction table not found | "Esto no parece un estado de cuenta de Bank of America" | "Asegúrate de haber subido un estado de cuenta corriente/ahorro de BoFA" |
+| Balance mismatch | "El saldo del estado de cuenta no coincide con las transacciones" | "Esto podría ser un estado de cuenta parcial - contacta soporte" |
+| No transactions found | "No se encontraron transacciones en este estado de cuenta" | "Este período de estado de cuenta puede no tener actividad" |
+| Date parsing error | "Se encontró fecha inválida en el estado de cuenta" | "Contacta soporte con el nombre del archivo" |
+
+---
+
+## Estrategia de Testing
+
+**Enfoque de archivos golden:**
 
 ```
 tests/fixtures/
@@ -532,7 +532,7 @@ tests/fixtures/
   bofa-statement-corrupted.pdf     → Corrupted PDF (should fail gracefully)
 ```
 
-**Test cases:**
+**Casos de prueba:**
 
 ```python
 def test_parse_typical_statement():
@@ -561,24 +561,24 @@ def test_parse_corrupted_pdf():
 
 ---
 
-## Future Enhancements
+## Mejoras Futuras
 
-**When to add support for other statement types:**
+**Cuándo agregar soporte para otros tipos de estados de cuenta:**
 
-1. **Credit Card Statements** (different format)
-   - Separate parser: `parse_bofa_credit_card()`
-   - Different table structure (has category column)
+1. **Estados de Cuenta de Tarjeta de Crédito** (formato diferente)
+   - Parser separado: `parse_bofa_credit_card()`
+   - Estructura de tabla diferente (tiene columna de categoría)
 
-2. **Investment Accounts** (very different)
-   - Trades, dividends, capital gains
-   - Requires new parser entirely
+2. **Cuentas de Inversión** (muy diferente)
+   - Operaciones, dividendos, ganancias de capital
+   - Requiere un parser completamente nuevo
 
-3. **Other Banks** (Chase, Wells Fargo)
-   - Each bank has unique PDF format
-   - Parsers registered in ParserRegistry
-   - User selects bank during upload or system auto-detects
+3. **Otros Bancos** (Chase, Wells Fargo)
+   - Cada banco tiene un formato PDF único
+   - Parsers registrados en ParserRegistry
+   - El usuario selecciona banco durante subida o el sistema auto-detecta
 
-**Auto-detection (future):**
+**Auto-detección (futuro):**
 ```python
 def detect_statement_type(pdf_path):
     """Automatically detect bank and account type"""
@@ -600,19 +600,19 @@ def detect_statement_type(pdf_path):
 
 ---
 
-## Summary
+## Resumen
 
-**This parser is:**
-- ✅ Bank of America specific (checking/savings)
-- ✅ Handles common edge cases (pending, refunds, FX)
-- ✅ Validates output (balance reconciliation)
-- ✅ Fast (< 5 seconds for typical statement)
+**Este parser es:**
+- ✅ Específico de Bank of America (corriente/ahorro)
+- ✅ Maneja casos especiales comunes (pendientes, reembolsos, FX)
+- ✅ Valida salida (reconciliación de saldo)
+- ✅ Rápido (< 5 segundos para estado de cuenta típico)
 
-**This parser does NOT:**
-- ❌ Handle scanned/image PDFs (requires OCR)
-- ❌ Support other banks (yet)
-- ❌ Parse credit card statements (different format)
-- ❌ Extract check images (not in PDF)
+**Este parser NO:**
+- ❌ Maneja PDFs escaneados/imagen (requiere OCR)
+- ❌ Soporta otros bancos (aún)
+- ❌ Parsea estados de cuenta de tarjeta de crédito (formato diferente)
+- ❌ Extrae imágenes de cheques (no están en el PDF)
 
-**Key Principle:**
-Parse conservatively - when in doubt, include the transaction and let normalization handle edge cases. It's better to have extra data than missing data.
+**Principio Clave:**
+Parsear conservadoramente - en caso de duda, incluir la transacción y dejar que la normalización maneje casos especiales. Es mejor tener datos extra que datos faltantes.
