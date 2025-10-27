@@ -14,6 +14,206 @@ Universal interface for extracting structured observations from unstructured/sem
 
 ---
 
+## Simplicity Profiles
+
+**This section shows how the same universal Parser interface is implemented differently based on usage scale.**
+
+### Profile 1: Personal Use (Finance App - Single Bank, Hardcoded Parser)
+
+**Context:** Darwin only uploads Bank of America PDFs (single source_type), hardcoded BoFA parser
+
+**Configuration:**
+```yaml
+parser:
+  parser_id: "bofa_pdf_parser"  # Hardcoded (only parser in app)
+  version: "1.0.0"  # No versioning (single implementation)
+  supported_source_types: ["bofa_pdf"]  # Only BoFA supported
+  settings:
+    strict_mode: false  # Warnings OK (don't block parsing)
+    max_rows: 1000  # Reasonable limit for personal statements
+```
+
+**What's Used:**
+- ✅ Core `parse()` method - Extract transactions from BoFA PDF
+- ✅ AS-IS extraction - No validation (date/amount as strings)
+- ✅ Zero rows = success - Empty statement (no transactions) is valid
+- ✅ Basic error handling - `ParseError` if PDF corrupted
+- ✅ Deterministic row IDs - Same file → same row_id assignments
+
+**What's NOT Used:**
+- ❌ Parser registry - Only 1 parser (BoFA), hardcoded
+- ❌ Versioning system - No parser version tracking
+- ❌ `can_parse()` detection - Only uploads BoFA PDFs (no auto-detection needed)
+- ❌ Warnings vs errors distinction - All issues are errors (simpler)
+- ❌ Partial parse support - Either parse all rows or fail
+- ❌ Parser performance metrics - No latency tracking
+
+**Implementation Complexity:** **LOW**
+- ~200 lines Python
+- Single file: `bofa_pdf_parser.py`
+- Uses PyPDF2 for text extraction
+- Regex patterns for transaction rows
+- No tests (manual verification with user's own PDFs)
+
+**Narrative Example:**
+> Darwin uploads "BoFA_Oct2024.pdf". API calls `BoFAPDFParser().parse(pdf_bytes)`. Parser:
+> 1. Extract text from PDF using PyPDF2
+> 2. Find transaction table (regex search for "Date Description Amount Balance")
+> 3. Extract rows with pattern: `r'(\d{2}/\d{2}/\d{4})\s+(.+?)\s+(-?\$[\d,]+\.\d{2})\s+(\$[\d,]+\.\d{2})'`
+> 4. Create Observation for each row: `{"raw_data": {"date": "10/15/2024", "description": "WHOLE FOODS MARKET", "amount": "-$87.43", "balance": "$4,462.89"}, "row_id": 0}`
+> 5. Return 42 observations (42 transactions in October)
+>
+> If PDF corrupted → PyPDF2 raises exception → Wrapped as `ParseError("Failed to extract text from PDF")` → Upload marked as `error`.
+
+---
+
+### Profile 2: Small Business (Accounting Firm - Multiple Parsers, Basic Versioning)
+
+**Context:** Accountants upload docs from 10 different banks + client invoices (multiple source_types), need parser selection
+
+**Configuration:**
+```yaml
+parser_registry:
+  parsers:
+    - parser_id: "bofa_pdf_parser"
+      version: "1.2.0"
+      supported_source_types: ["bofa_pdf"]
+    - parser_id: "chase_pdf_parser"
+      version: "1.0.0"
+      supported_source_types: ["chase_pdf"]
+    - parser_id: "wells_fargo_csv_parser"
+      version: "1.1.0"
+      supported_source_types: ["wells_fargo_csv"]
+    - parser_id: "generic_invoice_parser"
+      version: "2.0.0"
+      supported_source_types: ["invoice_pdf", "invoice_docx"]
+  settings:
+    strict_mode: false
+    max_rows: 5000
+    warnings_as_errors: false
+    partial_parse_allowed: true  # Return rows before corruption
+```
+
+**What's Used:**
+- ✅ Parser registry - Lookup parser by `source_type`
+- ✅ Multiple parsers - 4 different parsers (BoFA, Chase, Wells Fargo, invoices)
+- ✅ Basic versioning - Track parser version in parse log
+- ✅ `can_parse()` detection - Auto-detect if wrong parser selected
+- ✅ Warnings - Non-fatal issues logged but parsing continues
+- ✅ Partial parse support - If row 45 corrupted, return rows 0-44
+- ✅ Zero rows = success
+
+**What's NOT Used:**
+- ❌ A/B testing - Single parser per source_type (no canary deployments)
+- ❌ Parser metrics - Just basic logging
+- ❌ Schema evolution tracking - No automatic migration
+
+**Implementation Complexity:** **MEDIUM**
+- ~800 lines Python (4 parsers × ~200 lines each)
+- Simple registry: `dict[source_type -> Parser]`
+- Basic versioning: Log parser version in ParseLog
+- Unit tests per parser (golden files for regression testing)
+
+**Narrative Example:**
+> Accountant uploads "chase_statement.pdf" with `source_type="chase_pdf"`. API looks up parser: `ParserRegistry.get_parser("chase_pdf")` → Returns `ChasePDFParser(version="1.0.0")`. Calls `parser.parse(pdf_bytes)`:
+> 1. Extract 45 transactions (rows 0-44) successfully
+> 2. Row 45 has corrupted text (mangled OCR) → Warning: "Row 45: unparseable, skipping"
+> 3. Continue parsing rows 46-50 (5 more transactions)
+> 4. Return `ParseResult(success=True, observations=[...50 total], warnings=["Row 45: unparseable, skipping"])`
+> 5. ParseLog records: `{"parser_id": "chase_pdf_parser", "version": "1.0.0", "rows_extracted": 50, "warnings": 1}`
+>
+> Accountant sees: "Parsed 50 transactions, 1 warning (row 45 skipped)". Can review warning later, but upload succeeds.
+
+---
+
+### Profile 3: Enterprise (Bank - Parser Versioning, Canary Deployments, Metrics)
+
+**Context:** Bank processes 10,000 uploads/day from 50+ bank/credit card formats, needs safe parser updates (canary deployments), A/B testing
+
+**Configuration:**
+```yaml
+parser_registry:
+  parsers:
+    - parser_id: "universal_credit_card_parser"
+      versions:
+        - version: "2.1.0"
+          rollout_percentage: 5  # Canary: 5% of traffic
+          enabled: true
+        - version: "2.0.0"
+          rollout_percentage: 95  # Stable: 95% of traffic
+          enabled: true
+        - version: "1.9.0"
+          enabled: false  # Deprecated
+      supported_source_types: ["visa_pdf", "mastercard_pdf", "amex_pdf"]
+  settings:
+    strict_mode: false
+    max_rows: 100000  # Credit card statements can be huge
+    warnings_as_errors: false
+    partial_parse_allowed: true
+    canary_monitoring:
+      error_rate_threshold: 0.05  # Rollback if >5% error rate
+      comparison_window_hours: 24
+    metrics:
+      enabled: true
+      backend: "prometheus"
+      labels: ["parser_id", "version", "source_type"]
+    schema_evolution:
+      track_field_changes: true  # Detect new fields in output
+      alert_on_breaking_changes: true
+```
+
+**What's Used:**
+- ✅ Parser registry with versioning
+- ✅ Canary deployments - 5% traffic to v2.1.0 (new), 95% to v2.0.0 (stable)
+- ✅ A/B testing - Compare error rates v2.1.0 vs v2.0.0
+- ✅ Automatic rollback - If v2.1.0 error rate >5%, route all traffic to v2.0.0
+- ✅ `can_parse()` detection - Verify parser recognizes format
+- ✅ Warnings - Extensive warning categories
+- ✅ Partial parse - Critical for large statements (100K+ rows)
+- ✅ Prometheus metrics - Track latency, error rate, warnings per parser version
+- ✅ Schema evolution tracking - Alert if parser outputs new fields
+
+**What's NOT Used:**
+- (All features enabled at enterprise scale)
+
+**Implementation Complexity:** **HIGH**
+- ~5000 lines TypeScript/Python
+- Universal parser (handles 50+ formats with heuristics)
+- Canary deployment logic (route 5% → v2.1.0, monitor error rates)
+- Comprehensive test suite (1000+ golden files covering edge cases)
+- Schema evolution detector (compare field sets across versions)
+- Monitoring dashboards: Error rate by parser version, latency p95, warning categories
+
+**Narrative Example:**
+> Customer uploads Visa statement PDF. API routes to ParserRegistry:
+> 1. Lookup parser: `source_type="visa_pdf"` → `UniversalCreditCardParser`
+> 2. **Canary routing**: Random selection → 5% chance → Selects v2.1.0 (canary), 95% chance → Selects v2.0.0 (stable). Random draw: 0.03 → **v2.1.0 selected**
+> 3. Call `parser_v2_1_0.parse(pdf_bytes)`:
+>    - Extract 1,200 transactions
+>    - Row 450: Date format unusual ("Oct 15, 2024" instead of "10/15/2024") → Warning: "Date format variant detected"
+>    - Row 800: Balance missing (field blank) → Warning: "Balance field empty"
+>    - Return `ParseResult(success=True, observations=1200, warnings=["Date format variant: row 450", "Balance missing: row 800"])`
+> 4. Prometheus metrics recorded:
+>    - `parser_duration_seconds{parser_id="universal_credit_card",version="2.1.0",source_type="visa_pdf"} 3.2`
+>    - `parser_observations_total{parser_id="universal_credit_card",version="2.1.0"} 1200`
+>    - `parser_warnings_total{parser_id="universal_credit_card",version="2.1.0"} 2`
+>    - `parser_errors_total{parser_id="universal_credit_card",version="2.1.0"} 0`
+> 5. ParseLog: `{"parser_id":"universal_credit_card","version":"2.1.0","upload_id":"UL_12345","rows_extracted":1200,"warnings":2,"latency_ms":3200}`
+>
+> **Canary monitoring (runs every hour)**:
+> - Query Prometheus: Compare error rates v2.1.0 vs v2.0.0 (last 24 hours)
+> - v2.1.0 error rate: 2.1% (21 failures / 1000 uploads)
+> - v2.0.0 error rate: 1.8% (171 failures / 9500 uploads)
+> - Delta: +0.3% (within threshold of 5%) ✅ → **Canary healthy, continue rollout**
+>
+> Alternative scenario: v2.1.0 has bug (regex broken for certain date formats) → Error rate spikes to 12% → Monitoring detects `error_rate > 5%` threshold → **Automatic rollback**: Update registry: `{version: "2.1.0", rollout_percentage: 0, enabled: false}`, `{version: "2.0.0", rollout_percentage: 100}` → Alert: "P1: Parser v2.1.0 rolled back due to high error rate (12%)" → Engineering investigates.
+
+---
+
+**Key Insight:** The same `Parser` interface works across all 3 profiles. Personal use has 1 hardcoded parser (BoFA only); Small business has parser registry with multiple parsers; Enterprise adds canary deployments, A/B testing, and automatic rollback based on error rate monitoring.
+
+---
+
 ## Interface Contract
 
 ### Core Interface

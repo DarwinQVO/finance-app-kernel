@@ -19,6 +19,170 @@
 
 ---
 
+## Simplicity Profiles
+
+**This section shows how the same universal retrieval primitive is configured differently based on usage scale.**
+
+### Profile 1: Personal Use (Finance App - Single User, Direct Access)
+
+**Context:** Darwin accesses his own uploaded bank statements (single user, no sharing)
+
+**Configuration:**
+```yaml
+artifact_retriever:
+  signed_urls: false  # Single user, no need to sign URLs
+  access_control: false  # Single user owns all uploads
+  streaming: false  # Files <10MB (fit in memory)
+  url_expiration_seconds: null  # URLs don't expire
+```
+
+**What's Used:**
+- ✅ Basic metadata retrieval - `get_metadata(upload_id)` returns filename, size, mime_type
+- ✅ Direct file retrieval - Read file from StorageEngine, return bytes
+- ✅ Inline vs download - Support PDF inline view vs download
+- ✅ Deletion tracking - Show "This statement was deleted" if deleted
+
+**What's NOT Used:**
+- ❌ Signed URLs - Single user, no security risk
+- ❌ URL expiration - No unauthorized sharing risk
+- ❌ Access control checks - Single user owns all files
+- ❌ Streaming - Files <10MB (fit in memory)
+- ❌ HMAC signature verification - No signed URLs
+- ❌ Audit logging - No compliance requirement
+
+**Implementation Complexity:** **LOW**
+- ~80 lines Python
+- Simple endpoint: `GET /uploads/{upload_id}/download`
+- Reads file from StorageEngine, streams HTTP response
+- No access control checks (single user app)
+
+**Narrative Example:**
+> Darwin clicks "View Statement" for Oct 2024 upload. UI calls `/uploads/UL_abc123/download`. ArtifactRetriever retrieves metadata → `{"filename": "BoFA_Oct2024.pdf", "mime_type": "application/pdf", "size_bytes": 2300000}`. Retrieve file from StorageEngine → Read 2.3MB into memory → Return HTTP response with headers `Content-Type: application/pdf`, `Content-Disposition: inline` (opens in browser PDF viewer). If Darwin clicks "Download" → Same process, but `Content-Disposition: attachment; filename="BoFA_Oct2024.pdf"` (triggers browser download).
+
+---
+
+### Profile 2: Small Business (Accounting Firm - Multi-User, Basic Security)
+
+**Context:** 10 accountants access client uploads, need basic access control (accountant A can't access accountant B's files)
+
+**Configuration:**
+```yaml
+artifact_retriever:
+  signed_urls: true  # Generate secure URLs
+  url_expiration_seconds: 3600  # 1 hour expiration
+  access_control: true  # Check user owns upload
+  streaming:
+    enabled: true
+    threshold_mb: 10  # Stream files >10MB
+  signing_secret: "${SIGNING_SECRET}"  # HMAC key
+```
+
+**What's Used:**
+- ✅ Signed URLs - Generate URLs with HMAC-SHA256 signature
+- ✅ URL expiration - 1-hour expiration (prevent link sharing)
+- ✅ Access control - Check `upload.uploaded_by == user_id`
+- ✅ Streaming - Files >10MB streamed in 8KB chunks
+- ✅ Metadata retrieval with access check
+- ✅ Deletion tracking
+
+**What's NOT Used:**
+- ❌ Audit logging - Just basic access control (no compliance)
+- ❌ CDN integration - Direct download from app server
+- ❌ Rate limiting - Small user base (10 users)
+
+**Implementation Complexity:** **MEDIUM**
+- ~250 lines Python
+- HMAC-SHA256 URL signing
+- Access control middleware
+- Streaming for large files
+- URL format: `/uploads/{upload_id}/download?sig=a3b5c7...&exp=1730000000`
+
+**Narrative Example:**
+> Accountant Alice clicks "View Receipt" for client upload. UI calls `/api/generate-download-url` with `upload_id="UL_123"`. ArtifactRetriever checks: Does Alice own this upload? Query: `SELECT uploaded_by FROM upload_records WHERE upload_id='UL_123'` → `uploaded_by='user_alice'` ✅ Match. Generate signed URL: `base_url="/uploads/UL_123/download" + timestamp=1730000000 + signature=HMAC_SHA256(signing_secret, "UL_123|1730000000")` → Returns `{"url": "/uploads/UL_123/download?sig=a3b5c7&exp=1730000000", "expires_at": "2024-10-27T11:00:00Z"}`. Alice opens URL → ArtifactRetriever verifies signature → Valid ✅ → Check expiration → `now() < 1730000000` ✅ → Stream file (PDF 450KB, <10MB threshold, loaded into memory) → Return HTTP response.
+>
+> Alternative: Accountant Bob tries to access Alice's upload URL → Copy-paste signed URL → ArtifactRetriever verifies signature ✅ (valid), checks expiration ✅ (within 1 hour), checks access → Query: `uploaded_by='user_alice'` ≠ `user_bob` ❌ → Return `403 Forbidden: "You don't own this upload"`.
+
+---
+
+### Profile 3: Enterprise (Bank - High Security, Audit, CDN)
+
+**Context:** Bank serves 10,000 uploads/day to 1M customers, strict security (GLBA compliance), serve via CDN for performance
+
+**Configuration:**
+```yaml
+artifact_retriever:
+  signed_urls: true
+  url_expiration_seconds: 300  # 5 minutes (short-lived for security)
+  access_control:
+    enabled: true
+    method: "database"  # Query access control table
+    cache_ttl_seconds: 60  # Cache access decisions
+  streaming:
+    enabled: true
+    threshold_mb: 1  # Always stream (even 1MB files, for consistency)
+    chunk_size_kb: 64  # Larger chunks for CDN efficiency
+  signing:
+    algorithm: "hmac-sha256"
+    secret_rotation: true  # Rotate signing keys monthly
+    secret_version_tracking: true
+  cdn:
+    enabled: true
+    provider: "cloudfront"
+    signed_cookies: true  # CloudFront signed cookies
+  audit:
+    log_every_access: true
+    log_to: "audit_log_table"
+    include_fields: ["user_id", "upload_id", "ip_address", "user_agent"]
+  rate_limiting:
+    enabled: true
+    max_requests_per_minute: 60  # Per user
+  metrics:
+    enabled: true
+    backend: "prometheus"
+    labels: ["document_type", "access_result"]
+```
+
+**What's Used:**
+- ✅ HMAC-signed URLs with short expiration (5 minutes)
+- ✅ Secret rotation - Monthly key rotation for security
+- ✅ Access control with caching - Cache decisions for 60s (reduce DB load)
+- ✅ Always streaming - Even 1MB files (consistency)
+- ✅ CDN integration - CloudFront signed cookies
+- ✅ Audit logging - Log every access attempt
+- ✅ Rate limiting - 60 requests/min per user (prevent abuse)
+- ✅ Prometheus metrics - Track access patterns, latencies
+
+**What's NOT Used:**
+- (All features enabled at enterprise scale)
+
+**Implementation Complexity:** **HIGH**
+- ~900 lines TypeScript/Python
+- HMAC signing with key rotation
+- CloudFront signed cookie generation
+- Access control with Redis caching
+- Comprehensive audit logging
+- Rate limiting (Redis-backed)
+- Monitoring dashboards
+
+**Narrative Example:**
+> Customer logs into bank portal, clicks "Download October Statement" → UI calls `/api/generate-download-url` with `upload_id="UL_stmt_456"`. ArtifactRetriever:
+> 1. Access control check (cached): Redis lookup `access:user_12345:UL_stmt_456` → Cache miss → Query DB: `SELECT customer_id FROM upload_records WHERE upload_id='UL_stmt_456'` → `customer_id='12345'` ✅ → Cache result in Redis (TTL=60s)
+> 2. Rate limit check: Redis INCR `ratelimit:user_12345:minute` → Count=15 (< 60 limit) ✅
+> 3. Generate CloudFront signed cookie: `Policy=base64({"Resource":"https://cdn.bank.com/uploads/*","Condition":{"DateLessThan":{"AWS:EpochTime":1730000300}}})` + `Signature=RSA_SHA256(cloudfront_private_key, policy)`
+> 4. Generate backend signed URL: `url="/uploads/UL_stmt_456/download"`, `timestamp=now()+300`, `signature=HMAC_SHA256(signing_secret_v3, "UL_stmt_456|1730000300")` → Returns `{"url": "https://cdn.bank.com/uploads/UL_stmt_456/download?sig=a3b5c7&exp=1730000300&v=3", "expires_at": "2024-10-27T10:05:00Z", "signed_cookie": "CloudFront-Policy=...; CloudFront-Signature=..."}`
+> 5. Audit log: `INSERT INTO audit_log (event="download_url_generated", user_id="12345", upload_id="UL_stmt_456", ip_address="203.0.113.45", timestamp=now())`
+> 6. Prometheus metric: `download_url_generations_total{document_type="statement",access_result="success"}++`
+>
+> Customer clicks download link → CloudFront validates signed cookie → Valid ✅ → CloudFront requests file from origin (app server) → ArtifactRetriever verifies backend signature → Valid ✅, not expired ✅ → Stream file from S3 (2.5MB, 64KB chunks) → CloudFront caches response → Serve to customer (fast, low latency). Total time: <500ms (CDN cached).
+>
+> 5 minutes later, customer shares URL with friend → Friend opens URL → CloudFront validates cookie → Expired ❌ → Return `403 Forbidden: "Download link expired"`.
+
+---
+
+**Key Insight:** The same `ArtifactRetriever` interface works across all 3 profiles. Personal use has direct access (no security needed); Small business adds signed URLs and basic access control; Enterprise adds short expiration, CDN integration, audit logs, and rate limiting for compliance and performance.
+
+---
+
 ## Interface Contract
 
 ```python
