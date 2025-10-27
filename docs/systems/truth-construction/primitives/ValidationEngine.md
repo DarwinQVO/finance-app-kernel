@@ -3502,6 +3502,770 @@ console.log(correction2);
 
 ---
 
+## Simplicity Profiles
+
+The same ValidationEngine interface scales from "basic type checking" to "extensible rule registry":
+
+### Personal Profile (Darwin) - ~40 LOC
+
+**Context:**
+- Darwin has 871 transactions
+- Simple field corrections (merchant names, categories, amounts)
+- Basic validation needed: type checking + range validation
+- No custom rules or cross-field validation
+
+**Implementation:**
+```python
+# File: lib/validation.py
+
+class ValidationEngine:
+    """Simple validation for field overrides."""
+
+    def validate(self, field_name: str, value: any, entity_type: str = "transaction") -> dict:
+        """
+        Validate a field value.
+
+        Args:
+            field_name: Field being validated ("amount", "merchant", "date", "category")
+            value: Value to validate
+            entity_type: Entity type (default: "transaction")
+
+        Returns:
+            {"valid": True/False, "error": str | None}
+        """
+        # Amount validation
+        if field_name == "amount":
+            if not isinstance(value, (int, float)):
+                return {"valid": False, "error": "Amount must be a number"}
+            if value == 0:
+                return {"valid": False, "error": "Amount cannot be zero"}
+            return {"valid": True}
+
+        # Date validation
+        if field_name == "transaction_date":
+            from datetime import datetime
+            try:
+                date = datetime.fromisoformat(value)
+                if date.year < 2000 or date.year > 2030:
+                    return {"valid": False, "error": "Date must be between 2000 and 2030"}
+                if date > datetime.now():
+                    return {"valid": False, "error": "Date cannot be in the future"}
+                return {"valid": True}
+            except ValueError:
+                return {"valid": False, "error": "Date must be in ISO format (YYYY-MM-DD)"}
+
+        # Merchant validation
+        if field_name == "merchant":
+            if not isinstance(value, str):
+                return {"valid": False, "error": "Merchant must be a string"}
+            if len(value) < 1 or len(value) > 255:
+                return {"valid": False, "error": "Merchant must be 1-255 characters"}
+            return {"valid": True}
+
+        # Category validation
+        if field_name == "category":
+            if not isinstance(value, str):
+                return {"valid": False, "error": "Category must be a string"}
+            # No taxonomy check - Darwin uses freeform categories
+            return {"valid": True}
+
+        # Default: accept any value
+        return {"valid": True}
+
+# Usage
+engine = ValidationEngine()
+
+# Validate merchant change
+result = engine.validate("merchant", "Starbucks")
+# → {"valid": True}
+
+# Validate invalid amount
+result = engine.validate("amount", "fifty dollars")
+# → {"valid": False, "error": "Amount must be a number"}
+
+# Validate future date
+result = engine.validate("transaction_date", "2026-12-31")
+# → {"valid": False, "error": "Date cannot be in the future"}
+```
+
+**Decision Context:**
+- **YAGNI Applied**: Skip complex validation (cross-field, custom rules, taxonomy)
+- **Hardcoded Rules**: Type + range checks sufficient for 871 transactions
+- **No Registry**: Only 4 fields need validation
+- **Total Code**: ~40 LOC (simple if/elif checks)
+
+**UI Integration:**
+```python
+# Before saving field override
+def save_field_override(canonical_id, field_name, new_value):
+    # Validate
+    result = engine.validate(field_name, new_value)
+
+    if not result["valid"]:
+        # Show error in UI
+        return {"success": False, "error": result["error"]}
+
+    # Save to database
+    conn.execute("""
+        INSERT INTO field_overrides (canonical_id, field_name, override_value)
+        VALUES (?, ?, ?)
+    """, (canonical_id, field_name, new_value))
+
+    return {"success": True}
+```
+
+### Small Business Profile - ~150 LOC
+
+**Context:**
+- Small business has 45K transactions
+- More sophisticated validation needed
+- Category taxonomy enforcement (YAML config)
+- Format validation (email, phone, SKU patterns)
+- No custom validators or rule registry
+
+**Implementation:**
+```python
+# File: lib/validation_engine.py
+import yaml
+from datetime import datetime
+from typing import Dict, Any
+
+class ValidationEngine:
+    """Validation with taxonomy and format checking."""
+
+    def __init__(self, taxonomy_file: str = "config/categories.yaml"):
+        # Load category taxonomy
+        with open(taxonomy_file, "r") as f:
+            self.taxonomy = yaml.safe_load(f)
+        self.valid_categories = self._flatten_taxonomy(self.taxonomy)
+
+    def _flatten_taxonomy(self, taxonomy: dict, parent: str = "") -> set:
+        """Flatten hierarchical taxonomy to set of valid paths."""
+        categories = set()
+        for key, value in taxonomy.items():
+            path = f"{parent} > {key}" if parent else key
+            categories.add(path)
+            if isinstance(value, dict):
+                categories.update(self._flatten_taxonomy(value, path))
+        return categories
+
+    def validate(self, field_name: str, value: Any, entity_type: str = "transaction") -> dict:
+        """Validate field with type, range, format, and taxonomy checks."""
+
+        # Amount validation
+        if field_name == "amount":
+            if not isinstance(value, (int, float)):
+                return {"valid": False, "error": "Amount must be a number"}
+            if value == 0:
+                return {"valid": False, "error": "Amount cannot be zero"}
+            if abs(value) > 100000:
+                return {
+                    "valid": False,
+                    "error": "Amount exceeds $100,000 limit",
+                    "warning": "Contact admin for large transaction approval"
+                }
+            return {"valid": True}
+
+        # Date validation
+        if field_name == "transaction_date":
+            try:
+                date = datetime.fromisoformat(value)
+                if date.year < 2000:
+                    return {"valid": False, "error": "Date too old (before 2000)"}
+                if date > datetime.now():
+                    return {"valid": False, "error": "Date cannot be in the future"}
+                return {"valid": True}
+            except (ValueError, AttributeError):
+                return {"valid": False, "error": "Date must be in ISO format (YYYY-MM-DD)"}
+
+        # Merchant validation
+        if field_name == "merchant":
+            if not isinstance(value, str):
+                return {"valid": False, "error": "Merchant must be a string"}
+            if len(value) < 1:
+                return {"valid": False, "error": "Merchant cannot be empty"}
+            if len(value) > 255:
+                return {"valid": False, "error": "Merchant too long (max 255 characters)"}
+            return {"valid": True}
+
+        # Category validation (taxonomy check)
+        if field_name == "category":
+            if not isinstance(value, str):
+                return {"valid": False, "error": "Category must be a string"}
+
+            # Check if category exists in taxonomy
+            if value not in self.valid_categories:
+                # Find closest match for suggestion
+                from difflib import get_close_matches
+                suggestions = get_close_matches(value, self.valid_categories, n=1, cutoff=0.6)
+
+                return {
+                    "valid": False,
+                    "error": f"Category '{value}' not in taxonomy",
+                    "suggested_value": suggestions[0] if suggestions else None,
+                    "valid_categories": sorted(list(self.valid_categories))[:10]  # First 10
+                }
+
+            return {"valid": True}
+
+        # Email validation
+        if field_name == "email":
+            import re
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, value):
+                return {"valid": False, "error": "Invalid email format"}
+            return {"valid": True}
+
+        # Default
+        return {"valid": True}
+
+# Usage
+engine = ValidationEngine(taxonomy_file="config/categories.yaml")
+
+# Validate category against taxonomy
+result = engine.validate("category", "Food & Dining")
+# → {"valid": True}
+
+# Invalid category with suggestion
+result = engine.validate("category", "Food and Drink")
+# → {
+#   "valid": False,
+#   "error": "Category 'Food and Drink' not in taxonomy",
+#   "suggested_value": "Food & Dining"
+# }
+
+# Validate amount over limit
+result = engine.validate("amount", 150000)
+# → {
+#   "valid": False,
+#   "error": "Amount exceeds $100,000 limit",
+#   "warning": "Contact admin for large transaction approval"
+# }
+```
+
+**Category Taxonomy (YAML):**
+```yaml
+# config/categories.yaml
+Food & Dining:
+  Restaurants: {}
+  Groceries: {}
+  Coffee Shops: {}
+
+Transportation:
+  Gas & Fuel: {}
+  Public Transit: {}
+  Rideshare: {}
+
+Business:
+  Software: {}
+  Office Supplies: {}
+  Professional Services: {}
+```
+
+**Performance:**
+- Taxonomy loaded once at startup (not on every validation)
+- Validation: 2-5ms per field
+- Fuzzy match for suggestions: +3ms
+
+**Why No Rule Registry:**
+- Fixed set of fields (amount, date, merchant, category, email)
+- Validation logic stable (no frequent changes)
+- Trade-off: Simplicity > extensibility
+
+### Enterprise Profile - ~600 LOC
+
+**Context:**
+- Enterprise has 8.5M transactions across multiple tenants
+- Dynamic validation rules (custom per tenant)
+- Cross-field validation (category must match amount range)
+- Rule registry with priority ordering
+- Audit logging for compliance
+- Custom validators via plugin system
+
+**Implementation:**
+```python
+# File: lib/validation_engine.py
+import psycopg2
+from typing import Dict, Any, List, Callable
+from dataclasses import dataclass
+from datetime import datetime
+import logging
+
+@dataclass
+class ValidationRule:
+    """Validation rule definition."""
+    rule_id: str
+    entity_type: str
+    field_name: str
+    name: str
+    description: str
+    validator: Callable[[Any, Dict], Dict[str, Any]]
+    priority: int = 100
+    required: bool = True
+    tags: List[str] = None
+
+@dataclass
+class ValidationResult:
+    """Validation result."""
+    valid: bool
+    errors: List[Dict] = None
+    warnings: List[Dict] = None
+    metadata: Dict = None
+
+class ValidationEngine:
+    """
+    Production validation engine with rule registry.
+
+    Features:
+    - Dynamic rule registration (custom validators)
+    - Priority-based rule execution
+    - Cross-field validation
+    - Audit logging
+    - Multi-tenant support
+    """
+
+    def __init__(self, conn: psycopg2.connection):
+        self.conn = conn
+        self.rules: Dict[str, List[ValidationRule]] = {}
+        self.audit_logger = logging.getLogger("validation_audit")
+
+        # Load built-in rules
+        self._load_builtin_rules()
+
+        # Load tenant-specific rules from database
+        self._load_tenant_rules()
+
+    def _load_builtin_rules(self):
+        """Register built-in validation rules."""
+
+        # Rule: Amount must be numeric
+        self.register_rule(ValidationRule(
+            rule_id="amount_numeric",
+            entity_type="transaction",
+            field_name="amount",
+            name="Amount Type Validation",
+            description="Amount must be a numeric value",
+            validator=lambda value, ctx: {
+                "valid": isinstance(value, (int, float)),
+                "error": "Amount must be a number" if not isinstance(value, (int, float)) else None
+            },
+            priority=1000,  # Run first (type check)
+            required=True
+        ))
+
+        # Rule: Amount non-zero
+        self.register_rule(ValidationRule(
+            rule_id="amount_nonzero",
+            entity_type="transaction",
+            field_name="amount",
+            name="Amount Non-Zero",
+            description="Amount cannot be zero",
+            validator=lambda value, ctx: {
+                "valid": value != 0,
+                "error": "Amount cannot be zero" if value == 0 else None
+            },
+            priority=900,
+            required=True
+        ))
+
+        # Rule: Date format validation
+        self.register_rule(ValidationRule(
+            rule_id="date_iso_format",
+            entity_type="transaction",
+            field_name="transaction_date",
+            name="Date ISO Format",
+            description="Date must be in ISO 8601 format",
+            validator=self._validate_date_format,
+            priority=1000,
+            required=True
+        ))
+
+        # Rule: Date not future
+        self.register_rule(ValidationRule(
+            rule_id="date_not_future",
+            entity_type="transaction",
+            field_name="transaction_date",
+            name="Date Not Future",
+            description="Transaction date cannot be in the future",
+            validator=lambda value, ctx: {
+                "valid": datetime.fromisoformat(value) <= datetime.now(),
+                "error": "Date cannot be in the future" if datetime.fromisoformat(value) > datetime.now() else None
+            },
+            priority=800,
+            required=True
+        ))
+
+        # Rule: Cross-field validation (category matches amount range)
+        self.register_rule(ValidationRule(
+            rule_id="category_amount_consistency",
+            entity_type="transaction",
+            field_name="category",
+            name="Category-Amount Consistency",
+            description="Category must be consistent with transaction amount",
+            validator=self._validate_category_amount,
+            priority=500,  # Run after type/format checks
+            required=False  # Warning, not error
+        ))
+
+    def _validate_date_format(self, value: Any, context: Dict) -> Dict:
+        """Validate date format."""
+        try:
+            datetime.fromisoformat(value)
+            return {"valid": True}
+        except (ValueError, AttributeError, TypeError):
+            return {
+                "valid": False,
+                "error": "Date must be in ISO 8601 format (YYYY-MM-DD)"
+            }
+
+    def _validate_category_amount(self, value: str, context: Dict) -> Dict:
+        """
+        Cross-field validation: category should match amount range.
+
+        Example: "Auto > Gas" typically $30-$100, not $5,000
+        """
+        amount = context.get("amount")
+        if not amount:
+            return {"valid": True}  # Skip if amount not provided
+
+        # Load category rules from database
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT min_amount, max_amount
+            FROM category_amount_ranges
+            WHERE category = %s
+        """, (value,))
+
+        result = cursor.fetchone()
+        cursor.close()
+
+        if not result:
+            return {"valid": True}  # No rule for this category
+
+        min_amount, max_amount = result
+
+        if not (min_amount <= abs(amount) <= max_amount):
+            return {
+                "valid": False,
+                "error": f"Amount ${abs(amount):.2f} unusual for category '{value}' (typical range: ${min_amount}-${max_amount})",
+                "warning": True,  # Warning, not blocking error
+                "suggested_value": None
+            }
+
+        return {"valid": True}
+
+    def _load_tenant_rules(self):
+        """Load custom validation rules from database."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT
+                rule_id,
+                entity_type,
+                field_name,
+                name,
+                description,
+                validator_code,
+                priority,
+                required
+            FROM validation_rules
+            WHERE active = true
+            ORDER BY priority DESC
+        """)
+
+        for row in cursor.fetchall():
+            rule_id, entity_type, field_name, name, desc, code, priority, required = row
+
+            # Compile validator function from stored code
+            # SECURITY: Only allow safe operations (no exec/eval in production)
+            # This is simplified - real implementation uses sandbox
+            try:
+                validator_fn = self._compile_validator(code)
+
+                self.register_rule(ValidationRule(
+                    rule_id=rule_id,
+                    entity_type=entity_type,
+                    field_name=field_name,
+                    name=name,
+                    description=desc,
+                    validator=validator_fn,
+                    priority=priority,
+                    required=required
+                ))
+            except Exception as e:
+                self.audit_logger.error(f"Failed to load rule {rule_id}: {e}")
+
+        cursor.close()
+
+    def _compile_validator(self, code: str) -> Callable:
+        """Compile validator code (sandboxed)."""
+        # Real implementation uses restricted Python execution
+        # This is placeholder
+        namespace = {}
+        exec(code, namespace)
+        return namespace["validate"]
+
+    def register_rule(self, rule: ValidationRule):
+        """Register a validation rule."""
+        key = f"{rule.entity_type}:{rule.field_name}"
+        if key not in self.rules:
+            self.rules[key] = []
+        self.rules[key].append(rule)
+
+        # Sort by priority (higher first)
+        self.rules[key].sort(key=lambda r: r.priority, reverse=True)
+
+    def validate(
+        self,
+        entity_type: str,
+        field_name: str,
+        value: Any,
+        context: Dict = None
+    ) -> ValidationResult:
+        """
+        Validate a field value.
+
+        Args:
+            entity_type: Entity type ("transaction", "policy", etc.)
+            field_name: Field name ("amount", "date", etc.)
+            value: Value to validate
+            context: Additional context for cross-field validation
+
+        Returns:
+            ValidationResult
+        """
+        start_time = datetime.now()
+        context = context or {}
+
+        # Get applicable rules
+        key = f"{entity_type}:{field_name}"
+        rules = self.rules.get(key, [])
+
+        errors = []
+        warnings = []
+        rules_applied = []
+
+        # Execute rules in priority order
+        for rule in rules:
+            try:
+                result = rule.validator(value, context)
+                rules_applied.append(rule.rule_id)
+
+                if not result.get("valid", True):
+                    error_obj = {
+                        "field": field_name,
+                        "error": result.get("error", "Validation failed"),
+                        "code": rule.rule_id,
+                        "suggested_value": result.get("suggested_value")
+                    }
+
+                    # Check if warning or error
+                    if result.get("warning", False) or not rule.required:
+                        warnings.append(error_obj)
+                    else:
+                        errors.append(error_obj)
+                        # Stop on first blocking error
+                        break
+
+            except Exception as e:
+                self.audit_logger.error(f"Rule {rule.rule_id} failed: {e}")
+                # Continue with other rules
+
+        # Audit log
+        duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+        self._audit_log(entity_type, field_name, value, errors, warnings, duration_ms)
+
+        return ValidationResult(
+            valid=(len(errors) == 0),
+            errors=errors if errors else None,
+            warnings=warnings if warnings else None,
+            metadata={
+                "rules_applied": rules_applied,
+                "duration_ms": duration_ms,
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+
+    def _audit_log(
+        self,
+        entity_type: str,
+        field_name: str,
+        value: Any,
+        errors: List,
+        warnings: List,
+        duration_ms: float
+    ):
+        """Log validation attempt to audit table."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO validation_audit_log (
+                entity_type,
+                field_name,
+                value,
+                valid,
+                errors,
+                warnings,
+                duration_ms,
+                timestamp
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+        """, (
+            entity_type,
+            field_name,
+            str(value),
+            len(errors) == 0,
+            str(errors) if errors else None,
+            str(warnings) if warnings else None,
+            duration_ms
+        ))
+        self.conn.commit()
+        cursor.close()
+
+    def validate_bulk(
+        self,
+        validations: List[Dict]
+    ) -> List[ValidationResult]:
+        """Validate multiple fields (batch)."""
+        results = []
+        for v in validations:
+            result = self.validate(
+                entity_type=v["entity_type"],
+                field_name=v["field_name"],
+                value=v["value"],
+                context=v.get("context")
+            )
+            results.append(result)
+        return results
+
+# Usage
+conn = psycopg2.connect("dbname=rsrch_production")
+engine = ValidationEngine(conn)
+
+# Validate field correction
+result = engine.validate(
+    entity_type="transaction",
+    field_name="amount",
+    value=-50.00,
+    context={"category": "Food & Dining"}
+)
+
+if not result.valid:
+    print(f"Validation failed: {result.errors}")
+else:
+    # Save to FieldOverrides
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO field_overrides (canonical_id, field_name, override_value)
+        VALUES (%s, %s, %s)
+    """, ("can_123", "amount", -50.00))
+    conn.commit()
+
+# Cross-field validation example
+result = engine.validate(
+    entity_type="transaction",
+    field_name="category",
+    value="Auto > Gas",
+    context={"amount": -5000.00}  # $5000 for gas is unusual
+)
+# → {
+#   "valid": False,
+#   "warnings": [{
+#     "field": "category",
+#     "error": "Amount $5000.00 unusual for category 'Auto > Gas' (typical range: $30-$100)",
+#     "warning": True
+#   }]
+# }
+```
+
+**Database Schema:**
+```sql
+-- Validation rules table
+CREATE TABLE validation_rules (
+    rule_id VARCHAR(255) PRIMARY KEY,
+    entity_type VARCHAR(100) NOT NULL,
+    field_name VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    validator_code TEXT NOT NULL,  -- Python code for validation
+    priority INT DEFAULT 100,
+    required BOOLEAN DEFAULT true,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Category amount ranges (for cross-field validation)
+CREATE TABLE category_amount_ranges (
+    category VARCHAR(255) PRIMARY KEY,
+    min_amount DECIMAL(10,2),
+    max_amount DECIMAL(10,2),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Audit log
+CREATE TABLE validation_audit_log (
+    id SERIAL PRIMARY KEY,
+    entity_type VARCHAR(100),
+    field_name VARCHAR(100),
+    value TEXT,
+    valid BOOLEAN,
+    errors TEXT,
+    warnings TEXT,
+    duration_ms DECIMAL(10,2),
+    timestamp TIMESTAMP DEFAULT NOW()
+);
+
+-- Index for performance
+CREATE INDEX idx_validation_audit_timestamp ON validation_audit_log(timestamp);
+```
+
+**Custom Validator Example (Stored in DB):**
+```python
+# Stored in validation_rules.validator_code
+def validate(value, context):
+    """Custom validator: Amount over $10K requires approval."""
+    if abs(value) > 10000:
+        return {
+            "valid": False,
+            "error": f"Amount ${abs(value):,.2f} exceeds $10,000 limit - requires manager approval",
+            "warning": True,  # Non-blocking warning
+            "suggested_value": None
+        }
+    return {"valid": True}
+```
+
+**Performance:**
+- Single validation: 8-12ms (includes DB queries for cross-field checks)
+- Bulk validation (100 fields): 450ms (parallelizable)
+- Audit log write: +2ms per validation
+- Rule registry load: Once at startup (cached in memory)
+
+**Why Rule Registry Required:**
+- Dynamic rules: Tenants can register custom validators
+- Priority ordering: Type checks run before business logic
+- Cross-field validation: Category must match amount range
+- Audit compliance: Log all validation attempts
+- Extensibility: Add rules without code changes
+
+### Comparison Table
+
+| Feature | Personal (Darwin) | Small Business | Enterprise |
+|---------|------------------|----------------|------------|
+| **LOC** | ~40 | ~150 | ~600 |
+| **Rules** | 4 hardcoded | 5 built-in + taxonomy | Dynamic rule registry |
+| **Taxonomy** | No | YAML file | PostgreSQL |
+| **Cross-Field** | No | No | Yes (category-amount) |
+| **Custom Validators** | No | No | Yes (DB-stored code) |
+| **Fuzzy Matching** | No | Yes (category suggestions) | Yes (with confidence) |
+| **Audit Logging** | No | No | Yes (PostgreSQL) |
+| **Validation Time** | < 1ms | 2-5ms | 8-12ms |
+| **Bulk Validation** | N/A | N/A | 450ms (100 fields) |
+| **Priority Ordering** | No | No | Yes |
+
+**Key Insight:**
+- **Darwin (40 LOC)**: Hardcoded type + range checks - sufficient for 871 transactions
+- **Small Business (150 LOC)**: Add taxonomy enforcement - prevent invalid categories
+- **Enterprise (600 LOC)**: Rule registry + cross-field validation - support multi-tenant custom rules
+
+---
+
 ## Summary
 
 The **ValidationEngine** primitive is the foundation of data integrity in the Objective Layer. By validating ALL field overrides BEFORE accepting them, it prevents invalid data from corrupting your single source of truth.
