@@ -2249,9 +2249,297 @@ async function validateUser(data: any): Promise<boolean> {
 
 ## Simplicity Profiles
 
-**Personal - ~20 LOC:** Hardcoded TypeScript interfaces, no validation
-**Small Business - ~90 LOC:** JSON Schema files, basic validation
-**Enterprise - ~450 LOC:** Schema versioning, backward compatibility checks, registry server
+### Personal Profile (20 LOC)
+
+**Contexto del Usuario:**
+Aplicación personal con schema fijo (transaction: date, amount, merchant, category). Schema hardcoded como TypeScript interface, sin validación runtime.
+
+**Implementation:**
+```typescript
+// types.ts (Personal - 20 LOC)
+interface Transaction {
+  id: string;
+  date: Date;
+  amount: number;
+  merchant: string;
+  category: string;
+}
+
+// No validation - TypeScript compiler checks types at build time
+function processTransaction(tx: Transaction) {
+  // Business logic here
+}
+```
+
+**Características Incluidas:**
+- ✅ Type safety en compile-time (TypeScript)
+- ✅ Schema como código (interfaces)
+
+**Características NO Incluidas:**
+- ❌ Runtime validation (YAGNI: trusted data sources)
+- ❌ Versioning (YAGNI: schema nunca cambia)
+- ❌ JSON Schema files (TypeScript interfaces suficientes)
+
+**Configuración:**
+```typescript
+// No config needed - schema in code
+```
+
+**Performance:**
+- Validation: 0ms (compile-time only)
+
+**Upgrade Triggers:**
+- Si schema cambia >2 veces/año → Small Business (JSON Schema files)
+- Si necesita validación runtime → Small Business (JSON Schema validation)
+
+---
+
+### Small Business Profile (90 LOC)
+
+**Contexto del Usuario:**
+Firma con API REST que recibe uploads de 10 clientes. Necesitan validar payloads contra JSON Schema para evitar datos malformados.
+
+**Implementation:**
+```python
+# schema_registry.py (Small Business - 90 LOC)
+import json
+from jsonschema import validate, ValidationError
+
+# Schema files stored in schemas/ directory
+SCHEMAS = {
+    "transaction": "schemas/transaction.v1.json",
+    "upload": "schemas/upload.v1.json",
+}
+
+def load_schema(schema_name: str):
+    """Load JSON Schema from file."""
+    schema_path = SCHEMAS[schema_name]
+    with open(schema_path, 'r') as f:
+        return json.load(f)
+
+def validate_payload(schema_name: str, payload: dict):
+    """
+    Validate payload against JSON Schema.
+    Raises ValidationError if invalid.
+    """
+    schema = load_schema(schema_name)
+    validate(instance=payload, schema=schema)  # Raises if invalid
+
+# Example usage
+try:
+    payload = {"date": "2025-01-15", "amount": 42.50, "merchant": "Starbucks"}
+    validate_payload("transaction", payload)
+    print("✓ Valid payload")
+except ValidationError as e:
+    print(f"✗ Invalid payload: {e.message}")
+```
+
+**JSON Schema example:**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Transaction",
+  "type": "object",
+  "required": ["date", "amount", "merchant"],
+  "properties": {
+    "date": {"type": "string", "format": "date"},
+    "amount": {"type": "number"},
+    "merchant": {"type": "string", "minLength": 1},
+    "category": {"type": "string"}
+  }
+}
+```
+
+**Características Incluidas:**
+- ✅ JSON Schema validation (runtime)
+- ✅ Schema files (versioned en Git)
+- ✅ Clear error messages (ValidationError)
+
+**Características NO Incluidas:**
+- ❌ Semantic versioning (solo v1, v2 manualmente)
+- ❌ Backward compatibility checks (manual review)
+- ❌ Schema registry server (archivos locales)
+
+**Configuración:**
+```yaml
+schema_registry:
+  schemas_dir: "./schemas"
+  schemas:
+    transaction: "transaction.v1.json"
+    upload: "upload.v1.json"
+```
+
+**Performance:**
+- Validation: <1ms (JSON Schema validación)
+
+**Upgrade Triggers:**
+- Si >10 schemas → Enterprise (registry server)
+- Si necesita versionado semántico → Enterprise (v1.0.0 format)
+- Si >3 services usan schemas → Enterprise (centralized registry)
+
+---
+
+### Enterprise Profile (450 LOC)
+
+**Contexto del Usuario:**
+FinTech con 50+ microservices, 100+ schemas, semantic versioning estricto (v1.2.3), backward compatibility checks automáticos, schema registry HTTP server.
+
+**Implementation:**
+```python
+# schema_registry.py (Enterprise - 450 LOC)
+from fastapi import FastAPI, HTTPException
+import psycopg2
+from typing import Optional
+from dataclasses import dataclass
+
+app = FastAPI()
+
+@dataclass
+class Schema:
+    schema_id: str
+    version: str  # Semantic versioning: v1.2.3
+    schema_json: dict
+    created_at: str
+    deprecated: bool
+
+class SchemaRegistry:
+    def __init__(self, db):
+        self.db = db
+
+    def register_schema(self, schema_id: str, version: str, schema_json: dict) -> Schema:
+        """
+        Register new schema version.
+
+        Steps:
+        1. Parse semantic version (v1.2.3)
+        2. Check backward compatibility with latest version
+        3. Insert into database (UNIQUE constraint on schema_id + version)
+        4. Return registered schema
+        """
+        # 1. Validate semantic version format
+        if not self._is_valid_semver(version):
+            raise ValueError(f"Invalid semver: {version}")
+
+        # 2. Check backward compatibility
+        latest = self.get_latest_version(schema_id)
+        if latest:
+            if not self._is_backward_compatible(latest.schema_json, schema_json):
+                raise ValueError(f"Breaking change detected in {schema_id} {version}")
+
+        # 3. Insert into database
+        self.db.execute("""
+            INSERT INTO schemas (schema_id, version, schema_json, created_at)
+            VALUES (%s, %s, %s, NOW())
+        """, (schema_id, version, json.dumps(schema_json)))
+
+        return Schema(schema_id, version, schema_json, created_at=..., deprecated=False)
+
+    def get_schema(self, schema_id: str, version: Optional[str] = None) -> Schema:
+        """
+        Get schema by ID and version.
+        If version=None, returns latest version.
+        """
+        if version is None:
+            # Get latest version
+            row = self.db.execute("""
+                SELECT schema_id, version, schema_json, created_at, deprecated
+                FROM schemas
+                WHERE schema_id = %s
+                ORDER BY version DESC
+                LIMIT 1
+            """, (schema_id,)).fetchone()
+        else:
+            # Get specific version
+            row = self.db.execute("""
+                SELECT schema_id, version, schema_json, created_at, deprecated
+                FROM schemas
+                WHERE schema_id = %s AND version = %s
+            """, (schema_id, version)).fetchone()
+
+        if not row:
+            raise ValueError(f"Schema not found: {schema_id} {version}")
+
+        return Schema(row[0], row[1], json.loads(row[2]), row[3], row[4])
+
+    def _is_backward_compatible(self, old_schema: dict, new_schema: dict) -> bool:
+        """
+        Check if new schema is backward compatible with old schema.
+
+        Rules:
+        - Can add optional fields (backward compatible)
+        - Cannot remove required fields (breaking change)
+        - Cannot change field types (breaking change)
+        """
+        old_required = set(old_schema.get("required", []))
+        new_required = set(new_schema.get("required", []))
+
+        # Check if required fields were removed (breaking)
+        removed_required = old_required - new_required
+        if removed_required:
+            return False  # Breaking change
+
+        # Check if field types changed (breaking)
+        old_props = old_schema.get("properties", {})
+        new_props = new_schema.get("properties", {})
+
+        for field in old_required:
+            if field in old_props and field in new_props:
+                if old_props[field]["type"] != new_props[field]["type"]:
+                    return False  # Type change = breaking
+
+        return True  # Backward compatible
+
+# HTTP API
+registry = SchemaRegistry(db)
+
+@app.post("/schemas/{schema_id}")
+async def register_schema(schema_id: str, version: str, schema: dict):
+    """Register new schema version."""
+    try:
+        result = registry.register_schema(schema_id, version, schema)
+        return {"schema_id": result.schema_id, "version": result.version}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/schemas/{schema_id}")
+async def get_schema(schema_id: str, version: Optional[str] = None):
+    """Get schema (latest or specific version)."""
+    try:
+        schema = registry.get_schema(schema_id, version)
+        return schema.schema_json
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+```
+
+**Características Incluidas:**
+- ✅ Semantic versioning (v1.2.3 format)
+- ✅ Backward compatibility checks (automático)
+- ✅ PostgreSQL storage (UNIQUE constraint)
+- ✅ HTTP API (FastAPI)
+- ✅ Version history (query all versions)
+
+**Características NO Incluidas:**
+- ❌ Schema evolution UI (API-only)
+- ❌ Migration generation (separado en MigrationEngine)
+
+**Configuración:**
+```yaml
+schema_registry:
+  server:
+    host: "0.0.0.0"
+    port: 8081
+  database:
+    url: "postgresql://user:pass@host:5432/schemas"
+  compatibility:
+    default_mode: "backward"  # backward, forward, full, none
+```
+
+**Performance:**
+- Latency: <10ms (database query)
+- Storage: ~1KB per schema version
+
+**No Further Tiers:**
+- Scale horizontally (read replicas)
 
 ---
 

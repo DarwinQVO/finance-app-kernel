@@ -298,9 +298,282 @@ response = api_gateway.handle_request(request)
 
 ## Simplicity Profiles
 
-**Personal - 0 LOC:** Direct function calls (no API needed)
-**Small Business - ~100 LOC:** Basic Flask/FastAPI server with auth middleware
-**Enterprise - ~500 LOC:** Full gateway with rate limiting, circuit breakers, metrics
+### Personal Profile (0 LOC)
+
+**Contexto del Usuario:**
+Aplicación personal que corre localmente. No necesita API HTTP porque todas las operaciones son llamadas directas a funciones. No hay "clientes externos" que necesiten autenticación o rate limiting.
+
+**Implementation:**
+```python
+# No implementation needed (0 LOC)
+# Personal app = direct function calls, no HTTP API
+# Example: process_upload(file_path) instead of POST /v1/uploads
+```
+
+**Características Incluidas:**
+- ✅ Ninguna (API Gateway no necesario para apps locales)
+
+**Características NO Incluidas:**
+- ❌ HTTP server (YAGNI: llamadas directas a funciones)
+- ❌ Authentication (YAGNI: usuario único, trusted environment)
+- ❌ Rate limiting (YAGNI: no hay múltiples clientes)
+- ❌ CORS (YAGNI: no hay navegador web)
+
+**Configuración:**
+```python
+# No config needed
+```
+
+**Performance:**
+- Latency: N/A
+
+**Upgrade Triggers:**
+- Si necesita API web → Small Business (HTTP server)
+- Si necesita cliente móvil → Small Business (REST API)
+- Si necesita integración externa → Small Business (API keys)
+
+---
+
+### Small Business Profile (100 LOC)
+
+**Contexto del Usuario:**
+Firma con API REST para 10 clientes externos (accounting software, mobile app). Necesitan autenticación básica con API keys y logging simple de requests.
+
+**Implementation:**
+```python
+# api_gateway.py (Small Business - 100 LOC)
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+API_KEYS = {"client_quickbooks": "key_123", "client_mobile": "key_456"}
+
+def authenticate_request():
+    """Middleware: Validate API key from Authorization header."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+
+    api_key = auth_header.replace("Bearer ", "")
+    # Simple lookup in hardcoded dict
+    for client_id, key in API_KEYS.items():
+        if key == api_key:
+            return {"client_id": client_id}
+    return None
+
+@app.before_request
+def gateway_middleware():
+    """Run before every request: auth + logging."""
+    # 1. Authenticate
+    auth_context = authenticate_request()
+    if not auth_context:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    # 2. Log request (simple print to stdout)
+    print(f"[API] {request.method} {request.path} - Client: {auth_context['client_id']}")
+
+    # 3. Store auth context for handlers
+    request.auth_context = auth_context
+
+@app.route("/v1/transactions", methods=["GET"])
+def get_transactions():
+    """Example endpoint - auth already checked by middleware."""
+    # Business logic here
+    return jsonify({"transactions": []})
+
+@app.route("/v1/uploads", methods=["POST"])
+def create_upload():
+    """Example endpoint - auth already checked by middleware."""
+    # Business logic here
+    return jsonify({"upload_id": "upload_123"})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
+```
+
+**Características Incluidas:**
+- ✅ HTTP server (Flask)
+- ✅ API key authentication (hardcoded dict)
+- ✅ Request logging (stdout)
+- ✅ Middleware pattern (before_request)
+
+**Características NO Incluidas:**
+- ❌ Rate limiting (SQLite-based para Small Business es overkill)
+- ❌ OAuth2 (solo API keys)
+- ❌ Circuit breakers (no hay microservicios)
+- ❌ Metrics collection (logs suficientes)
+
+**Configuración:**
+```yaml
+api_gateway:
+  host: "0.0.0.0"
+  port: 5000
+  api_keys:
+    client_quickbooks: "key_123"
+    client_mobile: "key_456"
+```
+
+**Performance:**
+- Latency: <5ms (middleware overhead)
+- Throughput: ~1K req/sec (Flask single process)
+
+**Upgrade Triggers:**
+- Si >1K req/sec → Enterprise (async server)
+- Si necesita rate limiting → Enterprise (Redis-based)
+- Si >20 clientes → Enterprise (database-backed API keys)
+
+---
+
+### Enterprise Profile (500 LOC)
+
+**Contexto del Usuario:**
+FinTech con 10K clientes API, rate limiting estricto (1K req/min por tenant), circuit breakers para microservicios internos, métricas Prometheus, CORS para web apps.
+
+**Implementation:**
+```python
+# api_gateway.py (Enterprise - 500 LOC)
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import redis
+import time
+
+app = FastAPI()
+
+# CORS for web clients
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://app.example.com"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+redis_client = redis.Redis(host="localhost", port=6379)
+
+@app.middleware("http")
+async def gateway_middleware(request: Request, call_next):
+    """
+    Full gateway pipeline:
+    1. Authenticate (API key or OAuth2)
+    2. Rate limit check
+    3. Log request
+    4. Forward to router
+    5. Add rate limit headers
+    """
+    start_time = time.time()
+
+    # 1. Authenticate
+    auth_context = await authenticate(request)
+    if not auth_context:
+        return JSONResponse(
+            status_code=401,
+            content={"type": "about:blank", "title": "Unauthorized", "status": 401}
+        )
+
+    # 2. Rate limiting (Redis-based)
+    tenant_id = auth_context["tenant_id"]
+    rate_limit_key = f"rate_limit:{tenant_id}:{int(time.time() / 60)}"  # Per minute
+
+    current_count = redis_client.incr(rate_limit_key)
+    if current_count == 1:
+        redis_client.expire(rate_limit_key, 60)  # Expire after 1 minute
+
+    limit = 1000  # 1K req/min
+    if current_count > limit:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "type": "about:blank",
+                "title": "Rate Limit Exceeded",
+                "status": 429,
+                "detail": f"Rate limit of {limit} requests per minute exceeded"
+            },
+            headers={
+                "X-RateLimit-Limit": str(limit),
+                "X-RateLimit-Remaining": "0",
+                "Retry-After": "60"
+            }
+        )
+
+    # 3. Store auth context for downstream handlers
+    request.state.auth = auth_context
+
+    # 4. Forward to router (call_next executes the actual endpoint)
+    response = await call_next(request)
+
+    # 5. Add rate limit headers
+    response.headers["X-RateLimit-Limit"] = str(limit)
+    response.headers["X-RateLimit-Remaining"] = str(limit - current_count)
+
+    # 6. Log request with latency
+    latency_ms = (time.time() - start_time) * 1000
+    print(f"[API] {request.method} {request.url.path} - Tenant: {tenant_id} - {latency_ms:.2f}ms")
+
+    # 7. Emit Prometheus metrics
+    emit_metric("api_request_duration_ms", latency_ms, {"endpoint": request.url.path})
+
+    return response
+
+async def authenticate(request: Request):
+    """
+    Authenticate via API key or OAuth2 token.
+    Supports both authentication methods.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        return None
+
+    if auth_header.startswith("Bearer tc_"):
+        # API Key authentication
+        api_key = auth_header.replace("Bearer ", "")
+        return await api_key_validator.validate_key(api_key)
+    elif auth_header.startswith("Bearer ey"):
+        # OAuth2 JWT token
+        token = auth_header.replace("Bearer ", "")
+        return await oauth2_provider.validate_token(token)
+
+    return None
+```
+
+**Características Incluidas:**
+- ✅ FastAPI async server (high throughput)
+- ✅ Dual authentication (API keys + OAuth2)
+- ✅ Redis-based rate limiting (1K req/min per tenant)
+- ✅ CORS middleware (web client support)
+- ✅ RFC 7807 error responses
+- ✅ Rate limit headers (X-RateLimit-*)
+- ✅ Prometheus metrics
+
+**Características NO Incluidas:**
+- ❌ API versioning (manejado por APIRouter)
+- ❌ Request transformation (responsibility de router)
+
+**Configuración:**
+```yaml
+api_gateway:
+  server:
+    host: "0.0.0.0"
+    port: 8000
+    workers: 4
+  rate_limiting:
+    enabled: true
+    redis_url: "redis://localhost:6379"
+    default_limit: 1000  # per minute
+    burst: 1200
+  cors:
+    allowed_origins:
+      - "https://app.example.com"
+      - "https://dashboard.example.com"
+  authentication:
+    api_keys_enabled: true
+    oauth2_enabled: true
+```
+
+**Performance:**
+- Latency: <5ms p95 (middleware overhead)
+- Throughput: 50K req/sec (4 workers)
+- Rate limiting overhead: <1ms (Redis lookup)
+
+**No Further Tiers:**
+- Scale horizontally (load balancer + multiple instances)
 
 ---
 

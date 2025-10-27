@@ -2453,9 +2453,263 @@ class TracingMetricsCollector implements MetricsCollector {
 
 ## Simplicity Profiles
 
-**Personal - ~15 LOC:** Print statements for debugging (no metrics)
-**Small Business - ~70 LOC:** Simple counters, log to file
-**Enterprise - ~350 LOC:** Prometheus metrics, Grafana dashboards, alerting
+### Personal Profile (15 LOC)
+
+**Contexto del Usuario:**
+Aplicación personal donde los "metrics" son solo prints para debugging. No necesita Prometheus/Grafana porque procesa 1-2 PDFs/mes.
+
+**Implementation:**
+```python
+# metrics.py (Personal - 15 LOC)
+import time
+
+def track_operation(operation_name: str):
+    """Simple timing decorator con print statement."""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            start = time.time()
+            result = func(*args, **kwargs)
+            duration_ms = (time.time() - start) * 1000
+            print(f"[METRIC] {operation_name}: {duration_ms:.2f}ms")
+            return result
+        return wrapper
+    return decorator
+
+@track_operation("parse_pdf")
+def parse_pdf(file_path):
+    # Business logic here
+    pass
+```
+
+**Características Incluidas:**
+- ✅ Timing básico (print statements)
+- ✅ Decorator pattern (fácil de aplicar)
+
+**Características NO Incluidas:**
+- ❌ Persistencia (YAGNI: prints suficiente para debugging)
+- ❌ Aggregation (YAGNI: volumen bajo)
+- ❌ Dashboards (YAGNI: procesa 1-2 PDFs/mes)
+
+**Configuración:**
+```python
+# No config needed
+```
+
+**Performance:**
+- Overhead: <0.1ms (time.time() call)
+
+**Upgrade Triggers:**
+- Si necesita histórico → Small Business (log to file)
+- Si >100 operations/day → Small Business (counters)
+
+---
+
+### Small Business Profile (70 LOC)
+
+**Contexto del Usuario:**
+Firma que procesa 500 PDFs/mes. Necesitan counters simples (success/failure) y log file con durations para análisis manual.
+
+**Implementation:**
+```python
+# metrics.py (Small Business - 70 LOC)
+import time
+from datetime import datetime
+from collections import defaultdict
+
+class MetricsCollector:
+    def __init__(self, log_file: str = "metrics.log"):
+        self.log_file = log_file
+        self.counters = defaultdict(int)  # {operation_name: count}
+
+    def record_duration(self, operation: str, duration_ms: float, success: bool):
+        """
+        Record operation duration to log file.
+        Also increment success/failure counter.
+        """
+        # 1. Write to log file (append mode)
+        timestamp = datetime.now().isoformat()
+        status = "SUCCESS" if success else "FAILURE"
+        with open(self.log_file, 'a') as f:
+            f.write(f"{timestamp},{operation},{duration_ms:.2f},{status}\n")
+
+        # 2. Update counter
+        counter_key = f"{operation}_{status}"
+        self.counters[counter_key] += 1
+
+    def get_counters(self):
+        """Return all counters (for debugging)."""
+        return dict(self.counters)
+
+# Usage
+metrics = MetricsCollector(log_file="metrics.log")
+
+start = time.time()
+try:
+    parse_pdf(file_path)
+    duration_ms = (time.time() - start) * 1000
+    metrics.record_duration("parse_pdf", duration_ms, success=True)
+except Exception:
+    duration_ms = (time.time() - start) * 1000
+    metrics.record_duration("parse_pdf", duration_ms, success=False)
+
+# Get counters
+print(metrics.get_counters())
+# {"parse_pdf_SUCCESS": 487, "parse_pdf_FAILURE": 13}
+```
+
+**Características Incluidas:**
+- ✅ Log file persistencia (CSV format)
+- ✅ Success/failure counters
+- ✅ Manual analysis (Excel, grep)
+
+**Características NO Incluidas:**
+- ❌ Prometheus integration (file-based suficiente)
+- ❌ Real-time dashboards (manual analysis OK)
+- ❌ Alerting (revisar logs manualmente)
+
+**Configuración:**
+```yaml
+metrics:
+  log_file: "./metrics.log"
+  rotation: "daily"  # Rotate log files daily
+```
+
+**Performance:**
+- Overhead: <1ms (file append)
+
+**Upgrade Triggers:**
+- Si >10K operations/day → Enterprise (Prometheus)
+- Si necesita real-time alerts → Enterprise (Grafana alerting)
+- Si múltiples services → Enterprise (centralized metrics)
+
+---
+
+### Enterprise Profile (350 LOC)
+
+**Contexto del Usuario:**
+FinTech con 100+ parsers, 10K uploads/day. Necesitan Prometheus metrics, Grafana dashboards, alerting automático cuando parser latency >5s.
+
+**Implementation:**
+```python
+# metrics.py (Enterprise - 350 LOC)
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
+import time
+
+# Prometheus metrics
+parse_duration = Histogram(
+    'parser_duration_seconds',
+    'Parser execution duration',
+    ['parser_name', 'status']
+)
+
+parse_count = Counter(
+    'parser_executions_total',
+    'Total parser executions',
+    ['parser_name', 'status']
+)
+
+queue_depth = Gauge(
+    'parser_queue_depth',
+    'Current parser queue depth',
+    ['parser_name']
+)
+
+class MetricsCollector:
+    def __init__(self, prometheus_port: int = 9090):
+        # Start Prometheus HTTP server
+        start_http_server(prometheus_port)
+
+    def record_parse_duration(self, parser_name: str, duration_seconds: float, success: bool):
+        """
+        Record parser execution duration.
+        Emits Prometheus histogram + counter.
+        """
+        status = "success" if success else "failure"
+
+        # 1. Record duration (histogram for p50, p95, p99)
+        parse_duration.labels(parser_name=parser_name, status=status).observe(duration_seconds)
+
+        # 2. Increment counter
+        parse_count.labels(parser_name=parser_name, status=status).inc()
+
+    def set_queue_depth(self, parser_name: str, depth: int):
+        """Set current parser queue depth (gauge)."""
+        queue_depth.labels(parser_name=parser_name).set(depth)
+
+# Usage
+metrics = MetricsCollector(prometheus_port=9090)
+
+start = time.time()
+try:
+    result = parse_pdf(file_path, parser="bofa_statement_v2")
+    duration = time.time() - start
+    metrics.record_parse_duration("bofa_statement_v2", duration, success=True)
+except Exception:
+    duration = time.time() - start
+    metrics.record_parse_duration("bofa_statement_v2", duration, success=False)
+
+# Update queue depth
+metrics.set_queue_depth("bofa_statement_v2", queue_length=142)
+```
+
+**Grafana Dashboard (PromQL queries):**
+```promql
+# Parser p95 latency (by parser)
+histogram_quantile(0.95, rate(parser_duration_seconds_bucket[5m]))
+
+# Parser success rate
+rate(parser_executions_total{status="success"}[5m]) /
+rate(parser_executions_total[5m]) * 100
+
+# Parser queue depth alert (> 1000)
+parser_queue_depth > 1000
+```
+
+**Alerting Rules:**
+```yaml
+# alerting_rules.yml
+groups:
+  - name: parser_alerts
+    rules:
+      - alert: HighParserLatency
+        expr: histogram_quantile(0.95, rate(parser_duration_seconds_bucket[5m])) > 5
+        for: 10m
+        annotations:
+          summary: "Parser latency exceeded 5s"
+
+      - alert: LowSuccessRate
+        expr: rate(parser_executions_total{status="success"}[5m]) / rate(parser_executions_total[5m]) < 0.90
+        for: 5m
+        annotations:
+          summary: "Parser success rate below 90%"
+```
+
+**Características Incluidas:**
+- ✅ Prometheus metrics (histograms, counters, gauges)
+- ✅ Grafana dashboards (real-time)
+- ✅ Alerting rules (PagerDuty integration)
+- ✅ Multi-dimensional labels (parser_name, status)
+
+**Características NO Incluidas:**
+- ❌ Distributed tracing (separado en OpenTelemetry)
+
+**Configuración:**
+```yaml
+metrics:
+  prometheus:
+    port: 9090
+    scrape_interval: 15s
+  alerting:
+    pagerduty_key: "secret"
+    slack_webhook: "https://hooks.slack.com/..."
+```
+
+**Performance:**
+- Overhead: <1ms (in-memory counters)
+- Storage: Prometheus (30d retention)
+
+**No Further Tiers:**
+- Scale horizontally (Prometheus federation)
 
 ---
 
