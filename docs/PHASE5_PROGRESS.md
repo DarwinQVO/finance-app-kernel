@@ -1,14 +1,14 @@
 # Phase 5: Refactoring Progress Report
 
-**Status:** In Progress (5/33 primitives complete)
+**Status:** In Progress (8/33 primitives complete)
 **Started:** 2025-10-27  
 **Pattern:** Literate programming style with Spanish narrative + English code
 
 ---
 
-## Completed Primitives (5/33 - 15%)
+## Completed Primitives (8/33 - 24%)
 
-### API/Auth System (5/8 complete)
+### API/Auth System (8/8 complete ✅)
 
 1. ✅ **APIKeyValidator** (commit be2bcbe)
    - Personal (15 LOC): Hardcoded string comparison
@@ -40,14 +40,27 @@
    - Enterprise (400 LOC): 5 roles, PostgreSQL RLS, resource-level ACL
    - Expansion: 3 lines → 145 lines
 
+6. ✅ **APIGateway** (commit 5c1eaca)
+   - Personal (0 LOC): No HTTP API, direct function calls
+   - Small Business (100 LOC): Flask, API keys, logging
+   - Enterprise (500 LOC): FastAPI, Redis rate limiting, CORS
+   - Expansion: 3 lines → 278 lines
+
+7. ✅ **SchemaRegistry** (commit 5c1eaca)
+   - Personal (20 LOC): TypeScript interfaces, compile-time
+   - Small Business (90 LOC): JSON Schema files, runtime validation
+   - Enterprise (450 LOC): Semantic versioning, HTTP server
+   - Expansion: 3 lines → 293 lines
+
+8. ✅ **MetricsCollector** (commit 5c1eaca)
+   - Personal (15 LOC): Print statements for debugging
+   - Small Business (70 LOC): Log files + counters
+   - Enterprise (350 LOC): Prometheus + Grafana + alerting
+   - Expansion: 3 lines → 259 lines
+
 ---
 
-## Pending Primitives (28/33 - 85%)
-
-### API/Auth System (3 remaining)
-- ⏳ APIGateway
-- ⏳ SchemaRegistry
-- ⏳ MetricsCollector
+## Pending Primitives (25/33 - 76%)
 
 ### Truth Construction (9 primitives)
 - ⏳ IndexStrategy
@@ -172,17 +185,18 @@ primitive_name:
 
 ## Estimated Remaining Effort
 
-- Average expansion: ~200 lines per primitive (based on completed work)
-- Remaining primitives: 28
-- Estimated lines: 28 × 200 = 5,600 lines
-- Estimated time: 84 hours (3 hours per primitive)
+- Average expansion: ~250 lines per primitive (based on 8 completed)
+- Remaining primitives: 25
+- Estimated lines: 25 × 250 = 6,250 lines
+- Estimated time: 75 hours (3 hours per primitive)
 
 ---
 
 **Status Summary:**
-- ✅ Pattern established and validated (5 primitives)
-- ✅ Pattern documented for replication
-- ⏳ 28 primitives await systematic application
+- ✅ Pattern established and validated (8 primitives)
+- ✅ API/Auth system complete (8/8 primitives - 100%)
+- ✅ Average 250 lines expansion per primitive
+- ⏳ 25 primitives await systematic application
 - ⏳ Consistency review pending
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
