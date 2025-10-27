@@ -1,62 +1,62 @@
-# Open Questions
+# Preguntas Abiertas
 
-> **Purpose:** Document undecided features and design choices that need user input
-
----
-
-## Philosophy
-
-**Not all decisions need to be made upfront.** Some features depend on actual usage patterns. This document tracks questions that should be answered based on real-world experience, not speculation.
-
-**Decision Process:**
-1. Build v1 without the feature
-2. Use the app for 1-2 months
-3. If pain point emerges → Revisit question
-4. If no pain point → Feature not needed
+> **Propósito:** Documentar características y decisiones de diseño no decididas que necesitan input del usuario
 
 ---
 
-## Question 1: Multi-Currency Support
+## Filosofía
 
-**The Question:**
-Should the app support transactions in multiple currencies (EUR, GBP, MXN, etc.)?
+**No todas las decisiones necesitan tomarse por adelantado.** Algunas características dependen de patrones de uso reales. Este documento rastrea preguntas que deben responderse basándose en experiencia del mundo real, no especulación.
 
-**Current State (v1):**
-- All transactions assumed to be in USD
-- No `currency_code` field
-- No exchange rate tracking
-- Foreign currency transactions show converted amount only
+**Proceso de Decisión:**
+1. Construir v1 sin la característica
+2. Usar la app por 1-2 meses
+3. Si emerge un punto de dolor → Revisitar pregunta
+4. Si no hay punto de dolor → Característica no necesaria
 
-**Example Scenario:**
-User travels to Europe. Credit card statement shows:
+---
+
+## Pregunta 1: Soporte Multi-Moneda
+
+**La Pregunta:**
+¿Debería la app soportar transacciones en múltiples monedas (EUR, GBP, MXN, etc.)?
+
+**Estado Actual (v1):**
+- Todas las transacciones se asumen en USD
+- Sin campo `currency_code`
+- Sin seguimiento de tasa de cambio
+- Transacciones en moneda extranjera muestran solo monto convertido
+
+**Escenario de Ejemplo:**
+El usuario viaja a Europa. El estado de cuenta de tarjeta de crédito muestra:
 ```
 10/15/2024  RESTAURANT PARIS EUR 45.00
             EXCHANGE RATE 1.10              -$49.50
 10/15/2024  FOREIGN TRANSACTION FEE          -$2.50
 ```
 
-**Current handling:**
-- Import as two USD transactions: -$49.50 and -$2.50
-- Lose original EUR 45.00 information
-- Can't calculate effective exchange rate including fee
+**Manejo actual:**
+- Importar como dos transacciones USD: -$49.50 y -$2.50
+- Se pierde información original de EUR 45.00
+- No se puede calcular tasa de cambio efectiva incluyendo comisión
 
-**What multi-currency would enable:**
-- Store original currency: `amount=45.00, currency=EUR`
-- Store converted amount: `amount_usd=49.50`
-- Track exchange rate: `rate=1.10`
-- Calculate effective rate: `(49.50 + 2.50) / 45.00 = 1.156`
-- View spending in original currency
+**Lo que multi-moneda habilitaría:**
+- Almacenar moneda original: `amount=45.00, currency=EUR`
+- Almacenar monto convertido: `amount_usd=49.50`
+- Rastrear tasa de cambio: `rate=1.10`
+- Calcular tasa efectiva: `(49.50 + 2.50) / 45.00 = 1.156`
+- Ver gastos en moneda original
 
-**Decision Criteria:**
+**Criterios de Decisión:**
 
-| If... | Then... |
-|-------|---------|
-| User rarely travels internationally (< 2x/year) | **Don't add** - Complexity not worth it |
-| User travels frequently (> 4x/year) | **Add it** - Useful feature |
-| User has foreign income/expenses | **Add it** - Essential |
-| User only spends in USD | **Don't add** - Not needed |
+| Si... | Entonces... |
+|-------|-------------|
+| El usuario rara vez viaja internacionalmente (< 2x/año) | **No agregar** - Complejidad no vale la pena |
+| El usuario viaja frecuentemente (> 4x/año) | **Agregarlo** - Característica útil |
+| El usuario tiene ingresos/gastos extranjeros | **Agregarlo** - Esencial |
+| El usuario solo gasta en USD | **No agregar** - No necesario |
 
-**Data Model Impact:**
+**Impacto en Modelo de Datos:**
 ```sql
 -- Would need to add:
 ALTER TABLE transactions
@@ -70,61 +70,61 @@ ADD COLUMN exchange_rate REAL;  -- 1.10
 -- Just add currency_code, assume single currency per transaction
 ```
 
-**Recommendation:**
-**START WITHOUT IT.** Add only if user travels frequently.
+**Recomendación:**
+**COMENZAR SIN ESTO.** Agregar solo si el usuario viaja frecuentemente.
 
 ---
 
-## Question 2: Auto-Categorization Strategy
+## Pregunta 2: Estrategia de Auto-Categorización
 
-**The Question:**
-Should categorization use:
-- **Option A:** Simple pattern matching (YAML rules)
-- **Option B:** Machine learning (train on user's history)
-- **Option C:** Hybrid (rules + ML)
+**La Pregunta:**
+¿Debería la categorización usar:
+- **Opción A:** Coincidencia simple de patrones (reglas YAML)
+- **Opción B:** Aprendizaje automático (entrenar en historial del usuario)
+- **Opción C:** Híbrido (reglas + ML)
 
-**Current State (v1):**
-Using **Option A** - Pattern matching with YAML rules:
+**Estado Actual (v1):**
+Usando **Opción A** - Coincidencia de patrones con reglas YAML:
 ```yaml
 - pattern: "WHOLE FOODS"
   category: "Groceries"
   confidence: 0.9
 ```
 
-**Pros of Pattern Matching:**
-- ✅ Simple to understand
-- ✅ Deterministic (same input → same output)
-- ✅ Easy to debug (just look at YAML file)
-- ✅ User can edit rules directly
-- ✅ No training data needed
+**Pros de Coincidencia de Patrones:**
+- ✅ Simple de entender
+- ✅ Determinístico (mismo input → mismo output)
+- ✅ Fácil de debugear (solo mirar archivo YAML)
+- ✅ El usuario puede editar reglas directamente
+- ✅ No se necesitan datos de entrenamiento
 
-**Cons of Pattern Matching:**
-- ❌ Requires manual rule creation
-- ❌ Can't learn from user corrections
-- ❌ Doesn't adapt to new merchants
-- ❌ 50-100 rules needed for good coverage
+**Contras de Coincidencia de Patrones:**
+- ❌ Requiere creación manual de reglas
+- ❌ No puede aprender de correcciones del usuario
+- ❌ No se adapta a nuevos comerciantes
+- ❌ Se necesitan 50-100 reglas para buena cobertura
 
-**What ML would enable:**
-- Learn from corrections: User changes "Amazon" from "Shopping" to "Books" → System learns
-- Adaptive: Accuracy improves over time
-- Handle new merchants automatically
+**Lo que ML habilitaría:**
+- Aprender de correcciones: Usuario cambia "Amazon" de "Compras" a "Libros" → Sistema aprende
+- Adaptativo: Precisión mejora con el tiempo
+- Manejar nuevos comerciantes automáticamente
 
-**What ML would require:**
-- Training data: Need 100+ categorized transactions minimum
-- Complexity: scikit-learn, model training, confidence scores
-- Explainability: Harder to answer "why did you categorize this as X?"
+**Lo que ML requeriría:**
+- Datos de entrenamiento: Necesita 100+ transacciones categorizadas mínimo
+- Complejidad: scikit-learn, entrenamiento de modelo, puntajes de confianza
+- Explicabilidad: Más difícil responder "¿por qué categorizaste esto como X?"
 
-**Decision Criteria:**
+**Criterios de Decisión:**
 
-| If... | Then... |
-|-------|---------|
-| User has < 500 transactions | **Pattern matching** - Not enough training data |
-| User is comfortable editing YAML | **Pattern matching** - User prefers control |
-| Categorization accuracy > 85% with rules | **Pattern matching** - Good enough |
-| User frequently corrects categories (> 10% of transactions) | **Try ML** - Rules not working |
-| User wants "auto-improve" feature | **Try ML** - Sells the feature |
+| Si... | Entonces... |
+|-------|-------------|
+| El usuario tiene < 500 transacciones | **Coincidencia de patrones** - No suficientes datos de entrenamiento |
+| El usuario se siente cómodo editando YAML | **Coincidencia de patrones** - Usuario prefiere control |
+| Precisión de categorización > 85% con reglas | **Coincidencia de patrones** - Suficientemente bueno |
+| El usuario corrige frecuentemente categorías (> 10% de transacciones) | **Probar ML** - Reglas no funcionan |
+| El usuario quiere característica "auto-mejorar" | **Probar ML** - Vende la característica |
 
-**Hybrid Approach (Option C):**
+**Enfoque Híbrido (Opción C):**
 ```python
 def categorize_transaction(description):
     # Try pattern matching first (fast, explainable)
@@ -137,44 +137,44 @@ def categorize_transaction(description):
     return category
 ```
 
-**Recommendation:**
-**START WITH RULES.** Measure correction rate. If > 10%, consider ML.
+**Recomendación:**
+**COMENZAR CON REGLAS.** Medir tasa de corrección. Si > 10%, considerar ML.
 
 ---
 
-## Question 3: Split Transactions
+## Pregunta 3: Transacciones Divididas
 
-**The Question:**
-Should users be able to split a single transaction across multiple categories?
+**La Pregunta:**
+¿Deberían los usuarios poder dividir una única transacción entre múltiples categorías?
 
-**Example Scenario:**
-User shops at Target:
+**Escenario de Ejemplo:**
+El usuario compra en Target:
 ```
 10/15/2024  TARGET #1234               -$127.50
 ```
 
-But the $127.50 actually includes:
-- Groceries: $45.00
-- Household items: $35.50
-- Clothing: $47.00
+Pero los $127.50 realmente incluyen:
+- Supermercado: $45.00
+- Artículos del hogar: $35.50
+- Ropa: $47.00
 
-**Current State (v1):**
-- Transaction assigned to ONE category only
-- User can add note: "Includes groceries + household + clothing"
-- No way to split into multiple categories
+**Estado Actual (v1):**
+- Transacción asignada a UNA categoría solamente
+- El usuario puede agregar nota: "Incluye supermercado + hogar + ropa"
+- No hay manera de dividir en múltiples categorías
 
-**What splitting would enable:**
-- Accurate spending breakdown by category
-- Tax deductible portions (if Target purchases include office supplies)
-- Budget tracking per category
+**Lo que división habilitaría:**
+- Desglose preciso de gastos por categoría
+- Porciones deducibles de impuestos (si compras en Target incluyen suministros de oficina)
+- Seguimiento de presupuesto por categoría
 
-**What splitting would require:**
-- UI for creating splits (% or $ amounts)
-- Validation: Splits must sum to total
-- Complex queries: "Show all grocery spending" → Include partial transactions
-- Export complexity: Does split show as 1 row or 3 rows?
+**Lo que división requeriría:**
+- UI para crear divisiones (% o montos en $)
+- Validación: Divisiones deben sumar al total
+- Consultas complejas: "Mostrar todos los gastos de supermercado" → Incluir transacciones parciales
+- Complejidad de exportación: ¿La división se muestra como 1 fila o 3 filas?
 
-**Data Model Impact:**
+**Impacto en Modelo de Datos:**
 ```sql
 -- Option 1: Split transactions table
 CREATE TABLE transaction_splits (
@@ -194,46 +194,46 @@ ADD COLUMN splits JSON;
 -- ]
 ```
 
-**Decision Criteria:**
+**Criterios de Decisión:**
 
-| If... | Then... |
-|-------|---------|
-| User rarely shops at stores with multiple departments (< 5% of transactions) | **Don't add** - Edge case |
-| User needs tax deduction tracking for mixed purchases | **Add it** - Required for taxes |
-| User is comfortable with approximate category splits | **Don't add** - Notes field sufficient |
-| Budget tracking requires exact splits | **Add it** - Affects budgets |
+| Si... | Entonces... |
+|-------|-------------|
+| El usuario rara vez compra en tiendas con múltiples departamentos (< 5% de transacciones) | **No agregar** - Caso especial |
+| El usuario necesita seguimiento de deducción de impuestos para compras mixtas | **Agregarlo** - Requerido para impuestos |
+| El usuario se siente cómodo con divisiones aproximadas de categoría | **No agregar** - Campo de notas suficiente |
+| Seguimiento de presupuesto requiere divisiones exactas | **Agregarlo** - Afecta presupuestos |
 
-**Recommendation:**
-**START WITHOUT IT.** Use notes field. Add if tax requirements emerge.
+**Recomendación:**
+**COMENZAR SIN ESTO.** Usar campo de notas. Agregar si emergen requisitos de impuestos.
 
 ---
 
-## Question 4: Receipt Attachments
+## Pregunta 4: Adjuntos de Recibos
 
-**The Question:**
-Should users be able to attach receipt images/PDFs to transactions?
+**La Pregunta:**
+¿Deberían los usuarios poder adjuntar imágenes/PDFs de recibos a transacciones?
 
-**Example Scenario:**
-- Business expense: Need receipt for reimbursement
-- Large purchase: Warranty, return policy on receipt
-- Tax deduction: IRS requires receipts for certain expenses
+**Escenario de Ejemplo:**
+- Gasto de negocio: Necesita recibo para reembolso
+- Compra grande: Garantía, política de devolución en recibo
+- Deducción de impuestos: IRS requiere recibos para ciertos gastos
 
-**Current State (v1):**
-- No attachment support
-- User can add note: "Receipt in Dropbox: /tax-docs/2024/target-receipt-oct15.pdf"
+**Estado Actual (v1):**
+- Sin soporte de adjuntos
+- El usuario puede agregar nota: "Recibo en Dropbox: /tax-docs/2024/target-receipt-oct15.pdf"
 
-**What attachments would enable:**
-- One-click receipt access from transaction
-- Receipt storage integrated with app
-- OCR to extract amount/date from receipt (validate against transaction)
+**Lo que adjuntos habilitarían:**
+- Acceso al recibo con un clic desde la transacción
+- Almacenamiento de recibos integrado con la app
+- OCR para extraer monto/fecha del recibo (validar contra transacción)
 
-**What attachments would require:**
-- File upload UI (drag & drop images)
-- Storage (500 receipts × 1 MB = 500 MB)
-- Image viewer in transaction detail modal
-- File management (delete, download)
+**Lo que adjuntos requerirían:**
+- UI de subida de archivos (arrastrar y soltar imágenes)
+- Almacenamiento (500 recibos × 1 MB = 500 MB)
+- Visor de imágenes en modal de detalle de transacción
+- Gestión de archivos (eliminar, descargar)
 
-**Data Model Impact:**
+**Impacto en Modelo de Datos:**
 ```sql
 CREATE TABLE attachments (
   id TEXT PRIMARY KEY,
@@ -246,53 +246,53 @@ CREATE TABLE attachments (
 );
 ```
 
-**Decision Criteria:**
+**Criterios de Decisión:**
 
-| If... | Then... |
-|-------|---------|
-| User is tracking personal expenses only | **Don't add** - Not needed |
-| User needs receipts for business reimbursement | **Add it** - Essential for work |
-| User needs receipts for tax audits | **Add it** - IRS compliance |
-| User is comfortable storing receipts externally (Dropbox, Google Drive) | **Don't add** - External works |
+| Si... | Entonces... |
+|-------|-------------|
+| El usuario solo rastrea gastos personales | **No agregar** - No necesario |
+| El usuario necesita recibos para reembolso de negocio | **Agregarlo** - Esencial para trabajo |
+| El usuario necesita recibos para auditorías de impuestos | **Agregarlo** - Cumplimiento con IRS |
+| El usuario se siente cómodo almacenando recibos externamente (Dropbox, Google Drive) | **No agregar** - Externo funciona |
 
-**Recommendation:**
-**START WITHOUT IT.** Add if business/tax use case emerges.
+**Recomendación:**
+**COMENZAR SIN ESTO.** Agregar si emerge caso de uso de negocio/impuestos.
 
 ---
 
-## Question 5: Budget Tracking
+## Pregunta 5: Seguimiento de Presupuesto
 
-**The Question:**
-Should the app include monthly budget tracking (planned vs. actual spending)?
+**La Pregunta:**
+¿Debería la app incluir seguimiento mensual de presupuesto (gasto planificado vs. real)?
 
-**Example Scenario:**
-User sets monthly budgets:
-- Groceries: $500/month
-- Dining: $200/month
-- Entertainment: $100/month
+**Escenario de Ejemplo:**
+El usuario establece presupuestos mensuales:
+- Supermercado: $500/mes
+- Restaurantes: $200/mes
+- Entretenimiento: $100/mes
 
-App shows:
-- Groceries: $520 spent (104% of budget) ⚠️
-- Dining: $180 spent (90% of budget) ✅
-- Entertainment: $85 spent (85% of budget) ✅
+La app muestra:
+- Supermercado: $520 gastado (104% del presupuesto) ⚠️
+- Restaurantes: $180 gastado (90% del presupuesto) ✅
+- Entretenimiento: $85 gastado (85% del presupuesto) ✅
 
-**Current State (v1):**
-- No budget tracking
-- User can see total spending by category in dashboard
-- No alerts or warnings
+**Estado Actual (v1):**
+- Sin seguimiento de presupuesto
+- El usuario puede ver gasto total por categoría en dashboard
+- Sin alertas o advertencias
 
-**What budgets would enable:**
-- Proactive alerts: "You've spent 90% of your Grocery budget"
-- Goal setting: "Save $500 this month"
-- Trend analysis: "Groceries over budget 3 months in a row"
+**Lo que presupuestos habilitarían:**
+- Alertas proactivas: "Has gastado 90% de tu presupuesto de Supermercado"
+- Establecimiento de metas: "Ahorrar $500 este mes"
+- Análisis de tendencias: "Supermercado sobre presupuesto 3 meses seguidos"
 
-**What budgets would require:**
-- Budget setup UI (set amount per category)
-- Budget progress bars in dashboard
-- Alert system (email/push when over budget)
-- Historical budget vs. actual comparison
+**Lo que presupuestos requerirían:**
+- UI de configuración de presupuesto (establecer monto por categoría)
+- Barras de progreso de presupuesto en dashboard
+- Sistema de alertas (email/push cuando se excede presupuesto)
+- Comparación histórica presupuesto vs. real
 
-**Data Model Impact:**
+**Impacto en Modelo de Datos:**
 ```sql
 CREATE TABLE budgets (
   id TEXT PRIMARY KEY,
@@ -305,252 +305,252 @@ CREATE TABLE budgets (
 );
 ```
 
-**Decision Criteria:**
+**Criterios de Decisión:**
 
-| If... | Then... |
-|-------|---------|
-| User wants passive tracking (just see spending) | **Don't add** - Dashboard sufficient |
-| User wants active control (stay within budget) | **Add it** - Core feature |
-| User has irregular income (freelancer, contractor) | **Maybe add** - Budgets less useful |
-| User has fixed income and expenses | **Add it** - Very useful |
+| Si... | Entonces... |
+|-------|-------------|
+| El usuario quiere seguimiento pasivo (solo ver gastos) | **No agregar** - Dashboard suficiente |
+| El usuario quiere control activo (mantenerse dentro del presupuesto) | **Agregarlo** - Característica central |
+| El usuario tiene ingresos irregulares (freelancer, contratista) | **Tal vez agregar** - Presupuestos menos útiles |
+| El usuario tiene ingresos y gastos fijos | **Agregarlo** - Muy útil |
 
-**Recommendation:**
-**START WITHOUT IT.** Use app for 1-2 months. If user repeatedly checks "did I overspend on X?" → Add it.
-
----
-
-## Question 6: Recurring Transaction Tracking
-
-**The Question:**
-What level of recurring transaction support?
-- **Option A:** Manual (user creates series, links transactions manually)
-- **Option B:** Auto-detect (system suggests series based on patterns)
-- **Option C:** Proactive (system creates series automatically, user approves)
-
-**Current State (v1):**
-Implementing **Option B** - Auto-detect with suggestions
-
-**How it works:**
-- System detects: Netflix $14.99 every month on 15th
-- User sees notification: "Looks like Netflix is a recurring payment - track it?"
-- User approves → Series created
-- Future Netflix charges auto-link to series
-
-**Open Questions:**
-
-**Q6.1: Missing Payment Alerts**
-If November 15th passes without Netflix charge:
-- **Alert immediately?** "Missing expected Netflix payment"
-- **Wait 5 days?** (payment might be delayed)
-- **User configurable?** Let user set grace period per series
-
-**Decision:**
-Wait 5 days by default. Add user setting if needed.
-
-**Q6.2: Variance Tolerance**
-Netflix charge is usually $14.99, but December shows $15.99:
-- **Reject as non-match?** (create new transaction, don't link to series)
-- **Accept with warning?** "Netflix charge was $1 higher - price increase?"
-- **Auto-update series amount?** (assume new price going forward)
-
-**Decision:**
-Accept with warning. User reviews and either:
-- Confirms price increase → Update series amount to $15.99
-- Rejects → One-time variance, keep series at $14.99
-
-**Q6.3: Series Cancellation**
-User cancels Netflix. How should system handle?
-- **Auto-detect?** If 2 months pass without charge, suggest "Mark series as cancelled?"
-- **Manual only?** User must explicitly cancel series
-- **Keep forever?** Series stays active indefinitely (alerts user every month)
-
-**Decision:**
-Auto-suggest after 2 missed payments. Don't auto-cancel (user might resume subscription).
+**Recomendación:**
+**COMENZAR SIN ESTO.** Usar app por 1-2 meses. Si el usuario repetidamente pregunta "¿gasté de más en X?" → Agregarlo.
 
 ---
 
-## Question 7: Tax Preparation Integration
+## Pregunta 6: Seguimiento de Transacciones Recurrentes
 
-**The Question:**
-How deep should tax support go?
+**La Pregunta:**
+¿Qué nivel de soporte de transacciones recurrentes?
+- **Opción A:** Manual (usuario crea serie, vincula transacciones manualmente)
+- **Opción B:** Auto-detectar (sistema sugiere series basándose en patrones)
+- **Opción C:** Proactivo (sistema crea series automáticamente, usuario aprueba)
 
-**Levels of Support:**
+**Estado Actual (v1):**
+Implementando **Opción B** - Auto-detectar con sugerencias
 
-**Level 1: Basic (v1)**
-- Categorize transactions
-- Tag tax-deductible expenses
-- Export CSV for accountant
+**Cómo funciona:**
+- Sistema detecta: Netflix $14.99 cada mes el día 15
+- Usuario ve notificación: "Parece que Netflix es un pago recurrente - ¿rastrearlo?"
+- Usuario aprueba → Serie creada
+- Cargos futuros de Netflix se auto-vinculan a la serie
 
-**Level 2: Intermediate**
-- Pre-filled tax forms (Schedule C for self-employed)
-- Multi-jurisdiction support (lived in 2 states)
-- Mileage tracking (if car expenses deductible)
+**Preguntas Abiertas:**
 
-**Level 3: Advanced**
-- Direct export to TurboTax, H&R Block
-- Real-time estimated tax calculation
-- Quarterly tax payment reminders
-- Audit trail documentation
+**P6.1: Alertas de Pago Faltante**
+Si el 15 de noviembre pasa sin cargo de Netflix:
+- **¿Alertar inmediatamente?** "Falta el pago esperado de Netflix"
+- **¿Esperar 5 días?** (el pago podría retrasarse)
+- **¿Configurable por usuario?** Dejar que usuario establezca período de gracia por serie
 
-**Current State (v1):**
-Implementing **Level 1** - Basic categorization
+**Decisión:**
+Esperar 5 días por defecto. Agregar configuración de usuario si es necesario.
 
-**Open Questions:**
+**P6.2: Tolerancia de Varianza**
+El cargo de Netflix es usualmente $14.99, pero diciembre muestra $15.99:
+- **¿Rechazar como no coincidente?** (crear nueva transacción, no vincular a serie)
+- **¿Aceptar con advertencia?** "Cargo de Netflix fue $1 más alto - ¿aumento de precio?"
+- **¿Auto-actualizar monto de serie?** (asumir nuevo precio hacia adelante)
 
-**Q7.1: What's deductible?**
-User marks transaction as "tax-deductible" but:
-- Medical expenses only deductible if > 7.5% AGI
-- Home office deduction has complex rules
-- Meals are 50% deductible (for business)
+**Decisión:**
+Aceptar con advertencia. Usuario revisa y:
+- Confirma aumento de precio → Actualizar monto de serie a $15.99
+- Rechaza → Varianza única, mantener serie en $14.99
 
-**Should app:**
-- **Trust user?** Let them mark anything deductible (accountant will verify)
-- **Enforce IRS rules?** Block marking groceries as deductible
-- **Warn user?** "Medical deductions require > $X total to claim"
+**P6.3: Cancelación de Serie**
+Usuario cancela Netflix. ¿Cómo debería manejar el sistema?
+- **¿Auto-detectar?** Si 2 meses pasan sin cargo, sugerir "¿Marcar serie como cancelada?"
+- **¿Solo manual?** Usuario debe cancelar serie explícitamente
+- **¿Mantener para siempre?** Serie permanece activa indefinidamente (alerta al usuario cada mes)
 
-**Decision:**
-Trust user (v1). Add warnings if user requests them.
-
-**Q7.2: Dual Purpose Expenses**
-User buys laptop for 60% work, 40% personal:
-- Split transaction? (see Question 3)
-- Custom percentage field? `deductible_percentage=60%`
-- Notes only? "60% work use"
-
-**Decision:**
-Notes only (v1). Add percentage field if common use case.
+**Decisión:**
+Auto-sugerir después de 2 pagos faltantes. No auto-cancelar (usuario podría reanudar suscripción).
 
 ---
 
-## Question 8: Mobile App vs. Web Only
+## Pregunta 7: Integración de Preparación de Impuestos
 
-**The Question:**
-Should there be a native mobile app (iOS/Android)?
+**La Pregunta:**
+¿Qué tan profundo debería ir el soporte de impuestos?
 
-**Current State (v1):**
-Web app only (responsive design works on mobile browser)
+**Niveles de Soporte:**
 
-**What mobile app would enable:**
-- **Receipt capture:** Take photo → auto-attach to transaction
-- **Push notifications:** "Netflix payment due tomorrow"
-- **Offline mode:** View transactions without internet
-- **Fingerprint/Face ID:** Quick login
+**Nivel 1: Básico (v1)**
+- Categorizar transacciones
+- Etiquetar gastos deducibles de impuestos
+- Exportar CSV para contador
 
-**What mobile app would require:**
-- Native development (Swift for iOS, Kotlin for Android)
-- App store submissions, reviews, updates
-- Push notification infrastructure
-- Higher complexity, more maintenance
+**Nivel 2: Intermedio**
+- Formularios de impuestos pre-llenados (Schedule C para auto-empleados)
+- Soporte multi-jurisdicción (vivió en 2 estados)
+- Seguimiento de millaje (si gastos de auto deducibles)
 
-**Decision Criteria:**
+**Nivel 3: Avanzado**
+- Exportación directa a TurboTax, H&R Block
+- Cálculo estimado de impuestos en tiempo real
+- Recordatorios de pagos de impuestos trimestrales
+- Documentación de rastro de auditoría
 
-| If... | Then... |
-|-------|---------|
-| User primarily uses app on desktop | **Web only** - Sufficient |
-| User wants receipt photo upload | **Build mobile** - Camera essential |
-| User needs offline access | **Build mobile** - Web requires internet |
-| User is comfortable with mobile web | **Web only** - Save development time |
+**Estado Actual (v1):**
+Implementando **Nivel 1** - Categorización básica
 
-**Recommendation:**
-**WEB ONLY (v1).** Measure mobile web usage. If > 50% of traffic is mobile, consider native app.
+**Preguntas Abiertas:**
 
----
+**P7.1: ¿Qué es deducible?**
+Usuario marca transacción como "deducible de impuestos" pero:
+- Gastos médicos solo deducibles si > 7.5% AGI
+- Deducción de oficina en casa tiene reglas complejas
+- Comidas son 50% deducibles (para negocio)
 
-## Question 9: Data Export Formats
+**¿Debería la app:**
+- **¿Confiar en usuario?** Dejarlos marcar cualquier cosa deducible (contador verificará)
+- **¿Hacer cumplir reglas del IRS?** Bloquear marcar supermercado como deducible
+- **¿Advertir al usuario?** "Deducciones médicas requieren > $X total para reclamar"
 
-**The Question:**
-What export formats should be supported?
+**Decisión:**
+Confiar en usuario (v1). Agregar advertencias si usuario las solicita.
 
-**Currently Supported:**
-- CSV (for Excel, Google Sheets)
+**P7.2: Gastos de Doble Propósito**
+Usuario compra laptop para 60% trabajo, 40% personal:
+- ¿Dividir transacción? (ver Pregunta 3)
+- ¿Campo de porcentaje personalizado? `deductible_percentage=60%`
+- ¿Solo notas? "60% uso de trabajo"
 
-**Requested Formats:**
-
-| Format | Use Case | Complexity |
-|--------|----------|------------|
-| Excel (XLSX) | Formatted reports with charts | Medium |
-| PDF | Printable monthly summaries | Low |
-| JSON | API integration, custom analysis | Low |
-| QIF (Quicken) | Import into Quicken desktop | Medium |
-| OFX (Open Financial Exchange) | Import into other finance software | High |
-
-**Decision Criteria:**
-
-| If... | Then... |
-|-------|---------|
-| User only needs data for spreadsheets | **CSV only** - Universal format |
-| User wants to print monthly statements | **Add PDF** - Simple addition |
-| User wants API access | **Add JSON** - Enables automation |
-| User wants to migrate to other software | **Add OFX** - Standard format |
-
-**Recommendation:**
-CSV + PDF initially. Add others based on specific user requests.
+**Decisión:**
+Solo notas (v1). Agregar campo de porcentaje si es caso de uso común.
 
 ---
 
-## Question 10: Account Sync vs. Manual Upload
+## Pregunta 8: App Móvil vs. Solo Web
 
-**The Question:**
-Should the app support automatic bank sync (Plaid, Yodlee)?
+**La Pregunta:**
+¿Debería haber una app móvil nativa (iOS/Android)?
 
-**Current State (v1):**
-Manual upload only (user downloads PDF from bank, uploads to app)
+**Estado Actual (v1):**
+Solo app web (diseño responsivo funciona en navegador móvil)
 
-**What automatic sync would enable:**
-- No manual uploads (transactions appear automatically)
-- Real-time balance updates
-- Multi-bank aggregation in one place
+**Lo que app móvil habilitaría:**
+- **Captura de recibos:** Tomar foto → auto-adjuntar a transacción
+- **Notificaciones push:** "Pago de Netflix debido mañana"
+- **Modo offline:** Ver transacciones sin internet
+- **Fingerprint/Face ID:** Login rápido
 
-**What automatic sync would require:**
-- Plaid integration ($0.25 per user per month)
-- Security review (storing bank credentials)
-- Bank connection maintenance (breaks when banks change APIs)
-- Dealing with MFA challenges, captchas
+**Lo que app móvil requeriría:**
+- Desarrollo nativo (Swift para iOS, Kotlin para Android)
+- Envíos a app store, revisiones, actualizaciones
+- Infraestructura de notificaciones push
+- Mayor complejidad, más mantenimiento
 
-**Why Manual Upload is Better (for v1):**
-- ✅ **Privacy:** No bank credentials stored in app
-- ✅ **Reliability:** PDF format rarely changes
-- ✅ **Cost:** Free (no Plaid fees)
-- ✅ **Control:** User decides when to import
+**Criterios de Decisión:**
 
-**Why Automatic Sync is Better (for power users):**
-- ✅ **Convenience:** Set it and forget it
-- ✅ **Real-time:** See transactions immediately
-- ✅ **Multi-bank:** Aggregate 10+ accounts easily
+| Si... | Entonces... |
+|-------|-------------|
+| El usuario usa la app principalmente en escritorio | **Solo web** - Suficiente |
+| El usuario quiere subida de fotos de recibos | **Construir móvil** - Cámara esencial |
+| El usuario necesita acceso offline | **Construir móvil** - Web requiere internet |
+| El usuario se siente cómodo con web móvil | **Solo web** - Ahorrar tiempo de desarrollo |
 
-**Decision Criteria:**
-
-| If... | Then... |
-|-------|---------|
-| User has 1-2 bank accounts | **Manual upload** - Once per month is fine |
-| User has 10+ accounts | **Auto-sync** - Manual upload too tedious |
-| User uploads < 12 times/year | **Manual upload** - Not burdensome |
-| User wants daily balance checks | **Auto-sync** - Manual too slow |
-
-**Recommendation:**
-**MANUAL UPLOAD (v1).** Revisit if user complains about upload frequency.
+**Recomendación:**
+**SOLO WEB (v1).** Medir uso de web móvil. Si > 50% del tráfico es móvil, considerar app nativa.
 
 ---
 
-## Summary: Decision Framework
+## Pregunta 9: Formatos de Exportación de Datos
 
-**For each open question, apply this framework:**
+**La Pregunta:**
+¿Qué formatos de exportación deberían soportarse?
 
-1. **Build v1 without the feature**
-2. **Instrument usage:** Track how often user encounters the limitation
-3. **Set threshold:** If pain point occurs > X times/month → Add feature
-4. **Validate with user:** Ask "Would feature Y solve problem Z?"
-5. **Implement if yes, defer if no**
+**Actualmente Soportado:**
+- CSV (para Excel, Google Sheets)
 
-**Avoid:**
-- ❌ Building features "just in case"
-- ❌ Speculating about future needs
-- ❌ Adding complexity without proven value
+**Formatos Solicitados:**
 
-**Embrace:**
-- ✅ Starting simple
-- ✅ Learning from real usage
-- ✅ Adding features when pain points emerge
+| Formato | Caso de Uso | Complejidad |
+|---------|-------------|-------------|
+| Excel (XLSX) | Reportes formateados con gráficos | Media |
+| PDF | Resúmenes mensuales imprimibles | Baja |
+| JSON | Integración API, análisis personalizado | Baja |
+| QIF (Quicken) | Importar a Quicken desktop | Media |
+| OFX (Open Financial Exchange) | Importar a otro software financiero | Alta |
 
-**Key Principle:**
-Every feature added makes the app slightly more complex. Complexity has a cost. Only add features when the benefit clearly outweighs the cost.
+**Criterios de Decisión:**
+
+| Si... | Entonces... |
+|-------|-------------|
+| El usuario solo necesita datos para hojas de cálculo | **Solo CSV** - Formato universal |
+| El usuario quiere imprimir estados mensuales | **Agregar PDF** - Adición simple |
+| El usuario quiere acceso API | **Agregar JSON** - Habilita automatización |
+| El usuario quiere migrar a otro software | **Agregar OFX** - Formato estándar |
+
+**Recomendación:**
+CSV + PDF inicialmente. Agregar otros basándose en solicitudes específicas del usuario.
+
+---
+
+## Pregunta 10: Sincronización de Cuenta vs. Subida Manual
+
+**La Pregunta:**
+¿Debería la app soportar sincronización bancaria automática (Plaid, Yodlee)?
+
+**Estado Actual (v1):**
+Solo subida manual (usuario descarga PDF del banco, sube a la app)
+
+**Lo que sincronización automática habilitaría:**
+- Sin subidas manuales (transacciones aparecen automáticamente)
+- Actualizaciones de saldo en tiempo real
+- Agregación multi-banco en un lugar
+
+**Lo que sincronización automática requeriría:**
+- Integración con Plaid ($0.25 por usuario por mes)
+- Revisión de seguridad (almacenar credenciales bancarias)
+- Mantenimiento de conexión bancaria (se rompe cuando bancos cambian APIs)
+- Lidiar con desafíos MFA, captchas
+
+**Por qué Subida Manual es Mejor (para v1):**
+- ✅ **Privacidad:** Sin credenciales bancarias almacenadas en app
+- ✅ **Confiabilidad:** Formato PDF raramente cambia
+- ✅ **Costo:** Gratis (sin tarifas de Plaid)
+- ✅ **Control:** Usuario decide cuándo importar
+
+**Por qué Sincronización Automática es Mejor (para usuarios avanzados):**
+- ✅ **Conveniencia:** Configúralo y olvídalo
+- ✅ **Tiempo real:** Ver transacciones inmediatamente
+- ✅ **Multi-banco:** Agregar 10+ cuentas fácilmente
+
+**Criterios de Decisión:**
+
+| Si... | Entonces... |
+|-------|-------------|
+| El usuario tiene 1-2 cuentas bancarias | **Subida manual** - Una vez al mes está bien |
+| El usuario tiene 10+ cuentas | **Auto-sincronización** - Subida manual demasiado tediosa |
+| El usuario sube < 12 veces/año | **Subida manual** - No es carga |
+| El usuario quiere chequeos de saldo diarios | **Auto-sincronización** - Manual demasiado lento |
+
+**Recomendación:**
+**SUBIDA MANUAL (v1).** Revisitar si el usuario se queja de frecuencia de subida.
+
+---
+
+## Resumen: Marco de Decisión
+
+**Para cada pregunta abierta, aplicar este marco:**
+
+1. **Construir v1 sin la característica**
+2. **Instrumentar uso:** Rastrear qué tan seguido el usuario encuentra la limitación
+3. **Establecer umbral:** Si punto de dolor ocurre > X veces/mes → Agregar característica
+4. **Validar con usuario:** Preguntar "¿Característica Y resolvería problema Z?"
+5. **Implementar si sí, diferir si no**
+
+**Evitar:**
+- ❌ Construir características "por si acaso"
+- ❌ Especular sobre necesidades futuras
+- ❌ Agregar complejidad sin valor probado
+
+**Adoptar:**
+- ✅ Comenzar simple
+- ✅ Aprender del uso real
+- ✅ Agregar características cuando emergen puntos de dolor
+
+**Principio Clave:**
+Cada característica agregada hace la app ligeramente más compleja. La complejidad tiene un costo. Solo agregar características cuando el beneficio claramente supera el costo.
