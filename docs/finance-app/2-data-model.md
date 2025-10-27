@@ -1,81 +1,81 @@
-# Data Model (Minimal)
+# Modelo de Datos (Mínimo)
 
-> **Purpose:** Define the core data structures needed for the finance app (simple, practical, no enterprise complexity)
-
----
-
-## Design Philosophy
-
-**Start Simple, Grow Later**
-
-This data model represents what we need NOW for 500 transactions/month, not what we might need for 10M transactions/month.
-
-Key decisions:
-- ❌ **No bitemporal tracking** (transaction_time/valid_time) - can add later if needed
-- ❌ **No provenance ledger** (full audit trail) - simple audit_log is sufficient
-- ❌ **No sharding keys** (partition_id, shard_id) - single SQLite database
-- ✅ **Simple foreign keys** (account_id, category_id, counterparty_id)
-- ✅ **Straightforward types** (TEXT, REAL, INTEGER, DATETIME)
+> **Propósito:** Definir las estructuras de datos principales necesarias para la aplicación de finanzas (simple, práctica, sin complejidad empresarial)
 
 ---
 
-## Core Entities
+## Filosofía de Diseño
 
-### 1. Transaction (8 fields)
+**Empezar Simple, Crecer Después**
 
-**Purpose:** Represents a single financial transaction
+Este modelo de datos representa lo que necesitamos AHORA para 500 transacciones/mes, no lo que podríamos necesitar para 10M transacciones/mes.
+
+Decisiones clave:
+- ❌ **Sin seguimiento bitemporal** (transaction_time/valid_time) - se puede agregar después si es necesario
+- ❌ **Sin ledger de proveniencia** (audit trail completo) - un simple audit_log es suficiente
+- ❌ **Sin claves de sharding** (partition_id, shard_id) - base de datos SQLite única
+- ✅ **Claves foráneas simples** (account_id, category_id, counterparty_id)
+- ✅ **Tipos directos** (TEXT, REAL, INTEGER, DATETIME)
+
+---
+
+## Entidades Principales
+
+### 1. Transaction (8 campos)
+
+**Propósito:** Representa una sola transacción financiera
 
 ```sql
 CREATE TABLE transactions (
   id           TEXT PRIMARY KEY,      -- TX_abc123
   date         DATE NOT NULL,         -- 2024-10-15
-  amount       REAL NOT NULL,         -- -87.43 (negative = expense)
+  amount       REAL NOT NULL,         -- -87.43 (negativo = gasto)
   merchant     TEXT NOT NULL,         -- "Whole Foods Market"
   category_id  TEXT,                  -- FK to categories.id
   account_id   TEXT NOT NULL,         -- FK to accounts.id
-  notes        TEXT,                  -- User-added notes
-  tags         TEXT,                  -- Comma-separated: "groceries,weekly"
+  notes        TEXT,                  -- Notas agregadas por el usuario
+  tags         TEXT,                  -- Separado por comas: "groceries,weekly"
 
   created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-**Field Decisions:**
+**Decisiones de Campos:**
 
-- **id**: Generated UUID with TX_ prefix (human-readable in logs)
-- **date**: DATE only (no time) - bank statements don't include time
-- **amount**: Signed decimal (negative = expense, positive = income)
-- **merchant**: Normalized merchant name (not raw PDF description)
-- **category_id**: FK to categories (NULL = uncategorized)
-- **account_id**: Required - every transaction belongs to an account
-- **notes**: User can add context (e.g., "split with roommate")
-- **tags**: Flexible tagging system (e.g., "tax-deductible", "reimbursable")
+- **id**: UUID generado con prefijo TX_ (legible en logs)
+- **date**: Solo DATE (sin hora) - extractos bancarios no incluyen hora
+- **amount**: Decimal con signo (negativo = gasto, positivo = ingreso)
+- **merchant**: Nombre normalizado del comerciante (no descripción cruda del PDF)
+- **category_id**: FK a categories (NULL = sin categorizar)
+- **account_id**: Requerido - toda transacción pertenece a una cuenta
+- **notes**: Usuario puede agregar contexto (ej., "dividido con roommate")
+- **tags**: Sistema flexible de etiquetas (ej., "deducible-impuestos", "reembolsable")
 
-**What's NOT in this table:**
-- ❌ Raw PDF data (stored separately in observations)
-- ❌ Normalization history (stored separately in audit_log)
-- ❌ Currency code (assumed USD for v1)
-- ❌ Exchange rate (can add later for multi-currency)
+**Lo que NO está en esta tabla:**
+- ❌ Datos crudos del PDF (almacenados separadamente en observations)
+- ❌ Historial de normalización (almacenado separadamente en audit_log)
+- ❌ Código de moneda (asumido USD para v1)
+- ❌ Tasa de cambio (se puede agregar después para multi-moneda)
 
 ---
 
-### 2. Category (3 fields)
+### 2. Category (3 campos)
 
-**Purpose:** Organize transactions into spending categories
+**Propósito:** Organizar transacciones en categorías de gasto
 
 ```sql
 CREATE TABLE categories (
   id          TEXT PRIMARY KEY,      -- CAT_groceries
   name        TEXT NOT NULL UNIQUE,  -- "Groceries"
-  parent_id   TEXT,                  -- FK to categories.id (for subcategories)
-  color       TEXT,                  -- "#4CAF50" (hex color for UI)
+  parent_id   TEXT,                  -- FK to categories.id (para subcategorías)
+  color       TEXT,                  -- "#4CAF50" (color hex para UI)
 
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-**Hierarchical Structure:**
+**Estructura Jerárquica:**
 
 ```
 Groceries (CAT_groceries)
@@ -89,7 +89,7 @@ Food & Dining (CAT_food)
   └─ Fast Food (CAT_food_fastfood)
 ```
 
-**Seed Categories (20-30 common categories):**
+**Categorías Iniciales (20-30 categorías comunes):**
 ```
 - Groceries
 - Rent/Mortgage
@@ -108,20 +108,20 @@ Food & Dining (CAT_food)
 - Other
 ```
 
-**Max depth:** 3 levels (Category → Subcategory → Sub-subcategory)
+**Profundidad máxima:** 3 niveles (Categoría → Subcategoría → Sub-subcategoría)
 
 ---
 
-### 3. Account (4 fields)
+### 3. Account (4 campos)
 
-**Purpose:** User's financial accounts (checking, savings, credit cards)
+**Propósito:** Cuentas financieras del usuario (checking, savings, tarjetas de crédito)
 
 ```sql
 CREATE TABLE accounts (
   id           TEXT PRIMARY KEY,      -- ACC_chase_checking
   name         TEXT NOT NULL,         -- "Chase Checking"
   institution  TEXT NOT NULL,         -- "Chase Bank"
-  last4        TEXT NOT NULL,         -- "1234" (last 4 digits)
+  last4        TEXT NOT NULL,         -- "1234" (últimos 4 dígitos)
   type         TEXT NOT NULL,         -- checking, savings, credit_card
 
   active       BOOLEAN DEFAULT TRUE,  -- Soft delete
@@ -129,30 +129,30 @@ CREATE TABLE accounts (
 );
 ```
 
-**Account Types:**
-- `checking` - Bank checking account
-- `savings` - Bank savings account
-- `credit_card` - Credit card
-- `investment` - Investment/brokerage account (future)
-- `loan` - Loan/mortgage (future)
+**Tipos de Cuenta:**
+- `checking` - Cuenta bancaria corriente
+- `savings` - Cuenta de ahorros
+- `credit_card` - Tarjeta de crédito
+- `investment` - Cuenta de inversión/corretaje (futuro)
+- `loan` - Préstamo/hipoteca (futuro)
 
-**Why last4?**
-- Bank statements show "Account: ****1234"
-- Helps user identify which account without showing full number
-- Used for account resolution when importing statements
+**¿Por qué last4?**
+- Extractos bancarios muestran "Account: ****1234"
+- Ayuda al usuario a identificar qué cuenta sin mostrar número completo
+- Usado para resolución de cuenta al importar extractos
 
-**Active flag:**
-- Soft delete - never physically delete accounts (historical transactions reference them)
-- User can "archive" old accounts (active=false)
-- Archived accounts hidden from UI but preserved in database
+**Bandera active:**
+- Soft delete - nunca eliminar físicamente cuentas (transacciones históricas las referencian)
+- Usuario puede "archivar" cuentas antiguas (active=false)
+- Cuentas archivadas ocultas en UI pero preservadas en base de datos
 
 ---
 
-## Supporting Entities
+## Entidades de Soporte
 
-### 4. Counterparty (simplified)
+### 4. Counterparty (simplificado)
 
-**Purpose:** Merchants, employers, other entities user transacts with
+**Propósito:** Comerciantes, empleadores, otras entidades con las que el usuario hace transacciones
 
 ```sql
 CREATE TABLE counterparties (
@@ -171,25 +171,25 @@ CREATE TABLE counterparty_aliases (
 );
 ```
 
-**Why separate aliases table?**
-- One merchant can have many variations in bank statements
-- "WHOLE FOODS MARKET #1234 SF", "WFM", "WHOLE FOODS MKT" → all same counterparty
-- Allows fuzzy matching without duplicating data
+**¿Por qué tabla separada de aliases?**
+- Un comerciante puede tener muchas variaciones en extractos bancarios
+- "WHOLE FOODS MARKET #1234 SF", "WFM", "WHOLE FOODS MKT" → todos misma contraparte
+- Permite coincidencia difusa sin duplicar datos
 
 ---
 
-### 5. Series (recurring payments)
+### 5. Series (pagos recurrentes)
 
-**Purpose:** Track recurring transactions (subscriptions, rent, etc.)
+**Propósito:** Rastrear transacciones recurrentes (suscripciones, renta, etc.)
 
 ```sql
 CREATE TABLE series (
   id          TEXT PRIMARY KEY,      -- SER_netflix
   name        TEXT NOT NULL,         -- "Netflix Subscription"
   amount      REAL NOT NULL,         -- 14.99
-  tolerance   REAL DEFAULT 1.0,      -- ± $1 variance allowed
+  tolerance   REAL DEFAULT 1.0,      -- ± $1 varianza permitida
   frequency   TEXT NOT NULL,         -- monthly, weekly, yearly
-  day_of_month INTEGER,              -- 15 (for monthly)
+  day_of_month INTEGER,              -- 15 (para mensual)
   counterparty_id TEXT,              -- FK to counterparties.id
   category_id TEXT,                  -- FK to categories.id
 
@@ -202,9 +202,9 @@ CREATE TABLE series_instances (
   series_id       TEXT NOT NULL,     -- FK to series.id
   transaction_id  TEXT NOT NULL,     -- FK to transactions.id
   expected_date   DATE NOT NULL,     -- 2024-10-15
-  actual_date     DATE,              -- 2024-10-16 (1 day late)
+  actual_date     DATE,              -- 2024-10-16 (1 día tarde)
   expected_amount REAL NOT NULL,     -- 14.99
-  actual_amount   REAL,              -- 15.99 (price increase)
+  actual_amount   REAL,              -- 15.99 (aumento de precio)
   variance        REAL,              -- 1.00
   status          TEXT NOT NULL,     -- matched, variance, missing
 
@@ -212,18 +212,18 @@ CREATE TABLE series_instances (
 );
 ```
 
-**Status values:**
-- `matched` - Transaction found, amount within tolerance
-- `variance` - Transaction found, amount outside tolerance (flag for review)
-- `missing` - Expected transaction not found (cancelled or pending)
+**Valores de status:**
+- `matched` - Transacción encontrada, monto dentro de tolerancia
+- `variance` - Transacción encontrada, monto fuera de tolerancia (marcar para revisión)
+- `missing` - Transacción esperada no encontrada (cancelada o pendiente)
 
 ---
 
-### 6. Categorization Rules (YAML config, not database)
+### 6. Reglas de Categorización (config YAML, no base de datos)
 
-**Purpose:** Define how to auto-categorize transactions
+**Propósito:** Definir cómo auto-categorizar transacciones
 
-**File: `config/categorization_rules.yaml`**
+**Archivo: `config/categorization_rules.yaml`**
 
 ```yaml
 rules:
@@ -250,24 +250,24 @@ rules:
     confidence: 0.95
 ```
 
-**Why YAML instead of database?**
-- Easier to version control (git)
-- Easier to bulk edit (text editor)
-- Easier to share/import/export
-- Can load into memory at startup (50-100 rules = <1MB)
+**¿Por qué YAML en lugar de base de datos?**
+- Más fácil de versionar (git)
+- Más fácil de editar en masa (editor de texto)
+- Más fácil de compartir/importar/exportar
+- Se puede cargar en memoria al inicio (50-100 reglas = <1MB)
 
-**Can be moved to database later if:**
-- User needs web UI for rule editing
-- Multiple users need separate rule sets
-- Rules exceed 1000+ (performance consideration)
+**Se puede mover a base de datos después si:**
+- Usuario necesita UI web para editar reglas
+- Múltiples usuarios necesitan conjuntos de reglas separados
+- Reglas exceden 1000+ (consideración de rendimiento)
 
 ---
 
-## Audit & Metadata
+## Auditoría y Metadatos
 
 ### 7. Audit Log (simple)
 
-**Purpose:** Track user actions for accountability (not full provenance)
+**Propósito:** Rastrear acciones del usuario para accountability (no proveniencia completa)
 
 ```sql
 CREATE TABLE audit_log (
@@ -277,7 +277,7 @@ CREATE TABLE audit_log (
   entity_id    TEXT NOT NULL,         -- TX_abc123, CAT_groceries
   old_value    TEXT,                  -- JSON: {"category_id": "CAT_shopping"}
   new_value    TEXT,                  -- JSON: {"category_id": "CAT_books"}
-  user_id      TEXT,                  -- "darwin" (for multi-user future)
+  user_id      TEXT,                  -- "user" (para futuro multi-usuario)
   timestamp    DATETIME DEFAULT CURRENT_TIMESTAMP,
 
   INDEX idx_entity (entity_type, entity_id),
@@ -285,68 +285,68 @@ CREATE TABLE audit_log (
 );
 ```
 
-**What gets logged:**
-- Category changes
-- Transaction deletions
-- Account edits
-- Manual corrections
+**Lo que se registra:**
+- Cambios de categoría
+- Eliminaciones de transacción
+- Ediciones de cuenta
+- Correcciones manuales
 
-**What does NOT get logged (yet):**
-- Every database query (too verbose)
-- Every page view (not needed for v1)
-- System operations (parsing, normalization) - separate logs for this
+**Lo que NO se registra (todavía):**
+- Cada consulta a base de datos (demasiado verboso)
+- Cada vista de página (no necesario para v1)
+- Operaciones del sistema (parsing, normalización) - logs separados para esto
 
 ---
 
-### 8. Upload Records (state machine)
+### 8. Upload Records (máquina de estados)
 
-**Purpose:** Track PDF uploads and processing status
+**Propósito:** Rastrear cargas de PDF y estado de procesamiento
 
 ```sql
 CREATE TABLE upload_records (
   id              TEXT PRIMARY KEY,      -- UL_abc123
   filename        TEXT NOT NULL,         -- "bofa-statement-october.pdf"
   file_size       INTEGER NOT NULL,      -- 1245678 (bytes)
-  file_hash       TEXT NOT NULL UNIQUE,  -- SHA-256 hash (for deduplication)
+  file_hash       TEXT NOT NULL UNIQUE,  -- Hash SHA-256 (para deduplicación)
   status          TEXT NOT NULL,         -- queued, parsing, parsed, error
-  uploaded_by     TEXT,                  -- "darwin"
+  uploaded_by     TEXT,                  -- "user"
   uploaded_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
   processed_at    DATETIME,
   error_message   TEXT,
 
-  observations_count INTEGER DEFAULT 0,  -- How many raw transactions extracted
+  observations_count INTEGER DEFAULT 0,  -- Cuántas transacciones crudas se extrajeron
 
   INDEX idx_status (status),
   INDEX idx_hash (file_hash)
 );
 ```
 
-**Status state machine:**
+**Máquina de estados de status:**
 ```
-queued → parsing → parsed → (complete)
+queued → parsing → parsed → (completo)
           ↓
         error
 ```
 
-**Deduplication:**
-- If file_hash exists → return 409 Conflict before parsing
-- Prevents duplicate imports
+**Deduplicación:**
+- Si file_hash existe → retornar 409 Conflict antes de parsear
+- Previene importaciones duplicadas
 
 ---
 
-## Relationships Diagram
+## Diagrama de Relaciones
 
 ```
 ┌─────────────┐
 │  uploads    │
 └─────────────┘
        │
-       ↓ (creates)
+       ↓ (crea)
 ┌─────────────┐
-│observations │ (raw data from PDF - separate table)
+│observations │ (datos crudos del PDF - tabla separada)
 └─────────────┘
        │
-       ↓ (normalizes to)
+       ↓ (normaliza a)
 ┌─────────────┐        ┌─────────────┐
 │transactions │───────→│  accounts   │
 └─────────────┘        └─────────────┘
@@ -369,44 +369,44 @@ queued → parsing → parsed → (complete)
 
 ---
 
-## What's Deliberately Excluded (Can Add Later)
+## Lo que Deliberadamente se Excluye (Se Puede Agregar Después)
 
-**Bitemporal Tracking:**
-- No `transaction_time` / `valid_time` columns
-- Simple `updated_at` timestamp is sufficient for v1
-- Can add later if tax audits require "what did I know on date X?"
+**Seguimiento Bitemporal:**
+- Sin columnas `transaction_time` / `valid_time`
+- Timestamp simple `updated_at` es suficiente para v1
+- Se puede agregar después si auditorías fiscales requieren "¿qué sabía en fecha X?"
 
-**Multi-Currency:**
-- No `currency_code` field
-- No `exchange_rate` field
-- Assumed USD for v1
-- Can add later if user travels internationally frequently
+**Multi-Moneda:**
+- Sin campo `currency_code`
+- Sin campo `exchange_rate`
+- Asumido USD para v1
+- Se puede agregar después si usuario viaja internacionalmente con frecuencia
 
-**Provenance Ledger:**
-- No append-only event store
-- Simple audit_log with UPDATE capability is sufficient
-- Can add later if compliance requires immutable audit trail
+**Ledger de Proveniencia:**
+- Sin event store de solo-agregar
+- Simple audit_log con capacidad UPDATE es suficiente
+- Se puede agregar después si compliance requiere audit trail inmutable
 
-**Tagging System:**
-- Simple comma-separated `tags` field
-- No separate `tags` table with many-to-many relationship
-- Can normalize later if tag management becomes complex
+**Sistema de Etiquetas:**
+- Campo simple `tags` separado por comas
+- Sin tabla separada `tags` con relación muchos-a-muchos
+- Se puede normalizar después si gestión de etiquetas se vuelve compleja
 
-**Attachments:**
-- No `attachments` table (receipts, invoices)
-- User can link notes like "receipt in Dropbox: /tax-docs/2024/receipt-123.pdf"
-- Can add later if receipt management becomes important
+**Adjuntos:**
+- Sin tabla `attachments` (recibos, facturas)
+- Usuario puede enlazar notas como "recibo en Dropbox: /tax-docs/2024/receipt-123.pdf"
+- Se puede agregar después si gestión de recibos se vuelve importante
 
-**Budget Tracking:**
-- No `budgets` table
-- Can calculate spending by category manually
-- Can add later if user wants alerts ("spent 90% of grocery budget")
+**Seguimiento de Presupuesto:**
+- Sin tabla `budgets`
+- Se puede calcular gasto por categoría manualmente
+- Se puede agregar después si usuario quiere alertas ("gastado 90% de presupuesto de groceries")
 
 ---
 
-## Database Indexes
+## Índices de Base de Datos
 
-**Critical for Performance:**
+**Críticos para Rendimiento:**
 
 ```sql
 -- Transactions
@@ -424,20 +424,20 @@ CREATE INDEX idx_uploads_status ON upload_records(status);
 CREATE INDEX idx_uploads_hash ON upload_records(file_hash);
 ```
 
-**Why these indexes?**
-- `date` - Most queries filter by date range
-- `account_id` - "Show transactions for Chase Checking"
-- `category_id` - "Show all Grocery spending"
-- `date + account_id` - Compound index for common combo query
-- `status` - Worker queries for `WHERE status = 'queued'`
+**¿Por qué estos índices?**
+- `date` - La mayoría de consultas filtran por rango de fechas
+- `account_id` - "Mostrar transacciones para Chase Checking"
+- `category_id` - "Mostrar todo gasto en Groceries"
+- `date + account_id` - Índice compuesto para consulta combo común
+- `status` - Worker consulta para `WHERE status = 'queued'`
 
 ---
 
-## Data Sizes (500 tx/month)
+## Tamaños de Datos (500 tx/mes)
 
-**Storage Estimates:**
+**Estimaciones de Almacenamiento:**
 
-| Table | Rows/Year | Size/Row | Total/Year |
+| Tabla | Filas/Año | Tamaño/Fila | Total/Año |
 |-------|-----------|----------|------------|
 | transactions | 6,000 | ~200 bytes | 1.2 MB |
 | categories | 30 | ~100 bytes | 3 KB |
@@ -447,47 +447,47 @@ CREATE INDEX idx_uploads_hash ON upload_records(file_hash);
 | upload_records | 120 | ~300 bytes | 36 KB |
 | audit_log | 500 | ~400 bytes | 200 KB |
 
-**Total Database Size:** ~1.5 MB/year
+**Tamaño Total de Base de Datos:** ~1.5 MB/año
 
-**With 5 years of data:** ~7.5 MB (SQLite easily handles this)
+**Con 5 años de datos:** ~7.5 MB (SQLite maneja esto fácilmente)
 
-**PDFs:** 120 PDFs/year × 2 MB = 240 MB/year × 5 years = 1.2 GB
+**PDFs:** 120 PDFs/año × 2 MB = 240 MB/año × 5 años = 1.2 GB
 
-**Total Storage:** ~1.2 GB for 5 years of data (fits on any laptop)
-
----
-
-## Migration Strategy
-
-**When to upgrade to PostgreSQL:**
-- Transactions exceed 50,000 (would take 8+ years at current rate)
-- Multiple concurrent users
-- Need for row-level security
-- Geographic distribution (read replicas)
-
-**When to add bitemporal tracking:**
-- Tax audit requires "what did I know on date X?" queries
-- Regulatory compliance (GDPR, SOX)
-- Need to reconstruct historical states
-
-**When to separate observations table:**
-- Need to re-process historical data with new parsers
-- Want to A/B test different normalization rules
+**Almacenamiento Total:** ~1.2 GB para 5 años de datos (cabe en cualquier laptop)
 
 ---
 
-## Summary
+## Estrategia de Migración
 
-**This data model is:**
-- ✅ Simple (8 tables, ~50 columns total)
-- ✅ Sufficient for 500 tx/month
-- ✅ SQLite-compatible
-- ✅ Extensible (can add fields later)
+**Cuándo actualizar a PostgreSQL:**
+- Transacciones exceden 50,000 (tomaría 8+ años a ritmo actual)
+- Múltiples usuarios concurrentes
+- Necesidad de seguridad a nivel de fila
+- Distribución geográfica (réplicas de lectura)
 
-**This data model is NOT:**
-- ❌ Enterprise-scale (no sharding, no partitioning)
-- ❌ Multi-tenant (no tenant_id isolation)
-- ❌ Compliance-ready (no immutable audit trail)
+**Cuándo agregar seguimiento bitemporal:**
+- Auditoría fiscal requiere consultas "¿qué sabía en fecha X?"
+- Compliance regulatorio (GDPR, SOX)
+- Necesidad de reconstruir estados históricos
 
-**Key Insight:**
-Start with simple schema that solves real needs. Add complexity only when pain points emerge, not in anticipation of theoretical problems.
+**Cuándo separar tabla observations:**
+- Necesidad de re-procesar datos históricos con nuevos parsers
+- Querer hacer A/B testing de diferentes reglas de normalización
+
+---
+
+## Resumen
+
+**Este modelo de datos es:**
+- ✅ Simple (8 tablas, ~50 columnas total)
+- ✅ Suficiente para 500 tx/mes
+- ✅ Compatible con SQLite
+- ✅ Extensible (se pueden agregar campos después)
+
+**Este modelo de datos NO es:**
+- ❌ Escala empresarial (sin sharding, sin particionamiento)
+- ❌ Multi-tenant (sin aislamiento tenant_id)
+- ❌ Listo para compliance (sin audit trail inmutable)
+
+**Insight Clave:**
+Empezar con schema simple que resuelve necesidades reales. Agregar complejidad solo cuando puntos de dolor emergen, no en anticipación de problemas teóricos.
