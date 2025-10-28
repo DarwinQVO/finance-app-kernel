@@ -1,12 +1,12 @@
 # Phase 5: Refactoring Progress Report
 
-**Status:** In Progress (23/33 primitives complete - 70%)
+**Status:** In Progress (24/33 primitives complete - 73%)
 **Started:** 2025-10-27
 **Pattern:** Literate programming style with Spanish narrative + English code
 
 ---
 
-## Completed Primitives (23/33 - 70%)
+## Completed Primitives (24/33 - 73%)
 
 ### API/Auth System (8/8 complete ✅)
 
@@ -112,7 +112,7 @@
 
 ---
 
-### Other OL Primitives (7/11 complete)
+### Other OL Primitives (8/11 complete)
 
 17. ✅ **ParseLog** (commit 2686bec)
    - Personal (40 LOC): JSON files on disk
@@ -150,15 +150,21 @@
    - Enterprise (1200 LOC): PostgreSQL, monthly partitioning (36 partitions), zstd compression (40%), read replicas
    - Expansion: 769 lines → 574 lines (condensed -25%)
 
-23. ✅ **HashCalculator** (commit pending)
+23. ✅ **HashCalculator** (commit 9c4da7c)
    - Personal (30 LOC): In-memory SHA-256, simple and fast for <10MB files
    - Small Business (100 LOC): Auto-select streaming vs in-memory, integrity verification, 16KB chunks
    - Enterprise (800 LOC): Always streaming (64KB chunks), double verification, malware detection, Prometheus metrics
    - Expansion: 430 lines → 492 lines (enriched +14%)
 
+24. ✅ **ArtifactRetriever** (commit pending)
+   - Personal (80 LOC): Simple retrieval, no signed URLs, basic ownership check
+   - Small Business (250 LOC): HMAC-SHA256 signed URLs (1h expiration), streaming >10MB
+   - Enterprise (900 LOC): CloudFront CDN, 5-min expiration, Redis caching, rate limiting (60 req/min)
+   - Expansion: 669 lines → 592 lines (condensed -12%)
+
 ---
 
-## Pending Primitives (10/33 - 30%)
+## Pending Primitives (9/33 - 27%)
 
 ### Truth Construction (1 primitive remaining)
 - ⏳ ValidationEngine
@@ -170,8 +176,7 @@
 - ⏳ RetroactiveCorrector
 - ⏳ BitemporalQuery
 
-### Other OL Primitives (4 primitives remaining)
-- ⏳ ArtifactRetriever
+### Other OL Primitives (3 primitives remaining)
 - ⏳ Parser
 - ⏳ Normalizer
 - ⏳ NormalizationRuleSet
@@ -268,29 +273,30 @@ primitive_name:
 
 ## Estimated Remaining Effort
 
-- Average condensation: ~18% reduction (based on 11 condensed primitives)
-- Remaining primitives: 14
-- Estimated lines: 14 × 250 = 3,500 lines
-- Estimated time: 42 hours (3 hours per primitive)
+- Average condensation: ~21% reduction (based on 15 condensed primitives)
+- Remaining primitives: 9
+- Estimated lines: 9 × 250 = 2,250 lines
+- Estimated time: 27 hours (3 hours per primitive)
 
 ---
 
 **Status Summary:**
-- ✅ Pattern established and validated (23 primitives)
+- ✅ Pattern established and validated (24 primitives)
 - ✅ API/Auth system complete (8/8 primitives - 100%)
 - ✅ Truth Construction in progress (8/9 - 89%)
-- ✅ Other OL primitives in progress (7/11 - 64%)
-- ✅ Average ~22% condensation per primitive
-- ⏳ 10 primitives await systematic application
+- ✅ Other OL primitives in progress (8/11 - 73%)
+- ✅ Average ~21% condensation per primitive
+- ⏳ 9 primitives await systematic application
 - ⏳ Consistency review pending
 
 **Session Achievements:**
-- 23 primitives refactored (~6,700 lines total)
+- 24 primitives refactored (~7,300 lines total)
 - Pattern fully documented and replicable
 - FileArtifact enriched (410 → 638 lines, +56%)
 - StorageEngine condensed (961 → 618 lines, -36%)
 - ObservationStore condensed (769 → 574 lines, -25%)
 - HashCalculator enriched (430 → 492 lines, +14%)
+- ArtifactRetriever condensed (669 → 592 lines, -12%)
 - 1 commit pending push
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
