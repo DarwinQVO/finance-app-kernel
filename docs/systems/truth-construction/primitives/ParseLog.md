@@ -16,485 +16,433 @@ Structured execution log for parser operations. Records what happened during par
 
 ## Simplicity Profiles
 
-**This section shows how the same universal logging primitive is configured differently based on usage scale.**
+### Personal Profile (40 LOC)
 
-### Profile 1: Personal Use (Finance App - Simple JSON Files)
+**Contexto del Usuario:**
+Darwin procesa 1-2 uploads al mes. Cuando parser falla, necesita saber qué pasó: "PDF structure invalid" o "42 rows extracted successfully". JSON simple en disco local es suficiente. No necesita métricas agregadas ni alertas.
 
-**Context:** Darwin uploads 1-2 statements/month, needs basic debugging when parser fails
+**Implementation:**
+```python
+# lib/parse_log.py (Personal - 40 LOC)
+import json
+from pathlib import Path
+from datetime import datetime
 
-**Configuration:**
-```yaml
-parse_log:
-  format: "json"
-  destination: "file"
-  log_directory: "~/.finance-app/logs/parse/"
-  filename_pattern: "{upload_id}.log.json"
-  retention_days: null  # Keep forever (logs tiny: ~1KB/month)
-  structured: true
-  aggregation: false  # No metrics collection
-  alerting: false
+class ParseLog:
+    """Simple JSON file logging for parser execution."""
+
+    def __init__(self, log_dir="~/.finance-app/logs/parse/"):
+        self.log_dir = Path(log_dir).expanduser()
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+
+    def write(self, upload_id: str, log_entry: dict):
+        """Write parse log to JSON file."""
+        log_path = self.log_dir / f"{upload_id}.log.json"
+
+        # Add timestamps if not present
+        if "started_at" not in log_entry:
+            log_entry["started_at"] = datetime.now().isoformat()
+        if "completed_at" not in log_entry:
+            log_entry["completed_at"] = datetime.now().isoformat()
+
+        # Write (pretty-printed for readability)
+        with open(log_path, "w") as f:
+            json.dump(log_entry, f, indent=2)
+
+    def read(self, upload_id: str) -> dict:
+        """Read parse log for specific upload."""
+        log_path = self.log_dir / f"{upload_id}.log.json"
+        if not log_path.exists():
+            return None
+        with open(log_path, "r") as f:
+            return json.load(f)
+
+# Usage
+parse_log = ParseLog()
+
+# Success case
+parse_log.write("UL_abc123", {
+    "upload_id": "UL_abc123",
+    "parser_id": "bofa_pdf_parser",
+    "parser_version": "1.0.0",
+    "success": True,
+    "rows_extracted": 42,
+    "duration_ms": 3421,
+    "warnings": [],
+    "errors": []
+})
+
+# Failure case
+parse_log.write("UL_def456", {
+    "upload_id": "UL_def456",
+    "parser_id": "bofa_pdf_parser",
+    "success": False,
+    "rows_extracted": 0,
+    "duration_ms": 150,
+    "errors": ["PDF structure invalid: Cannot extract text"]
+})
+
+# UI displays error by reading log
+log = parse_log.read("UL_def456")
+if not log["success"]:
+    show_error(log["errors"][0])  # "PDF structure invalid"
 ```
 
-**What's Used:**
-- ✅ Write JSON log file - Simple dict → JSON file
-- ✅ Basic fields - upload_id, success, rows_extracted, duration_ms, errors
-- ✅ Immutable logs - Write-once, never update
-- ✅ Filesystem storage - Local directory
+**Características Incluidas:**
+- ✅ JSON file per upload
+- ✅ Success/failure tracking
+- ✅ Error messages for debugging
+- ✅ Duration tracking
+- ✅ Human-readable format (pretty-printed)
 
-**What's NOT Used:**
-- ❌ Centralized logging - No Elasticsearch/CloudWatch
-- ❌ Metrics aggregation - No success rate calculations
-- ❌ Alerting - No notifications on failure
-- ❌ Log rotation - Keep all logs (tiny footprint)
-- ❌ Structured search - No log indexing
-- ❌ Correlation IDs - Single user, no distributed tracing
+**Características NO Incluidas:**
+- ❌ Metrics aggregation (YAGNI: 24 logs/year, manual review)
+- ❌ Centralized logging (YAGNI: local files work)
+- ❌ Alerting (YAGNI: manual check)
+- ❌ Log rotation (YAGNI: 24KB/year total)
 
-**Implementation Complexity:** **LOW**
-- ~40 lines Python
-- Uses stdlib json module
-- Write dict to file
-- No tests
+**Configuración:**
+```python
+# Hardcoded
+LOG_DIR = "~/.finance-app/logs/parse/"
+```
 
-**Narrative Example:**
-> Darwin uploads "BoFA_Oct2024.pdf". Parser runs for 3.4 seconds, extracts 42 transactions. At completion:
-> ```python
-> parse_log = {
->     "upload_id": "UL_abc123",
->     "parser_id": "bofa_pdf_parser",
->     "parser_version": "1.0.0",
->     "success": True,
->     "rows_extracted": 42,
->     "duration_ms": 3421,
->     "warnings": [],
->     "errors": [],
->     "started_at": "2024-10-27T10:00:00Z",
->     "completed_at": "2024-10-27T10:00:03Z"
-> }
->
-> # Write to file
-> with open("~/.finance-app/logs/parse/UL_abc123.log.json", "w") as f:
->     json.dump(parse_log, f, indent=2)
-> ```
->
-> Week later, parser fails on corrupted PDF:
-> ```python
-> parse_log = {
->     "upload_id": "UL_def456",
->     "parser_id": "bofa_pdf_parser",
->     "parser_version": "1.0.0",
->     "success": False,
->     "rows_extracted": 0,
->     "duration_ms": 150,
->     "warnings": [],
->     "errors": ["PDF structure invalid: Cannot extract text"],
->     "started_at": "2024-11-03T14:30:00Z",
->     "completed_at": "2024-11-03T14:30:00Z"
-> }
-> ```
-> Darwin sees error message in UI: "Parsing failed". Clicks "View Details" → UI reads `/logs/parse/UL_def456.log.json` → Displays error: "PDF structure invalid" → Darwin re-downloads PDF from bank, re-uploads.
+**Performance:**
+- Write latency: 3ms (local SSD)
+- Read latency: 2ms
+- Storage: ~1KB per log
+
+**Upgrade Triggers:**
+- Si >100 uploads/mes → Small Business (metrics needed)
 
 ---
 
-### Profile 2: Small Business (Accounting Firm - Aggregated Metrics, Basic Monitoring)
+### Small Business Profile (200 LOC)
 
-**Context:** 50-100 uploads/day, need to monitor parser success rate and debug failures
+**Contexto del Usuario:**
+Firma contable con 50-100 uploads/día (36K logs/año). Necesitan monitorear success rate: si cae <95%, alerta por email. Dashboard simple con métricas: success rate, p95 latency, errores comunes. JSON files + agregación cada 5 min.
 
-**Configuration:**
+**Implementation:**
+```python
+# lib/parse_log.py (Small Business - 200 LOC)
+import json
+from pathlib import Path
+from datetime import datetime, timedelta
+from collections import defaultdict
+import smtplib
+
+class ParseLog:
+    """JSON file logging with metrics aggregation and alerting."""
+
+    def __init__(self, log_dir="/var/accounting-data/logs/parse/"):
+        self.log_dir = Path(log_dir)
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.metrics_file = self.log_dir / "_metrics.json"
+
+    def write(self, upload_id: str, log_entry: dict):
+        """Write parse log and trigger metrics update."""
+        log_path = self.log_dir / f"{upload_id}.log.json"
+        with open(log_path, "w") as f:
+            json.dump(log_entry, f, indent=2)
+
+    def aggregate_metrics(self, last_hours: int = 24) -> dict:
+        """
+        Aggregate metrics from logs in last N hours.
+
+        Returns:
+            {
+                "success_rate": 0.96,
+                "p95_latency_ms": 4500,
+                "total_uploads": 1234,
+                "errors_by_type": {"PDF invalid": 15, "Timeout": 3}
+            }
+        """
+        cutoff_time = datetime.now() - timedelta(hours=last_hours)
+
+        total = 0
+        successes = 0
+        latencies = []
+        errors_count = defaultdict(int)
+
+        # Scan all log files
+        for log_file in self.log_dir.glob("*.log.json"):
+            if log_file.name.startswith("_"):
+                continue  # Skip metrics files
+
+            with open(log_file, "r") as f:
+                log = json.load(f)
+
+            # Check timestamp
+            completed_at = datetime.fromisoformat(log["completed_at"])
+            if completed_at < cutoff_time:
+                continue
+
+            total += 1
+            if log["success"]:
+                successes += 1
+            latencies.append(log["duration_ms"])
+
+            # Count errors
+            for error in log.get("errors", []):
+                error_type = error.split(":")[0]  # "PDF invalid: ..." → "PDF invalid"
+                errors_count[error_type] += 1
+
+        # Calculate metrics
+        success_rate = (successes / total) if total > 0 else 1.0
+        p95_latency = sorted(latencies)[int(len(latencies) * 0.95)] if latencies else 0
+
+        metrics = {
+            "success_rate": success_rate,
+            "p95_latency_ms": p95_latency,
+            "total_uploads": total,
+            "errors_by_type": dict(errors_count),
+            "last_updated": datetime.now().isoformat()
+        }
+
+        # Save metrics
+        with open(self.metrics_file, "w") as f:
+            json.dump(metrics, f, indent=2)
+
+        # Check alert conditions
+        if success_rate < 0.95:
+            self._send_alert(f"Success rate dropped to {success_rate:.1%}")
+
+        return metrics
+
+    def _send_alert(self, message: str):
+        """Send email alert."""
+        smtp = smtplib.SMTP("localhost")
+        smtp.sendmail(
+            "alerts@accounting-firm.com",
+            "admin@accounting-firm.com",
+            f"Subject: Parser Alert\n\n{message}"
+        )
+        smtp.quit()
+
+# Background job (cron every 5 min)
+# */5 * * * * python aggregate_parse_metrics.py
+
+# aggregate_parse_metrics.py
+parse_log = ParseLog()
+metrics = parse_log.aggregate_metrics(last_hours=24)
+print(f"Success rate: {metrics['success_rate']:.1%}")
+```
+
+**Características Incluidas:**
+- ✅ JSON file logging (same as Personal)
+- ✅ Metrics aggregation (5 min intervals)
+- ✅ Email alerting (success rate < 95%)
+- ✅ Log retention (365 days)
+- ✅ Simple dashboard (read metrics.json)
+
+**Características NO Incluidas:**
+- ❌ Centralized logging (filesystem sufficient for 36K logs/year)
+- ❌ Real-time streaming (batch aggregation works)
+- ❌ Distributed tracing (single server)
+
+**Configuración:**
 ```yaml
 parse_log:
-  format: "json"
-  destination: "file"  # Still filesystem (sufficient for 36K logs/year)
   log_directory: "/var/accounting-data/logs/parse/"
-  filename_pattern: "{upload_id}.log.json"
-  retention_days: 365  # 1 year retention
-  structured: true
+  retention_days: 365
   aggregation:
-    enabled: true
-    metrics:
-      - success_rate
-      - p95_latency
-      - warning_rate
-      - errors_by_type
-    update_interval_minutes: 5  # Recalculate every 5 min
+    update_interval_minutes: 5
   alerting:
-    enabled: true
-    rules:
-      - condition: "success_rate < 0.95"  # Alert if <95% success
-        notification: "email"
-        recipients: ["admin@accounting-firm.com"]
-  dashboard:
-    enabled: true
-    refresh_interval_seconds: 30
+    success_rate_threshold: 0.95
+    email: "admin@accounting-firm.com"
 ```
 
-**What's Used:**
-- ✅ JSON file logging - Same format as Personal
-- ✅ Retention policy - Delete logs >1 year old
-- ✅ Metrics aggregation - Calculate success rate, latency, warnings
-- ✅ Simple dashboard - HTML page with metrics
-- ✅ Email alerting - Notify on success rate drop
+**Performance:**
+- Write: 3ms
+- Aggregation (36K logs): 500ms (every 5 min)
+- Storage: 36MB/year (36K × 1KB)
 
-**What's NOT Used:**
-- ❌ Centralized logging - Still filesystem
-- ❌ Real-time streaming - Batch aggregation (5min intervals)
-- ❌ Advanced analytics - Basic counts only
-- ❌ Distributed tracing - No correlation IDs
-
-**Implementation Complexity:** **MEDIUM**
-- ~200 lines Python
-- Background job: Aggregate metrics every 5 min
-- Simple HTML dashboard (Flask endpoint)
-- Email notification (SMTP)
-- Unit tests (test aggregation logic)
-
-**Narrative Example:**
-> Accountant uploads 85 documents in one day. Each parser execution writes log file. Background aggregation job runs every 5 minutes:
-> ```python
-> # Query logs from last 24 hours
-> logs = [json.load(open(f)) for f in glob("logs/parse/*.log.json") if recent(f, hours=24)]
->
-> # Calculate metrics
-> total = len(logs)  # 85
-> successes = sum(1 for log in logs if log["success"])  # 82
-> success_rate = successes / total  # 0.965 (96.5%)
->
-> latencies = [log["duration_ms"] for log in logs if log["success"]]
-> p95_latency = percentile(latencies, 95)  # 4200ms
->
-> warnings = sum(len(log["warnings"]) for log in logs)  # 12
-> warning_rate = warnings / total  # 0.141 (14.1%)
->
-> # Group errors by type
-> errors_by_type = {}
-> for log in logs:
->     for error in log["errors"]:
->         error_type = error.split(":")[0]  # "PDF structure invalid"
->         errors_by_type[error_type] = errors_by_type.get(error_type, 0) + 1
-> # {"PDF structure invalid": 3}
-> ```
->
-> Dashboard displays:
-> ```
-> Parser Success Rate: 96.5% ✅ (threshold: 95%)
-> P95 Latency: 4.2s
-> Warning Rate: 14.1%
-> Errors (last 24h):
->   - PDF structure invalid: 3 occurrences
-> ```
->
-> Next day, success rate drops to 92% (8 failures out of 100). Alerting rule triggers:
-> ```
-> Condition: success_rate (0.92) < 0.95 ✅
-> Send email to: admin@accounting-firm.com
-> Subject: "Parser Success Rate Alert: 92%"
-> Body: "Parser success rate dropped below 95% threshold. Current: 92%. Failures: 8/100 in last 24h."
-> ```
-> Admin investigates → Discovers new bank statement format not recognized by parser → Updates parser rules → Success rate recovers to 98%.
+**Upgrade Triggers:**
+- Si >100K uploads/año → Enterprise (Elasticsearch)
 
 ---
 
-### Profile 3: Enterprise (Bank - Elasticsearch, Prometheus, Distributed Tracing)
+### Enterprise Profile (600 LOC)
 
-**Context:** 10,000 uploads/day = 3.6M logs/year, need real-time monitoring, correlation with distributed services
+**Contexto del Usuario:**
+Banco procesa 10K uploads/día (3.6M logs/año). Necesitan: Elasticsearch para búsqueda rápida, distributed tracing (correlate parse errors con upstream issues), Prometheus metrics para Grafana dashboards, PagerDuty alerts para production incidents.
 
-**Configuration:**
+**Implementation:**
+```python
+# lib/parse_log.py (Enterprise - 600 LOC)
+from elasticsearch import Elasticsearch
+from datetime import datetime
+import uuid
+from prometheus_client import Counter, Histogram
+
+class ParseLog:
+    """Enterprise logging with Elasticsearch + distributed tracing."""
+
+    def __init__(self, es_hosts=["localhost:9200"]):
+        self.es = Elasticsearch(es_hosts)
+        self._ensure_index_template()
+
+    def _ensure_index_template(self):
+        """Create daily index template."""
+        self.es.indices.put_index_template(
+            name="parse-logs",
+            body={
+                "index_patterns": ["parse-logs-*"],
+                "template": {
+                    "mappings": {
+                        "properties": {
+                            "upload_id": {"type": "keyword"},
+                            "trace_id": {"type": "keyword"},
+                            "span_id": {"type": "keyword"},
+                            "parser_id": {"type": "keyword"},
+                            "parser_version": {"type": "keyword"},
+                            "success": {"type": "boolean"},
+                            "rows_extracted": {"type": "integer"},
+                            "duration_ms": {"type": "integer"},
+                            "started_at": {"type": "date"},
+                            "completed_at": {"type": "date"},
+                            "errors": {"type": "text"},
+                            "warnings": {"type": "text"}
+                        }
+                    }
+                }
+            }
+        )
+
+    def write(self, upload_id: str, log_entry: dict, trace_id: str = None):
+        """Write to Elasticsearch with distributed tracing."""
+        # Generate trace context
+        if not trace_id:
+            trace_id = str(uuid.uuid4())
+        span_id = str(uuid.uuid4())
+
+        log_entry["trace_id"] = trace_id
+        log_entry["span_id"] = span_id
+
+        # Daily index rotation
+        today = datetime.now().strftime("%Y.%m.%d")
+        index = f"parse-logs-{today}"
+
+        # Write to Elasticsearch
+        self.es.index(index=index, id=upload_id, document=log_entry)
+
+        # Update Prometheus metrics
+        parse_count.labels(
+            parser_id=log_entry["parser_id"],
+            status="success" if log_entry["success"] else "failure"
+        ).inc()
+
+        parse_duration.labels(
+            parser_id=log_entry["parser_id"]
+        ).observe(log_entry["duration_ms"] / 1000)
+
+    def get_success_rate(self, last_hours: int = 24) -> float:
+        """Real-time success rate from Elasticsearch."""
+        resp = self.es.search(
+            index="parse-logs-*",
+            body={
+                "size": 0,
+                "query": {
+                    "range": {
+                        "started_at": {
+                            "gte": f"now-{last_hours}h"
+                        }
+                    }
+                },
+                "aggs": {
+                    "total": {"value_count": {"field": "upload_id"}},
+                    "successes": {
+                        "filter": {"term": {"success": True}},
+                        "aggs": {"count": {"value_count": {"field": "upload_id"}}}
+                    }
+                }
+            }
+        )
+
+        total = resp["aggregations"]["total"]["value"]
+        successes = resp["aggregations"]["successes"]["count"]["value"]
+        return (successes / total) if total > 0 else 0.0
+
+# Prometheus metrics
+parse_count = Counter(
+    'parser_executions_total',
+    'Total parser executions',
+    ['parser_id', 'status']
+)
+
+parse_duration = Histogram(
+    'parser_duration_seconds',
+    'Parser execution duration',
+    ['parser_id']
+)
+
+# Usage with distributed tracing
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
+parse_log = ParseLog(es_hosts=["es-cluster:9200"])
+
+with tracer.start_as_current_span("parse_document") as span:
+    trace_id = format(span.get_span_context().trace_id, '032x')
+
+    # Parse
+    result = parser.parse(file_path)
+
+    # Log with trace context
+    parse_log.write("UL_abc123", {
+        "upload_id": "UL_abc123",
+        "parser_id": "bofa_pdf_parser",
+        "parser_version": "2.5.0",
+        "success": True,
+        "rows_extracted": 42,
+        "duration_ms": 3421
+    }, trace_id=trace_id)
+
+# Real-time monitoring
+success_rate = parse_log.get_success_rate(last_hours=1)
+if success_rate < 0.95:
+    send_pagerduty_alert(f"Parser success rate: {success_rate:.1%}")
+```
+
+**Características Incluidas:**
+- ✅ Elasticsearch with daily index rotation
+- ✅ Distributed tracing (trace_id, span_id)
+- ✅ Prometheus metrics + Grafana dashboards
+- ✅ PagerDuty alerts (success rate < 95%)
+- ✅ Real-time aggregations
+- ✅ 90-day retention (archived to S3)
+
+**Características NO Incluidas:**
+- ❌ Custom ML anomaly detection (threshold alerts sufficient)
+
+**Configuración:**
 ```yaml
 parse_log:
-  format: "json"
-  destination: "elasticsearch"
   elasticsearch:
-    hosts: ["es-logs-1.internal:9200", "es-logs-2.internal:9200"]
-    index: "parse-logs"
-    index_rotation: "daily"  # Daily indexes (parse-logs-2024-10-27)
-    retention_days: 90  # Delete indexes older than 90 days
-  structured: true
-  fields:
-    required: [upload_id, parser_id, parser_version, success, rows_extracted, duration_ms, started_at, completed_at]
-    optional: [warnings, errors, trace_id, span_id, customer_id, document_type]
-  distributed_tracing:
+    hosts:
+      - "es-node-1:9200"
+      - "es-node-2:9200"
+    index_prefix: "parse-logs"
+    retention_days: 90
+  tracing:
     enabled: true
-    trace_id_field: "trace_id"
-    span_id_field: "span_id"
-    parent_span_id_field: "parent_span_id"
-  metrics:
-    enabled: true
-    backend: "prometheus"
-    labels: [parser_id, parser_version, document_type, success]
-    histograms:
-      - name: "parse_duration_seconds"
-        buckets: [0.1, 0.5, 1, 2, 5, 10, 30]
-      - name: "rows_extracted"
-        buckets: [0, 10, 50, 100, 500, 1000, 5000]
-  alerting:
-    enabled: true
-    backend: "pagerduty"
-    rules:
-      - name: "parser_failure_rate_high"
-        condition: "success_rate < 0.99"  # Alert if <99%
-        severity: "P2"
-      - name: "parser_latency_high"
-        condition: "p95_latency_ms > 10000"  # >10s
-        severity: "P3"
-      - name: "parser_errors_spike"
-        condition: "error_rate > 0.05"  # >5% errors
-        severity: "P1"
-  dashboard:
-    enabled: true
-    backend: "grafana"
-    panels:
-      - parser_success_rate_by_version
-      - parser_latency_heatmap
-      - parser_errors_by_type
-      - parser_throughput_per_hour
+    service_name: "parser-service"
+  monitoring:
+    prometheus_port: 9090
+    pagerduty_integration_key: "xxx"
 ```
 
-**What's Used:**
-- ✅ Elasticsearch storage - Centralized, searchable, daily indexes
-- ✅ Distributed tracing - trace_id/span_id for correlation
-- ✅ Prometheus metrics - Histograms for latency/rows extracted
-- ✅ PagerDuty alerting - P1/P2/P3 severity levels
-- ✅ Grafana dashboards - Real-time visualization
-- ✅ Index rotation - Daily indexes, 90-day retention
-- ✅ Structured fields - Required + optional fields
-- ✅ Rich metadata - customer_id, document_type for segmentation
+**Performance:**
+- Write latency: 10ms (Elasticsearch async bulk)
+- Query latency (24h aggregation): 150ms
+- Throughput: 10K logs/day
+- Storage: 3.6GB/year (3.6M × 1KB)
 
-**Implementation Complexity:** **HIGH**
-- ~800 lines Python/TypeScript
-- Elasticsearch client (bulk insert for performance)
-- Prometheus client (histogram/counter metrics)
-- OpenTelemetry integration (distributed tracing)
-- PagerDuty API client
-- Grafana dashboard definitions (JSON)
-- Comprehensive test suite
-- Monitoring runbooks
-
-**Narrative Example:**
-> Bank processes credit card statement (1,200 transactions). Parser executes within distributed system:
-> ```python
-> # Distributed tracing context
-> trace_id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"  # From API gateway
-> span_id = "parser-span-001"
-> parent_span_id = "upload-span-001"
->
-> # Start parsing
-> started_at = datetime.now()
->
-> # ... parser execution ...
->
-> # Complete parsing
-> completed_at = datetime.now()
-> duration_ms = (completed_at - started_at).total_seconds() * 1000
->
-> # Build log entry
-> parse_log = {
->     "upload_id": "UL_12345",
->     "parser_id": "universal_credit_card_parser",
->     "parser_version": "3.5.0",
->     "success": True,
->     "rows_extracted": 1200,
->     "duration_ms": 3200,
->     "warnings": ["Row 450: Date format variant detected"],
->     "errors": [],
->     "started_at": started_at.isoformat(),
->     "completed_at": completed_at.isoformat(),
->     "trace_id": trace_id,
->     "span_id": span_id,
->     "parent_span_id": parent_span_id,
->     "customer_id": "CUST_12345",
->     "document_type": "credit_card_statement"
-> }
->
-> # Write to Elasticsearch
-> es_client.index(
->     index="parse-logs-2024-10-27",
->     document=parse_log
-> )
->
-> # Record Prometheus metrics
-> parse_duration_histogram.labels(
->     parser_id="universal_credit_card_parser",
->     parser_version="3.5.0",
->     document_type="credit_card_statement",
->     success="true"
-> ).observe(3.2)  # seconds
->
-> rows_extracted_histogram.labels(
->     parser_id="universal_credit_card_parser",
->     document_type="credit_card_statement"
-> ).observe(1200)
->
-> parse_total_counter.labels(
->     parser_id="universal_credit_card_parser",
->     parser_version="3.5.0",
->     success="true"
-> ).inc()
-> ```
->
-> **Distributed tracing query** (OpenTelemetry):
-> ```
-> Trace ID: a1b2c3d4-e5f6-7890-abcd-ef1234567890
-> ├─ API Gateway (50ms) [upload-span-000]
-> ├─ Upload Service (200ms) [upload-span-001]
-> │  ├─ File Storage (100ms) [storage-span-001]
-> │  └─ Parser Execution (3200ms) [parser-span-001] ← Parse log here
-> │     ├─ PDF Text Extraction (1500ms)
-> │     ├─ Transaction Pattern Matching (1200ms)
-> │     └─ Observation Store Writes (500ms)
-> └─ Normalization Service (2000ms) [normalize-span-001]
-> ```
-> Total request time: 5.45s (parse = 3.2s = 59% of total time)
->
-> **Grafana dashboard visualization:**
-> ```
-> Parser Success Rate (last 1 hour):
-> - universal_credit_card_parser v3.5.0: 99.2% ✅
-> - universal_credit_card_parser v3.4.0: 98.8% ✅
-> - bank_statement_parser v2.1.0: 97.5% ⚠️
->
-> P95 Latency Heatmap:
-> [Heat map showing latency distribution by hour, parser version]
-> - 10 AM - 12 PM: 3.5s (normal)
-> - 12 PM - 2 PM: 8.2s (high load, acceptable)
-> - 2 PM - 4 PM: 12.5s (⚠️ exceeds 10s threshold)
->
-> Errors by Type (last 24h):
-> - PDF structure invalid: 45 occurrences
-> - Timeout after 30s: 12 occurrences
-> - Unsupported encoding: 8 occurrences
-> ```
->
-> **Alert triggered** (2 PM - latency spike):
-> ```
-> PagerDuty Incident: #12345
-> Severity: P3
-> Title: "Parser Latency High"
-> Description: "P95 latency for universal_credit_card_parser v3.5.0 exceeded 10s threshold (current: 12.5s)"
-> Assigned to: On-call engineer
-> Runbook: https://internal-wiki.com/runbooks/parser-latency
-> ```
->
-> Engineer investigates:
-> 1. Query Elasticsearch: `GET /parse-logs-*/_search?q=parser_id:universal_credit_card_parser AND duration_ms:>10000`
-> 2. Finds 150 slow parses (all from same time window: 2-4 PM)
-> 3. Correlation: High CPU usage on parser workers during peak hours
-> 4. Resolution: Scale parser workers from 10 → 15 instances
-> 5. Latency recovers to 3.5s within 10 minutes ✅
->
-> **Retention cleanup** (runs daily):
-> ```bash
-> # Delete Elasticsearch indexes older than 90 days
-> curl -X DELETE "es-logs-1.internal:9200/parse-logs-2024-07-27"
-> # Success: Index deleted (freed 2.5GB disk space)
-> ```
-> Retention met, logs archived to S3 Glacier for compliance (7-year audit trail).
+**No Further Tiers:**
+- Scale horizontally (more Elasticsearch nodes)
 
 ---
 
-**Key Insight:** The same `ParseLog` structured format works across all 3 profiles. Personal writes JSON files (40 lines); Small business adds aggregation + email alerts (200 lines); Enterprise uses Elasticsearch + Prometheus + distributed tracing + PagerDuty (800 lines). All record the same core fields (upload_id, success, duration, errors).
-
----
-
-## Schema
-
-See [`parse-log.schema.json`](../../schemas/parse-log.schema.json) for complete schema.
-
-**Key fields:**
-```typescript
-interface ParseLog {
-  upload_id: string
-  parser_id: string
-  parser_version: string
-  success: boolean
-  rows_extracted: number
-  duration_ms: number
-  warnings: string[]
-  errors: string[]
-  started_at: ISO8601DateTime
-  completed_at: ISO8601DateTime
-}
-```
-
----
-
-## Behavior
-
-**Success case:**
-```json
-{
-  "upload_id": "UL_abc123",
-  "parser_id": "bofa_pdf_parser",
-  "parser_version": "1.2.0",
-  "success": true,
-  "rows_extracted": 42,
-  "duration_ms": 3421,
-  "warnings": ["Row 15: Ambiguous date format"],
-  "errors": [],
-  "started_at": "2025-10-23T14:35:00Z",
-  "completed_at": "2025-10-23T14:35:03Z"
-}
-```
-
-**Failure case:**
-```json
-{
-  "upload_id": "UL_def456",
-  "parser_id": "bofa_pdf_parser",
-  "parser_version": "1.2.0",
-  "success": false,
-  "rows_extracted": 0,
-  "duration_ms": 150,
-  "warnings": [],
-  "errors": ["PDF structure invalid", "Cannot extract table"],
-  "started_at": "2025-10-23T14:40:00Z",
-  "completed_at": "2025-10-23T14:40:00Z"
-}
-```
-
----
-
-## Storage
-
-**Path:** `/logs/parse/{upload_id}.log.json`
-
-**Persistence:** Write-once, immutable. Never update existing log.
-
----
-
-## Multi-Domain Applicability
-
-**Finance:** Log bank statement parsing (success rate, extraction latency)
-**Healthcare:** Log lab result extraction (which tests extracted, errors)
-**Legal:** Log contract parsing (clauses found, parsing time)
-**Research (RSRCH - Utilitario):** Log fact extraction from web pages (facts found, parsing errors, source credibility score)
-**Manufacturing:** Log sensor data parsing (data points extracted, corruption detected)
-
----
-
-## Domain Validation
-
-### ✅ Finance (Primary Instantiation)
-**Use case:** Log bank statement parsing execution for debugging and monitoring
-**Example:** User uploads BoFA PDF → Parser runs → ParseLog records {upload_id: "UL_abc123", parser_id: "bofa_pdf_parser", parser_version: "1.2.0", success: true, rows_extracted: 42, duration_ms: 3421, warnings: ["Row 15: Ambiguous date format"], started_at: "2025-10-23T14:35:00Z"} → Stored at /logs/parse/UL_abc123.log.json → Monitoring dashboard queries logs → Calculates parser success rate (98.5%), p95 latency (4.2s), warning rate (12%)
-**Operations:** Write immutable log (write-once), query logs (debugging, monitoring), aggregate metrics (success rate, latency percentiles)
-**Status:** ✅ Fully implemented in personal-finance-app
-
-### ✅ Healthcare
-**Use case:** Log lab result parsing for audit trail and error tracking
-**Example:** Hospital uploads Quest lab report → Parser extracts 8 tests → ParseLog records {success: true, rows_extracted: 8, duration_ms: 2100, warnings: []} → Later patient queries fail (0 results) → Admin checks parse log → Sees warning "Test name format changed, using fallback extraction" → Fixes parser
-**Status:** ✅ Conceptually validated
-
-### ✅ Legal
-**Use case:** Log contract parsing for audit trail (regulatory compliance)
-**Example:** Law firm uploads contract → Parser extracts 25 clauses → ParseLog records {parser_id: "docusign_pdf_parser", parser_version: "2.1.0", rows_extracted: 25, duration_ms: 5500} → Audit requires proof of extraction → Parse log provides immutable record with timestamp, parser version, extraction details
-**Status:** ✅ Conceptually validated
-
-### ✅ RSRCH (Utilitario Research)
-**Use case:** Log web page fact extraction for debugging and credibility tracking
-**Example:** Scraper downloads TechCrunch article → TechCrunchHTMLParser extracts 12 founder facts → ParseLog records {upload_id: "UL_tc_123", parser_id: "techcrunch_html_parser", parser_version: "1.5.0", success: true, rows_extracted: 12, duration_ms: 1850, warnings: ["Author field missing, using 'Unknown'"], metadata: {source_credibility_score: 0.92, publication_date: "2024-02-25"}} → Dashboard queries logs to calculate parser reliability (TechCrunch parser: 99.2% success rate, avg 12 facts per article)
-**Operations:** Logs include domain-specific metadata (source_credibility_score for research quality tracking), warnings track parsing anomalies (missing fields, format changes), duration tracking for scraper performance optimization
-**Status:** ✅ Conceptually validated
-
-### ✅ E-commerce
 **Use case:** Log supplier catalog parsing for monitoring and error alerts
 **Example:** Merchant imports supplier CSV (1,500 products) → SupplierCSVParser extracts observations → ParseLog records {rows_extracted: 1500, duration_ms: 6200, warnings: ["Row 342: Missing SKU, using product_id as fallback"]} → Alert fires if success: false (notify admin) → Monitoring tracks catalog import latency (p95: 7.5s)
 **Status:** ✅ Conceptually validated
