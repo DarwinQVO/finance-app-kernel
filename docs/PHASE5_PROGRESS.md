@@ -1,12 +1,12 @@
 # Phase 5: Refactoring Progress Report
 
-**Status:** In Progress (27/33 primitives complete - 82%)
+**Status:** In Progress (28/33 primitives complete - 85%)
 **Started:** 2025-10-27
 **Pattern:** Literate programming style with Spanish narrative + English code
 
 ---
 
-## Completed Primitives (27/33 - 82%)
+## Completed Primitives (28/33 - 85%)
 
 ### API/Auth System (8/8 complete ✅)
 
@@ -182,15 +182,26 @@
 
 ---
 
-## Pending Primitives (6/33 - 18%)
+---
+
+### Audit System (1/5 complete)
+
+28. ✅ **TimelineReconstructor** (commit pending)
+   - Personal (150 LOC): Text timeline output, retroactive detection, simple snapshot generation
+   - Small Business (400 LOC): D3.js output format, linear interpolation, JSON export for frontend
+   - Enterprise (1200 LOC): Bitemporal queries (transaction_time vs valid_time), Redis caching (1h TTL), spline interpolation, WebSocket streaming, multi-format export (D3/Chart.js/PDF/CSV)
+   - Expansion: 1704 lines → 877 lines (condensed -49%)
+
+---
+
+## Pending Primitives (5/33 - 15%)
 
 ### Truth Construction (1 primitive remaining)
 - ⏳ ValidationEngine
 
-### Audit System (5 primitives)
+### Audit System (4 primitives remaining)
 - ⏳ ProvenanceLedger
 - ⏳ AuditLog
-- ⏳ TimelineReconstructor
 - ⏳ RetroactiveCorrector
 - ⏳ BitemporalQuery
 
@@ -288,24 +299,25 @@ primitive_name:
 
 ## Estimated Remaining Effort
 
-- Average condensation: ~17% reduction (based on 16 condensed primitives)
-- Remaining primitives: 6
-- Estimated lines: 6 × 250 = 1,500 lines
-- Estimated time: 18 hours (3 hours per primitive)
+- Average condensation: ~20% reduction (based on 17 condensed primitives)
+- Remaining primitives: 5
+- Estimated lines: 5 × 250 = 1,250 lines
+- Estimated time: 15 hours (3 hours per primitive)
 
 ---
 
 **Status Summary:**
-- ✅ Pattern established and validated (27 primitives)
+- ✅ Pattern established and validated (28 primitives)
 - ✅ API/Auth system complete (8/8 primitives - 100%) ⭐
 - ✅ Truth Construction in progress (8/9 - 89%)
 - ✅ Other OL primitives complete (11/11 - 100%) ⭐
-- ✅ Average ~17% condensation per primitive
-- ⏳ 6 primitives await systematic application
+- ⏳ Audit System in progress (1/5 - 20%)
+- ✅ Average ~20% condensation per primitive
+- ⏳ 5 primitives await systematic application
 - ⏳ Consistency review pending
 
 **Session Achievements:**
-- 27 primitives refactored (~9,500 lines total)
+- 28 primitives refactored (~10,400 lines total)
 - Pattern fully documented and replicable
 - FileArtifact enriched (410 → 638 lines, +56%)
 - StorageEngine condensed (961 → 618 lines, -36%)
@@ -315,6 +327,7 @@ primitive_name:
 - Normalizer enriched (656 → 681 lines, +4%)
 - Parser stable (684 → 687 lines, +0.4%)
 - NormalizationRuleSet condensed (1002 → 831 lines, -17%)
+- TimelineReconstructor condensed (1704 → 877 lines, -49%)
 - 🎉 ALL Other OL primitives complete (11/11)
 - 1 commit pending push
 
