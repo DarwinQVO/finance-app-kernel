@@ -12,211 +12,572 @@
 
 Universal interface for extracting structured observations from unstructured/semi-structured source documents. Parsers are domain-specific (e.g., `bofa_pdf_parser`, `lab_results_parser`) but follow a universal contract that enables pluggable extraction across ANY domain.
 
+**Core Principle (ADR-0004):** Extract AS-IS (raw first), validate later. Preserve original data losslessly for re-normalization.
+
 ---
 
 ## Simplicity Profiles
 
-**This section shows how the same universal Parser interface is implemented differently based on usage scale.**
+### Profile 1: Personal Use (~200 LOC)
 
-### Profile 1: Personal Use (Finance App - Single Bank, Hardcoded Parser)
+**Contexto del Usuario:**
+Darwin solo sube extractos de Bank of America en PDF (un único banco, formato estable). Hardcodea el parser de BoFA porque nunca necesitará parsers adicionales. El formato PDF tiene una tabla con 4 columnas (Fecha, Descripción, Monto, Saldo) que PyPDF2 extrae como texto. Usa regex para identificar filas de transacciones. No necesita registro de parsers (solo hay uno), ni versionado (implementación única que nunca cambia), ni auto-detección (siempre sube BoFA).
 
-**Context:** Darwin only uploads Bank of America PDFs (single source_type), hardcoded BoFA parser
+**Implementation:**
 
-**Configuration:**
+```python
+import PyPDF2
+from io import BytesIO
+import re
+from dataclasses import dataclass
+from typing import List, Dict, Any
+
+@dataclass
+class Observation:
+    """Raw extracted data (AS-IS, no validation)."""
+    raw_data: Dict[str, Any]
+    row_id: int
+    warnings: List[str] = None
+
+    def __post_init__(self):
+        if self.warnings is None:
+            self.warnings = []
+
+class BofAPDFParser:
+    """Bank of America PDF statement parser - Personal profile."""
+    
+    parser_id = "bofa_pdf_parser"
+    version = "1.0.0"
+    supported_source_types = ["bofa_pdf"]
+    
+    # Regex pattern for BoFA transaction rows:
+    # Date (MM/DD/YYYY) | Description | Amount | Balance
+    TRANSACTION_PATTERN = re.compile(
+        r'(\d{2}/\d{2}/\d{4})\s+(.+?)\s+(-?\$[\d,]+\.\d{2})\s+(\$[\d,]+\.\d{2})'
+    )
+    
+    def parse(self, content: bytes) -> List[Observation]:
+        """Extract transaction rows from BoFA PDF (AS-IS, no validation)."""
+        try:
+            pdf = PyPDF2.PdfReader(BytesIO(content))
+        except Exception as e:
+            raise ParseError(f"Failed to read PDF: {e}")
+        
+        observations = []
+        
+        for page in pdf.pages:
+            text = page.extract_text()
+            
+            # Extract all transaction rows
+            matches = self.TRANSACTION_PATTERN.findall(text)
+            
+            for row_id, match in enumerate(matches, start=len(observations)):
+                date_str, description, amount_str, balance_str = match
+                
+                observations.append(Observation(
+                    raw_data={
+                        "date": date_str,          # AS-IS: "10/15/2024"
+                        "description": description, # AS-IS: "WHOLE FOODS MARKET #1234"
+                        "amount": amount_str,      # AS-IS: "-$87.43"
+                        "balance": balance_str,    # AS-IS: "$4,462.89"
+                        "currency": "USD",         # Inferred from source_type
+                        "account": "bofa_checking" # Inferred from source_type
+                    },
+                    row_id=row_id
+                ))
+        
+        return observations
+    
+    def can_parse(self, content: bytes) -> bool:
+        """Quick check if PDF is from Bank of America."""
+        try:
+            pdf = PyPDF2.PdfReader(BytesIO(content))
+            first_page_text = pdf.pages[0].extract_text()
+            return "BANK OF AMERICA" in first_page_text.upper()
+        except:
+            return False
+
+class ParseError(Exception):
+    """Raised when document is corrupted or unparseable."""
+    pass
+
+# Example usage
+pdf_content = open("bofa_oct_2024.pdf", "rb").read()
+parser = BofAPDFParser()
+
+if parser.can_parse(pdf_content):
+    observations = parser.parse(pdf_content)
+    print(f"Extracted {len(observations)} transactions")
+    # First transaction: {"date": "10/15/2024", "description": "WHOLE FOODS MARKET", 
+    #                     "amount": "-$87.43", "balance": "$4,462.89"}
+else:
+    print("Not a BoFA PDF")
+```
+
+**Características Incluidas:**
+- ✅ **AS-IS extraction** (preserve original text, no interpretation) - Enables lossless re-normalization
+- ✅ **Deterministic row IDs** (same file → same row_id) - Stable references
+- ✅ **Zero rows = success** (empty statement is valid) - Not an error
+- ✅ **Basic error handling** (ParseError if PDF corrupted) - Simple failure mode
+- ✅ **can_parse() check** (verify "BANK OF AMERICA" signature) - Prevent wrong parser
+
+**Características NO Incluidas:**
+- ❌ **Parser registry** (YAGNI: Only 1 parser, hardcoding is simpler)
+- ❌ **Versioning system** (YAGNI: Single implementation, never changes)
+- ❌ **Warnings vs errors distinction** (YAGNI: Everything is an error, simpler)
+- ❌ **Partial parse support** (YAGNI: If corrupted, fail completely)
+- ❌ **Performance metrics** (YAGNI: No latency tracking needed)
+
+**Configuración:**
+
 ```yaml
 parser:
-  parser_id: "bofa_pdf_parser"  # Hardcoded (only parser in app)
-  version: "1.0.0"  # No versioning (single implementation)
-  supported_source_types: ["bofa_pdf"]  # Only BoFA supported
-  settings:
-    strict_mode: false  # Warnings OK (don't block parsing)
-    max_rows: 1000  # Reasonable limit for personal statements
+  type: "bofa_pdf_parser"
+  version: "1.0.0"
+  source_types: ["bofa_pdf"]
+  max_rows: 1000
 ```
 
-**What's Used:**
-- ✅ Core `parse()` method - Extract transactions from BoFA PDF
-- ✅ AS-IS extraction - No validation (date/amount as strings)
-- ✅ Zero rows = success - Empty statement (no transactions) is valid
-- ✅ Basic error handling - `ParseError` if PDF corrupted
-- ✅ Deterministic row IDs - Same file → same row_id assignments
+**Performance:**
+- **Latency:** 2-4 seconds per PDF (100 rows)
+- **Memory:** 20MB per parse (PyPDF2 overhead)
+- **Throughput:** ~25 PDFs/minute (sequential)
+- **Dependencies:** PyPDF2 (PDF extraction)
 
-**What's NOT Used:**
-- ❌ Parser registry - Only 1 parser (BoFA), hardcoded
-- ❌ Versioning system - No parser version tracking
-- ❌ `can_parse()` detection - Only uploads BoFA PDFs (no auto-detection needed)
-- ❌ Warnings vs errors distinction - All issues are errors (simpler)
-- ❌ Partial parse support - Either parse all rows or fail
-- ❌ Parser performance metrics - No latency tracking
-
-**Implementation Complexity:** **LOW**
-- ~200 lines Python
-- Single file: `bofa_pdf_parser.py`
-- Uses PyPDF2 for text extraction
-- Regex patterns for transaction rows
-- No tests (manual verification with user's own PDFs)
-
-**Narrative Example:**
-> Darwin uploads "BoFA_Oct2024.pdf". API calls `BoFAPDFParser().parse(pdf_bytes)`. Parser:
-> 1. Extract text from PDF using PyPDF2
-> 2. Find transaction table (regex search for "Date Description Amount Balance")
-> 3. Extract rows with pattern: `r'(\d{2}/\d{2}/\d{4})\s+(.+?)\s+(-?\$[\d,]+\.\d{2})\s+(\$[\d,]+\.\d{2})'`
-> 4. Create Observation for each row: `{"raw_data": {"date": "10/15/2024", "description": "WHOLE FOODS MARKET", "amount": "-$87.43", "balance": "$4,462.89"}, "row_id": 0}`
-> 5. Return 42 observations (42 transactions in October)
->
-> If PDF corrupted → PyPDF2 raises exception → Wrapped as `ParseError("Failed to extract text from PDF")` → Upload marked as `error`.
+**Upgrade Triggers:**
+- If you add 2nd bank → Small Business (parser registry)
+- If you need versioning → Small Business (track parser versions)
+- If you need partial parse → Small Business (skip corrupted rows)
 
 ---
 
-### Profile 2: Small Business (Accounting Firm - Multiple Parsers, Basic Versioning)
+### Profile 2: Small Business (~800 LOC)
 
-**Context:** Accountants upload docs from 10 different banks + client invoices (multiple source_types), need parser selection
+**Contexto del Usuario:**
+Una firma de contabilidad procesa 50 clientes con 10 bancos diferentes (BoFA, Chase, Wells Fargo, Citibank). Necesita un registro de parsers (ParserRegistry) para seleccionar el parser correcto según source_type. Cada parser tiene su propia versión (BoFA v1.2.0, Chase v1.0.0) que se registra en ParseLog para auditoría. Si una fila está corrupta (row 45 tiene texto ilegible por OCR mal), el parser salta esa fila (warning) pero continúa extrayendo rows 46-50 (partial parse). Los contadores necesitan ver "Parsed 50 transactions, 1 warning (row 45 skipped)" para review manual.
 
-**Configuration:**
+**Implementation:**
+
+```python
+from typing import Dict, List, Optional
+from dataclasses import dataclass
+
+@dataclass
+class ParseResult:
+    """Result of parse operation."""
+    success: bool
+    observations: List[Observation]
+    errors: List[str] = None
+    warnings: List[str] = None
+
+    def __post_init__(self):
+        if self.errors is None:
+            self.errors = []
+        if self.warnings is None:
+            self.warnings = []
+
+class ParserRegistry:
+    """Registry for multiple parsers (Small Business profile)."""
+    
+    def __init__(self):
+        self.parsers: Dict[str, Parser] = {}
+    
+    def register(self, parser: 'Parser'):
+        """Register parser for its supported source_types."""
+        for source_type in parser.supported_source_types:
+            self.parsers[source_type] = parser
+    
+    def get_parser(self, source_type: str) -> Optional['Parser']:
+        """Lookup parser by source_type."""
+        return self.parsers.get(source_type)
+    
+    def list_supported_types(self) -> List[str]:
+        """Return all registered source_types."""
+        return list(self.parsers.keys())
+
+class ChasePDFParser:
+    """Chase bank PDF parser with partial parse support."""
+    
+    parser_id = "chase_pdf_parser"
+    version = "1.0.0"
+    supported_source_types = ["chase_pdf"]
+    
+    def parse(self, content: bytes, max_rows: int = 5000) -> ParseResult:
+        """Parse with partial parse support (skip corrupted rows)."""
+        observations = []
+        warnings = []
+        
+        try:
+            pdf = PyPDF2.PdfReader(BytesIO(content))
+        except Exception as e:
+            return ParseResult(
+                success=False,
+                observations=[],
+                errors=[f"Failed to read PDF: {e}"]
+            )
+        
+        for page in pdf.pages:
+            text = page.extract_text()
+            rows = self._extract_rows(text)
+            
+            for row_id, row_text in enumerate(rows, start=len(observations)):
+                if row_id >= max_rows:
+                    warnings.append(f"Max rows ({max_rows}) reached, stopping")
+                    break
+                
+                try:
+                    # Try to parse row
+                    fields = self._parse_row(row_text)
+                    observations.append(Observation(
+                        raw_data=fields,
+                        row_id=row_id
+                    ))
+                except RowParseError as e:
+                    # Corrupted row → Warning (not error)
+                    warnings.append(f"Row {row_id}: {e}, skipping")
+                    continue  # Partial parse: skip and continue
+        
+        return ParseResult(
+            success=True,
+            observations=observations,
+            warnings=warnings
+        )
+    
+    def _extract_rows(self, text: str) -> List[str]:
+        """Extract raw row text (domain-specific logic)."""
+        # Split by newlines, filter transaction rows
+        lines = text.split('\n')
+        return [line for line in lines if self._looks_like_transaction(line)]
+    
+    def _looks_like_transaction(self, line: str) -> bool:
+        """Heuristic: Does line look like transaction?"""
+        return bool(re.match(r'\d{2}/\d{2}/\d{4}', line))
+    
+    def _parse_row(self, row_text: str) -> dict:
+        """Parse row text → fields (can raise RowParseError)."""
+        match = re.match(
+            r'(\d{2}/\d{2}/\d{4})\s+(.+?)\s+(-?\$[\d,]+\.\d{2})',
+            row_text
+        )
+        if not match:
+            raise RowParseError("Could not parse row format")
+        
+        date_str, description, amount_str = match.groups()
+        return {
+            "date": date_str,
+            "description": description.strip(),
+            "amount": amount_str
+        }
+
+class RowParseError(Exception):
+    """Row-level parse error (non-fatal for partial parse)."""
+    pass
+
+# Example usage: Registry with multiple parsers
+registry = ParserRegistry()
+registry.register(BofAPDFParser())
+registry.register(ChasePDFParser())
+registry.register(WellsFargoCSVParser())  # (implementation omitted)
+
+# Parse Chase statement
+parser = registry.get_parser("chase_pdf")
+result = parser.parse(chase_pdf_content)
+
+if result.success:
+    print(f"Extracted {len(result.observations)} transactions")
+    if result.warnings:
+        print(f"Warnings: {len(result.warnings)}")
+        for warning in result.warnings:
+            print(f"  - {warning}")
+    # Output: "Extracted 50 transactions"
+    #         "Warnings: 1"
+    #         "  - Row 45: Could not parse row format, skipping"
+```
+
+**Características Incluidas:**
+- ✅ **Parser registry** (4 parsers: BoFA, Chase, Wells Fargo, invoices) - Support multiple source_types
+- ✅ **Basic versioning** (track parser version in ParseLog) - Audit trail
+- ✅ **can_parse() auto-detection** (verify format before parsing) - Prevent wrong parser
+- ✅ **Warnings** (non-fatal issues logged, parsing continues) - Partial parse friendly
+- ✅ **Partial parse support** (skip corrupted row, continue) - Row 45 fails → extract 0-44, 46-50
+- ✅ **Zero rows = success** (empty statement is valid) - Not an error
+
+**Características NO Incluidas:**
+- ❌ **A/B testing** (YAGNI: Single parser per source_type, no canary needed)
+- ❌ **Parser metrics** (YAGNI: Basic logging sufficient)
+- ❌ **Schema evolution tracking** (YAGNI: Manual schema changes)
+
+**Configuración:**
+
 ```yaml
 parser_registry:
   parsers:
-    - parser_id: "bofa_pdf_parser"
+    - id: "bofa_pdf_parser"
       version: "1.2.0"
-      supported_source_types: ["bofa_pdf"]
-    - parser_id: "chase_pdf_parser"
+      source_types: ["bofa_pdf"]
+    - id: "chase_pdf_parser"
       version: "1.0.0"
-      supported_source_types: ["chase_pdf"]
-    - parser_id: "wells_fargo_csv_parser"
+      source_types: ["chase_pdf"]
+    - id: "wells_fargo_csv_parser"
       version: "1.1.0"
-      supported_source_types: ["wells_fargo_csv"]
-    - parser_id: "generic_invoice_parser"
-      version: "2.0.0"
-      supported_source_types: ["invoice_pdf", "invoice_docx"]
+      source_types: ["wells_fargo_csv"]
   settings:
-    strict_mode: false
     max_rows: 5000
-    warnings_as_errors: false
-    partial_parse_allowed: true  # Return rows before corruption
+    partial_parse: true
 ```
 
-**What's Used:**
-- ✅ Parser registry - Lookup parser by `source_type`
-- ✅ Multiple parsers - 4 different parsers (BoFA, Chase, Wells Fargo, invoices)
-- ✅ Basic versioning - Track parser version in parse log
-- ✅ `can_parse()` detection - Auto-detect if wrong parser selected
-- ✅ Warnings - Non-fatal issues logged but parsing continues
-- ✅ Partial parse support - If row 45 corrupted, return rows 0-44
-- ✅ Zero rows = success
+**Performance:**
+- **Latency:** 3-6 seconds per PDF (100 rows, with warnings)
+- **Memory:** 30MB per parse (multiple parsers loaded)
+- **Throughput:** ~15 PDFs/minute (sequential)
+- **Dependencies:** PyPDF2, csv (stdlib)
 
-**What's NOT Used:**
-- ❌ A/B testing - Single parser per source_type (no canary deployments)
-- ❌ Parser metrics - Just basic logging
-- ❌ Schema evolution tracking - No automatic migration
-
-**Implementation Complexity:** **MEDIUM**
-- ~800 lines Python (4 parsers × ~200 lines each)
-- Simple registry: `dict[source_type -> Parser]`
-- Basic versioning: Log parser version in ParseLog
-- Unit tests per parser (golden files for regression testing)
-
-**Narrative Example:**
-> Accountant uploads "chase_statement.pdf" with `source_type="chase_pdf"`. API looks up parser: `ParserRegistry.get_parser("chase_pdf")` → Returns `ChasePDFParser(version="1.0.0")`. Calls `parser.parse(pdf_bytes)`:
-> 1. Extract 45 transactions (rows 0-44) successfully
-> 2. Row 45 has corrupted text (mangled OCR) → Warning: "Row 45: unparseable, skipping"
-> 3. Continue parsing rows 46-50 (5 more transactions)
-> 4. Return `ParseResult(success=True, observations=[...50 total], warnings=["Row 45: unparseable, skipping"])`
-> 5. ParseLog records: `{"parser_id": "chase_pdf_parser", "version": "1.0.0", "rows_extracted": 50, "warnings": 1}`
->
-> Accountant sees: "Parsed 50 transactions, 1 warning (row 45 skipped)". Can review warning later, but upload succeeds.
+**Upgrade Triggers:**
+- If you need A/B testing → Enterprise (canary deployments)
+- If you need automatic rollback → Enterprise (error rate monitoring)
+- If you need schema evolution → Enterprise (field change detection)
 
 ---
 
-### Profile 3: Enterprise (Bank - Parser Versioning, Canary Deployments, Metrics)
+### Profile 3: Enterprise (~5000 LOC)
 
-**Context:** Bank processes 10,000 uploads/day from 50+ bank/credit card formats, needs safe parser updates (canary deployments), A/B testing
+**Contexto del Usuario:**
+Un banco procesa 10,000 uploads/día de 50+ formatos (Visa, Mastercard, Amex, bancos regionales). Despliega una nueva versión del parser (v2.1.0) a solo 5% del tráfico (canary deployment) para probar cambios sin riesgo. Monitorea error rate cada hora: si v2.1.0 tiene >5% error rate vs v2.0.0 (estable), automáticamente hace rollback (desactiva v2.1.0, rutas 100% tráfico a v2.0.0). Prometheus registra métricas (latency p95, rows extracted, error rate) por parser version. Sistema detecta cambios de schema (parser v2.1 empieza a retornar nuevo campo "merchant_category" que v2.0 no tiene) y alerta para revisar compatibilidad.
 
-**Configuration:**
+**Implementation:**
+
+```python
+import random
+from typing import Dict, List, Tuple
+import time
+
+@dataclass
+class ParserVersion:
+    """Parser version with canary deployment config."""
+    version: str
+    rollout_percentage: int  # 0-100
+    enabled: bool
+
+class EnterpriseParserRegistry:
+    """Registry with canary deployments and A/B testing."""
+    
+    def __init__(self, monitoring_backend):
+        self.parsers: Dict[str, List[ParserVersion]] = {}
+        self.monitoring = monitoring_backend
+    
+    def register_version(self, parser_id: str, version: ParserVersion):
+        """Register parser version with rollout config."""
+        if parser_id not in self.parsers:
+            self.parsers[parser_id] = []
+        self.parsers[parser_id].append(version)
+    
+    def get_parser(self, source_type: str) -> Tuple['Parser', str]:
+        """Select parser version based on canary rollout percentage."""
+        parser_versions = self.parsers.get(source_type, [])
+        enabled_versions = [v for v in parser_versions if v.enabled]
+        
+        if not enabled_versions:
+            raise NoParserError(f"No enabled parser for {source_type}")
+        
+        # Weighted random selection based on rollout_percentage
+        total_percentage = sum(v.rollout_percentage for v in enabled_versions)
+        if total_percentage != 100:
+            raise ConfigError(f"Rollout percentages must sum to 100, got {total_percentage}")
+        
+        rand = random.randint(1, 100)
+        cumulative = 0
+        
+        for version in enabled_versions:
+            cumulative += version.rollout_percentage
+            if rand <= cumulative:
+                # Load parser for this version
+                parser = self._load_parser(source_type, version.version)
+                return (parser, version.version)
+        
+        # Fallback to first version
+        return self._load_parser(source_type, enabled_versions[0].version)
+    
+    def _load_parser(self, source_type: str, version: str) -> 'Parser':
+        """Load parser instance for specific version."""
+        # In real implementation: load from plugin system
+        return UniversalCreditCardParser(version=version)
+    
+    def monitor_canary(self, window_hours: int = 24, threshold: float = 0.05):
+        """Monitor canary error rate and auto-rollback if needed."""
+        for parser_id, versions in self.parsers.items():
+            canary_versions = [v for v in versions if v.rollout_percentage < 50]
+            stable_versions = [v for v in versions if v.rollout_percentage >= 50]
+            
+            for canary in canary_versions:
+                canary_error_rate = self.monitoring.get_error_rate(
+                    parser_id, canary.version, window_hours
+                )
+                stable_error_rate = self.monitoring.get_error_rate(
+                    parser_id, stable_versions[0].version, window_hours
+                )
+                
+                delta = canary_error_rate - stable_error_rate
+                
+                if delta > threshold:
+                    # Auto-rollback: disable canary, route 100% to stable
+                    self._rollback_canary(parser_id, canary.version, stable_versions[0].version)
+                    self._alert_p1(
+                        f"Parser {parser_id} v{canary.version} rolled back "
+                        f"(error rate {canary_error_rate:.1%} > threshold {threshold:.1%})"
+                    )
+    
+    def _rollback_canary(self, parser_id: str, canary_version: str, stable_version: str):
+        """Disable canary, route all traffic to stable."""
+        for version in self.parsers[parser_id]:
+            if version.version == canary_version:
+                version.enabled = False
+                version.rollout_percentage = 0
+            elif version.version == stable_version:
+                version.rollout_percentage = 100
+
+class UniversalCreditCardParser:
+    """Universal parser for 50+ credit card formats (Enterprise)."""
+    
+    def __init__(self, version: str):
+        self.parser_id = "universal_credit_card_parser"
+        self.version = version
+        self.supported_source_types = ["visa_pdf", "mastercard_pdf", "amex_pdf"]
+    
+    def parse(self, content: bytes) -> ParseResult:
+        """Parse with Prometheus metrics and schema tracking."""
+        start_time = time.time()
+        
+        try:
+            # Extract observations
+            observations = self._extract_observations(content)
+            
+            # Track schema (detect new fields)
+            if self.version == "2.1.0":
+                # New version adds "merchant_category" field
+                schema_diff = self._detect_schema_changes(observations)
+                if schema_diff:
+                    self._alert_schema_change(schema_diff)
+            
+            # Record metrics
+            duration = time.time() - start_time
+            self._record_metrics(
+                success=True,
+                duration=duration,
+                rows=len(observations)
+            )
+            
+            return ParseResult(success=True, observations=observations)
+        
+        except Exception as e:
+            duration = time.time() - start_time
+            self._record_metrics(success=False, duration=duration, rows=0)
+            return ParseResult(success=False, observations=[], errors=[str(e)])
+    
+    def _extract_observations(self, content: bytes) -> List[Observation]:
+        """Extract observations (stub for demo)."""
+        # Real implementation: heuristics for 50+ formats
+        return []
+    
+    def _detect_schema_changes(self, observations: List[Observation]) -> List[str]:
+        """Detect new fields in observations (schema evolution)."""
+        if not observations:
+            return []
+        
+        # Compare fields to baseline schema
+        current_fields = set(observations[0].raw_data.keys())
+        baseline_fields = {"date", "amount", "description"}  # v2.0.0 schema
+        
+        new_fields = current_fields - baseline_fields
+        return list(new_fields)
+    
+    def _record_metrics(self, success: bool, duration: float, rows: int):
+        """Record Prometheus metrics."""
+        status = "success" if success else "error"
+        # prometheus_client.Counter(f"parser_operations_total", 
+        #     labels={"parser_id": self.parser_id, "version": self.version, "status": status}
+        # ).inc()
+        # prometheus_client.Histogram(f"parser_duration_seconds",
+        #     labels={"parser_id": self.parser_id, "version": self.version}
+        # ).observe(duration)
+        pass
+
+# Example usage: Canary deployment
+registry = EnterpriseParserRegistry(monitoring_backend=PrometheusBackend())
+
+# Register v2.0.0 (stable: 95% traffic)
+registry.register_version("universal_credit_card_parser", ParserVersion(
+    version="2.0.0",
+    rollout_percentage=95,
+    enabled=True
+))
+
+# Register v2.1.0 (canary: 5% traffic)
+registry.register_version("universal_credit_card_parser", ParserVersion(
+    version="2.1.0",
+    rollout_percentage=5,
+    enabled=True
+))
+
+# Parse credit card statement (random 5% → v2.1.0, 95% → v2.0.0)
+parser, version = registry.get_parser("visa_pdf")
+print(f"Selected parser version: {version}")  # "2.1.0" (5% chance) or "2.0.0" (95% chance)
+
+result = parser.parse(visa_pdf_content)
+
+# Monitor canary (runs every hour)
+registry.monitor_canary(window_hours=24, threshold=0.05)
+# If v2.1.0 error rate > 5% threshold → Auto-rollback to v2.0.0
+```
+
+**Características Incluidas:**
+- ✅ **Canary deployments** (5% traffic to v2.1.0, 95% to v2.0.0) - Safe rollout
+- ✅ **A/B testing** (compare error rates between versions) - Validate changes
+- ✅ **Automatic rollback** (if error rate >5%, disable canary) - Self-healing
+- ✅ **Prometheus metrics** (latency p95, error rate, rows extracted) - Production monitoring
+- ✅ **Schema evolution tracking** (detect new fields in parser output) - Breaking change alerts
+- ✅ **Universal parser** (handles 50+ formats with heuristics) - Consolidate parsers
+- ✅ **Partial parse** (skip corrupted rows, continue) - Resilient extraction
+- ✅ **Warnings** (extensive categories for review) - Detailed diagnostics
+
+**Características NO Incluidas:**
+- ❌ **Real-time streaming** (YAGNI: Batch processing sufficient for 10K/day)
+
+**Configuración:**
+
 ```yaml
 parser_registry:
   parsers:
-    - parser_id: "universal_credit_card_parser"
+    - id: "universal_credit_card_parser"
       versions:
         - version: "2.1.0"
-          rollout_percentage: 5  # Canary: 5% of traffic
+          rollout_percentage: 5  # Canary
           enabled: true
         - version: "2.0.0"
-          rollout_percentage: 95  # Stable: 95% of traffic
+          rollout_percentage: 95  # Stable
           enabled: true
-        - version: "1.9.0"
-          enabled: false  # Deprecated
-      supported_source_types: ["visa_pdf", "mastercard_pdf", "amex_pdf"]
-  settings:
-    strict_mode: false
-    max_rows: 100000  # Credit card statements can be huge
-    warnings_as_errors: false
-    partial_parse_allowed: true
-    canary_monitoring:
-      error_rate_threshold: 0.05  # Rollback if >5% error rate
-      comparison_window_hours: 24
-    metrics:
-      enabled: true
-      backend: "prometheus"
-      labels: ["parser_id", "version", "source_type"]
-    schema_evolution:
-      track_field_changes: true  # Detect new fields in output
-      alert_on_breaking_changes: true
+  canary_monitoring:
+    error_rate_threshold: 0.05  # 5%
+    comparison_window_hours: 24
+  metrics:
+    backend: "prometheus"
+    labels: ["parser_id", "version", "source_type"]
+  schema_evolution:
+    track_field_changes: true
+    alert_on_breaking_changes: true
 ```
 
-**What's Used:**
-- ✅ Parser registry with versioning
-- ✅ Canary deployments - 5% traffic to v2.1.0 (new), 95% to v2.0.0 (stable)
-- ✅ A/B testing - Compare error rates v2.1.0 vs v2.0.0
-- ✅ Automatic rollback - If v2.1.0 error rate >5%, route all traffic to v2.0.0
-- ✅ `can_parse()` detection - Verify parser recognizes format
-- ✅ Warnings - Extensive warning categories
-- ✅ Partial parse - Critical for large statements (100K+ rows)
-- ✅ Prometheus metrics - Track latency, error rate, warnings per parser version
-- ✅ Schema evolution tracking - Alert if parser outputs new fields
+**Performance:**
+- **Latency:** 3.2 seconds per statement (1200 rows, p95)
+- **Memory:** 100MB per parse (universal parser overhead)
+- **Throughput:** ~18 statements/minute (parallel workers)
+- **Dependencies:** PyPDF2, prometheus_client, redis (caching)
 
-**What's NOT Used:**
-- (All features enabled at enterprise scale)
-
-**Implementation Complexity:** **HIGH**
-- ~5000 lines TypeScript/Python
-- Universal parser (handles 50+ formats with heuristics)
-- Canary deployment logic (route 5% → v2.1.0, monitor error rates)
-- Comprehensive test suite (1000+ golden files covering edge cases)
-- Schema evolution detector (compare field sets across versions)
-- Monitoring dashboards: Error rate by parser version, latency p95, warning categories
-
-**Narrative Example:**
-> Customer uploads Visa statement PDF. API routes to ParserRegistry:
-> 1. Lookup parser: `source_type="visa_pdf"` → `UniversalCreditCardParser`
-> 2. **Canary routing**: Random selection → 5% chance → Selects v2.1.0 (canary), 95% chance → Selects v2.0.0 (stable). Random draw: 0.03 → **v2.1.0 selected**
-> 3. Call `parser_v2_1_0.parse(pdf_bytes)`:
->    - Extract 1,200 transactions
->    - Row 450: Date format unusual ("Oct 15, 2024" instead of "10/15/2024") → Warning: "Date format variant detected"
->    - Row 800: Balance missing (field blank) → Warning: "Balance field empty"
->    - Return `ParseResult(success=True, observations=1200, warnings=["Date format variant: row 450", "Balance missing: row 800"])`
-> 4. Prometheus metrics recorded:
->    - `parser_duration_seconds{parser_id="universal_credit_card",version="2.1.0",source_type="visa_pdf"} 3.2`
->    - `parser_observations_total{parser_id="universal_credit_card",version="2.1.0"} 1200`
->    - `parser_warnings_total{parser_id="universal_credit_card",version="2.1.0"} 2`
->    - `parser_errors_total{parser_id="universal_credit_card",version="2.1.0"} 0`
-> 5. ParseLog: `{"parser_id":"universal_credit_card","version":"2.1.0","upload_id":"UL_12345","rows_extracted":1200,"warnings":2,"latency_ms":3200}`
->
-> **Canary monitoring (runs every hour)**:
-> - Query Prometheus: Compare error rates v2.1.0 vs v2.0.0 (last 24 hours)
-> - v2.1.0 error rate: 2.1% (21 failures / 1000 uploads)
-> - v2.0.0 error rate: 1.8% (171 failures / 9500 uploads)
-> - Delta: +0.3% (within threshold of 5%) ✅ → **Canary healthy, continue rollout**
->
-> Alternative scenario: v2.1.0 has bug (regex broken for certain date formats) → Error rate spikes to 12% → Monitoring detects `error_rate > 5%` threshold → **Automatic rollback**: Update registry: `{version: "2.1.0", rollout_percentage: 0, enabled: false}`, `{version: "2.0.0", rollout_percentage: 100}` → Alert: "P1: Parser v2.1.0 rolled back due to high error rate (12%)" → Engineering investigates.
-
----
-
-**Key Insight:** The same `Parser` interface works across all 3 profiles. Personal use has 1 hardcoded parser (BoFA only); Small business has parser registry with multiple parsers; Enterprise adds canary deployments, A/B testing, and automatic rollback based on error rate monitoring.
+**Upgrade Triggers:**
+- N/A (Enterprise tier includes all features)
 
 ---
 
 ## Interface Contract
-
-### Core Interface
 
 ```python
 from abc import ABC, abstractmethod
@@ -268,363 +629,15 @@ class Parser(ABC):
         pass
 ```
 
-### Types
-
-```python
-from dataclasses import dataclass
-from typing import Any, Dict, List
-
-@dataclass
-class Observation:
-    """
-    Raw extracted data (AS-IS from parser, no validation).
-    Domain-specific schema (ObservationTransaction, ObservationLabResult, etc.)
-    """
-    raw_data: Dict[str, Any]  # Domain-specific fields
-    row_id: int                # Position in source file (0-indexed)
-    warnings: List[str] = []   # Row-level warnings (not errors)
-
-@dataclass
-class ParseResult:
-    """Result of parse operation"""
-    success: bool
-    observations: List[Observation]
-    errors: List[str] = []
-    warnings: List[str] = []
-```
-
----
-
-## Behavior Specifications
-
-### 1. Extract AS-IS (No Validation)
-
-**Property**: Parser extracts text exactly as it appears, WITHOUT interpretation or validation.
-
-**Example:**
-```python
-# Parser sees "01/02/2024" → Extract as string "01/02/2024"
-# DO NOT interpret as date (could be Jan 2 or Feb 1)
-# Normalization stage (vertical 1.3) handles interpretation
-
-observation = Observation(
-    raw_data={
-        "date": "01/02/2024",  # AS-IS (string)
-        "amount": "(50.00)",   # AS-IS (string, not -50.00)
-        "description": "  STARBUCKS #1234  "  # AS-IS (keep spaces)
-    },
-    row_id=0
-)
-```
-
-**Rationale** (from ADR-0004):
-- Preserve original data (lossless extraction)
-- Enable re-normalization without re-parsing
-- Simpler parser implementation (no domain logic)
-
----
-
-### 2. Deterministic Row Ordering
-
-**Property**: Same file → same row_id assignments (stable)
-
-**Implementation:**
-```python
-def parse(self, content: bytes) -> List[Observation]:
-    observations = []
-
-    for row_id, raw_row in enumerate(self.extract_rows(content)):
-        observations.append(Observation(
-            raw_data=self.extract_fields(raw_row),
-            row_id=row_id  # 0-indexed, deterministic
-        ))
-
-    return observations
-```
-
-**Guarantee**: `row_id` is stable across re-parsing (same file, same row_ids).
-
----
-
-### 3. Zero Rows is Success
-
-**Property**: Empty file (0 observations) is valid parse success, NOT error.
-
-**Example:**
-```python
-# Empty bank statement (no transactions this month)
-result = parser.parse(empty_statement_pdf)
-
-assert result.success == True
-assert len(result.observations) == 0
-```
-
-**Rationale**: Empty ≠ Error. Corrupted file = error, empty file = success with 0 rows.
-
----
-
-### 4. Warnings vs Errors
-
-**Property**: Warnings allow parse to continue, errors fail entire parse.
-
-```python
-# WARNING: Suspicious but parseable
-observation = Observation(
-    raw_data={"date": "01/02/2024", "amount": "-5.75"},
-    row_id=0,
-    warnings=["Date format ambiguous (MM/DD or DD/MM?)"]
-)
-
-# ERROR: Corrupted, unparseable
-raise ParseError("PDF structure invalid, cannot extract rows")
-```
-
-**Principle**: Use warnings generously, errors sparingly.
-
----
-
-## Error Handling
-
-| Error | When | Response |
-|-------|------|----------|
-| `ParseError` | Document is corrupted, unparseable | Raise error, log details, mark upload as `error` |
-| `UnsupportedFormatError` | Parser doesn't recognize format | Raise error, try next parser in registry |
-| `PartialParseError` | Some rows extracted, then corruption | Return partial results, log error |
-| `EmptyDocumentWarning` | 0 rows extracted (not an error) | Return success with empty list |
-
----
-
-## Configuration
-
-```yaml
-parser:
-  parser_id: "bofa_pdf_parser"
-  version: "1.2.0"
-  supported_source_types:
-    - "bofa_pdf"
-  settings:
-    encoding: "utf-8"
-    strict_mode: false  # If true, fail on warnings
-    max_rows: 10000     # Prevent memory exhaustion
-```
-
 ---
 
 ## Multi-Domain Applicability
 
-This primitive constructs verifiable truth about **raw data extraction** - a universal concept across ALL domains:
-
-**Finance Domain:**
-- Parser: `bofa_pdf_parser`
-- Input: Bank statement PDF
-- Output: `ObservationTransaction[]` (date, amount, description, account)
-- Example: Extract 42 transactions from PDF table
-
-**Healthcare Domain:**
-- Parser: `lab_results_parser`
-- Input: Lab report PDF
-- Output: `ObservationLabResult[]` (test_name, value, unit, normal_range)
-- Example: Extract glucose, cholesterol, etc. from lab PDF
-
-**Legal Domain:**
-- Parser: `contract_parser`
-- Input: Contract PDF
-- Output: `ObservationClause[]` (clause_number, text, page_number)
-- Example: Extract clauses from legal contract
-
-**Research Domain (RSRCH - Utilitario):**
-- Parser: `web_page_fact_parser`
-- Input: TechCrunch HTML page
-- Output: `RawFact[]` (subject_entity, claim, fact_type, confidence)
-- Example: Extract founder investment facts from TechCrunch article
-
-**Manufacturing Domain:**
-- Parser: `sensor_log_parser`
-- Input: CSV from sensor
-- Output: `ObservationMeasurement[]` (timestamp, sensor_id, value, unit)
-- Example: Extract temperature readings from production line
-
-**Media Domain:**
-- Parser: `transcript_parser`
-- Input: Video transcript JSON
-- Output: `ObservationUtterance[]` (timestamp, speaker, text)
-- Example: Extract subtitles from video file
-
----
-
-## Implementation Example
-
-### Finance: Bank Statement Parser
-
-```python
-class BofAPDFParser(Parser):
-    parser_id = "bofa_pdf_parser"
-    version = "1.2.0"
-    supported_source_types = ["bofa_pdf"]
-
-    def can_parse(self, content: bytes) -> bool:
-        """Check if PDF has BoFA signature"""
-        text = extract_text_from_pdf(content)
-        return "BANK OF AMERICA" in text
-
-    def parse(self, content: bytes) -> List[Observation]:
-        """Extract transaction rows from PDF table"""
-        pdf = PyPDF2.PdfReader(BytesIO(content))
-        observations = []
-
-        for page in pdf.pages:
-            text = page.extract_text()
-            table = self._extract_table(text)
-
-            for row_id, row in enumerate(table):
-                observations.append(Observation(
-                    raw_data={
-                        "date": row[0],         # AS-IS: "01/15/2024"
-                        "description": row[1],  # AS-IS: "  STARBUCKS #1234  "
-                        "amount": row[2],       # AS-IS: "-5.75"
-                        "currency": "USD",      # Inferred from source_type
-                        "account": "bofa_debit" # Inferred from source_type
-                    },
-                    row_id=row_id,
-                    warnings=self._check_warnings(row)
-                ))
-
-        return observations
-
-    def _extract_table(self, text: str) -> List[List[str]]:
-        """Extract table from PDF text (domain-specific logic)"""
-        # ... implementation details ...
-        pass
-```
-
----
-
-## Performance Characteristics
-
-| Operation | Time Complexity | Notes |
-|-----------|-----------------|-------|
-| `parse()` | O(n) where n = file size | Dominated by PDF/CSV parsing |
-| `can_parse()` | O(1) | Quick signature check |
-
-**Benchmarks (PDF parser, 100-row statement):**
-- Parse latency: <5s (p95)
-- Memory usage: <50MB
-- Throughput: ~500 rows/second
-
----
-
-## Testing Strategy
-
-### Unit Tests
-
-```python
-def test_parse_valid_statement():
-    parser = BofAPDFParser()
-    content = read_file("test_data/bofa_jan_2024.pdf")
-
-    observations = parser.parse(content)
-
-    assert len(observations) == 42
-    assert observations[0].row_id == 0
-    assert observations[0].raw_data["date"] == "01/15/2024"
-
-def test_parse_empty_statement():
-    parser = BofAPDFParser()
-    content = read_file("test_data/bofa_empty.pdf")
-
-    observations = parser.parse(content)
-
-    assert len(observations) == 0  # Success, not error
-
-def test_parse_corrupted_pdf():
-    parser = BofAPDFParser()
-    content = b"corrupted data"
-
-    with pytest.raises(ParseError):
-        parser.parse(content)
-```
-
-### Golden Data Tests
-
-```python
-def test_parse_golden_data():
-    """Parse known file, verify exact output"""
-    parser = BofAPDFParser()
-    content = read_file("golden/bofa_statement.pdf")
-
-    observations = parser.parse(content)
-
-    # Load expected output
-    expected = json.load(open("golden/bofa_expected.json"))
-
-    assert len(observations) == len(expected)
-    for obs, exp in zip(observations, expected):
-        assert obs.raw_data == exp
-```
-
----
-
-## Security Considerations
-
-### 1. Resource Limits
-
-```python
-def parse(self, content: bytes) -> List[Observation]:
-    # Limit file size
-    if len(content) > 50 * 1024 * 1024:  # 50MB
-        raise ParseError("File too large")
-
-    # Limit rows extracted
-    observations = []
-    for row_id, row in enumerate(self.extract_rows(content)):
-        if row_id >= self.config['max_rows']:
-            raise ParseError(f"Too many rows (>{self.config['max_rows']})")
-
-        observations.append(...)
-
-    return observations
-```
-
-### 2. Sandboxing
-
-```python
-# Run parser in isolated process
-def run_parser_sandboxed(parser: Parser, content: bytes) -> List[Observation]:
-    with multiprocessing.Pool(1) as pool:
-        future = pool.apply_async(parser.parse, (content,))
-
-        try:
-            return future.get(timeout=60)  # 60s timeout
-        except TimeoutError:
-            raise ParseError("Parser timeout (>60s)")
-```
-
----
-
-## Observability
-
-### Metrics
-
-```python
-parser_operations_total{parser_id="bofa_pdf_parser", status="success"} 1234
-parser_operations_total{parser_id="bofa_pdf_parser", status="error"} 5
-parser_rows_extracted{parser_id="bofa_pdf_parser"} 52420
-parser_latency_seconds{parser_id="bofa_pdf_parser", quantile="0.95"} 4.2
-```
-
-### Logs
-
-```json
-{
-  "timestamp": "2025-10-23T14:35:00Z",
-  "level": "INFO",
-  "event": "parse.started",
-  "upload_id": "UL_abc123",
-  "parser_id": "bofa_pdf_parser",
-  "parser_version": "1.2.0",
-  "file_size_bytes": 245760
-}
-```
+**Finance:** Bank statement PDF → `bofa_pdf_parser` → ObservationTransaction[]
+**Healthcare:** Lab report PDF → `lab_results_parser` → ObservationLabResult[]
+**Legal:** Contract PDF → `contract_parser` → ObservationClause[]
+**RSRCH (Utilitario):** TechCrunch HTML → `web_fact_parser` → RawFact[]
+**E-commerce:** Supplier CSV → `supplier_csv_parser` → ObservationProduct[]
 
 ---
 
@@ -632,37 +645,27 @@ parser_latency_seconds{parser_id="bofa_pdf_parser", quantile="0.95"} 4.2
 
 ### ✅ Finance (Primary Instantiation)
 **Use case:** Extract raw transaction rows from bank statement PDFs
-**Example:** Bank of America PDF statement (42 rows) → `bofa_pdf_parser` extracts observations with raw_data `{"date": "01/15/2024", "amount": "-5.75", "description": "  STARBUCKS #1234  "}` (AS-IS strings, no validation) → 42 ObservationTransaction records in ObservationStore
-**Parser types:** `bofa_pdf_parser`, `chase_csv_parser`, `amex_ofx_parser`, `venmo_json_parser`
-**Observations extracted:** `ObservationTransaction` (date, amount, description, currency, account)
+**Example:** BoFA PDF (42 rows) → `bofa_pdf_parser` extracts AS-IS strings `{"date": "01/15/2024", "amount": "-5.75"}` → 42 ObservationTransaction records
 **Status:** ✅ Fully implemented in personal-finance-app
 
 ### ✅ Healthcare
 **Use case:** Extract lab test results from clinical lab report PDFs
-**Example:** Quest Diagnostics lab report PDF (8 tests) → `quest_pdf_parser` extracts observations with raw_data `{"test": "Glucose", "value": "95", "unit": "mg/dL", "date": "2024-03-15"}` (AS-IS strings) → 8 ObservationLabResult records
-**Parser types:** `quest_pdf_parser`, `labcorp_pdf_parser`, `hl7_message_parser`
-**Observations extracted:** `ObservationLabResult` (test_name, value, unit, normal_range, test_date)
+**Example:** Quest Diagnostics PDF (8 tests) → `quest_pdf_parser` extracts AS-IS `{"test": "Glucose", "value": "95", "unit": "mg/dL"}` → 8 ObservationLabResult records
 **Status:** ✅ Conceptually validated via examples in this doc
 
 ### ✅ Legal
 **Use case:** Extract clauses from contract PDFs
-**Example:** Contract PDF (25 pages, 47 clauses) → `contract_pdf_parser` extracts observations with raw_data `{"clause_num": "3.2", "text": "Payment due within 30 days...", "page": 5}` (AS-IS text) → 47 ObservationClause records
-**Parser types:** `contract_pdf_parser`, `court_filing_pdf_parser`, `deposition_transcript_parser`
-**Observations extracted:** `ObservationClause` (clause_number, text, page_number, section)
+**Example:** Contract PDF (47 clauses) → `contract_pdf_parser` extracts AS-IS text `{"clause_num": "3.2", "text": "Payment due within 30 days..."}` → 47 ObservationClause records
 **Status:** ✅ Conceptually validated via examples in this doc
 
 ### ✅ RSRCH (Utilitario Research)
-**Use case:** Extract founder investment facts from web articles (TechCrunch, Bloomberg)
-**Example:** TechCrunch article HTML (3,500 words) → `web_fact_parser` extracts observations with raw_data `{"text": "@sama invested $375M in OpenAI", "entity": "@sama", "amount": "$375M", "company": "OpenAI", "date": "2024-02-25"}` (AS-IS text extraction) → 12 RawFact records (article mentions multiple founders/investments)
-**Parser types:** `web_fact_parser` (TechCrunch, Bloomberg, Medium), `tweet_json_parser` (Twitter API), `podcast_transcript_parser` (Lex Fridman transcripts)
-**Observations extracted:** `RawFact` (subject_entity, claim, fact_type, source_url, publication_date)
+**Use case:** Extract founder investment facts from web articles
+**Example:** TechCrunch HTML → `web_fact_parser` extracts AS-IS `{"text": "@sama invested $375M in OpenAI", "entity": "@sama"}` → 12 RawFact records
 **Status:** ✅ Conceptually validated via examples in this doc
 
 ### ✅ E-commerce
 **Use case:** Extract product listings from supplier catalog CSVs
-**Example:** Supplier catalog CSV (1,500 products) → `supplier_csv_parser` extracts observations with raw_data `{"sku": "IPHONE15-256-BLU", "title": "  iPhone 15 Pro Max - 256GB  ", "price": "$1,199.99", "category": "Electronics > Phones"}` (AS-IS strings, with spaces) → 1,500 ObservationProduct records
-**Parser types:** `supplier_csv_parser`, `amazon_api_parser`, `shopify_export_parser`
-**Observations extracted:** `ObservationProduct` (SKU, title, price, category, description, image_url)
+**Example:** Supplier CSV (1500 products) → `supplier_csv_parser` extracts AS-IS `{"sku": "IPHONE15-256-BLU", "title": "  iPhone 15 Pro Max - 256GB  "}` → 1500 ObservationProduct records
 **Status:** ✅ Conceptually validated via examples in this doc
 
 **Validation Status:** ✅ **5 domains validated** (1 fully implemented, 4 conceptually verified)
