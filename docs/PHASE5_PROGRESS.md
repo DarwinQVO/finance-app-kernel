@@ -1,12 +1,12 @@
 # Phase 5: Refactoring Progress Report
 
-**Status:** In Progress (21/33 primitives complete - 64%)
+**Status:** In Progress (22/33 primitives complete - 67%)
 **Started:** 2025-10-27
 **Pattern:** Literate programming style with Spanish narrative + English code
 
 ---
 
-## Completed Primitives (21/33 - 64%)
+## Completed Primitives (22/33 - 67%)
 
 ### API/Auth System (8/8 complete ✅)
 
@@ -112,7 +112,7 @@
 
 ---
 
-### Other OL Primitives (5/11 complete)
+### Other OL Primitives (6/11 complete)
 
 17. ✅ **ParseLog** (commit 2686bec)
    - Personal (40 LOC): JSON files on disk
@@ -138,15 +138,21 @@
    - Enterprise (500 LOC): S3 storage, thumbnails, OCR, audit trails
    - Expansion: 410 lines → 638 lines (enriched with 7-step pattern)
 
-21. ✅ **StorageEngine** (commit pending)
+21. ✅ **StorageEngine** (commit 8e4d0f1)
    - Personal (150 LOC): Filesystem backend, hash-based dedupe, atomic writes
    - Small Business (300 LOC): Gzip compression (50% savings), 7-year GC, PostgreSQL metadata
    - Enterprise (1500 LOC): S3 storage, KMS encryption, streaming (>50MB), quota enforcement
    - Expansion: 961 lines → 618 lines (condensed -36%)
 
+22. ✅ **ObservationStore** (commit pending)
+   - Personal (80 LOC): SQLite with idempotent upsert (upload_id, row_id), JSON blob
+   - Small Business (200 LOC): Connection pooling (5 conn), additional indexes, 7-year retention
+   - Enterprise (1200 LOC): PostgreSQL, monthly partitioning (36 partitions), zstd compression (40%), read replicas
+   - Expansion: 769 lines → 574 lines (condensed -25%)
+
 ---
 
-## Pending Primitives (12/33 - 36%)
+## Pending Primitives (11/33 - 33%)
 
 ### Truth Construction (1 primitive remaining)
 - ⏳ ValidationEngine
@@ -158,8 +164,7 @@
 - ⏳ RetroactiveCorrector
 - ⏳ BitemporalQuery
 
-### Other OL Primitives (6 primitives remaining)
-- ⏳ ObservationStore
+### Other OL Primitives (5 primitives remaining)
 - ⏳ FuzzyMatcher
 - ⏳ ClusteringEngine
 - ⏳ RelationshipStore
@@ -266,20 +271,21 @@ primitive_name:
 ---
 
 **Status Summary:**
-- ✅ Pattern established and validated (21 primitives)
+- ✅ Pattern established and validated (22 primitives)
 - ✅ API/Auth system complete (8/8 primitives - 100%)
 - ✅ Truth Construction in progress (8/9 - 89%)
-- ✅ Other OL primitives in progress (5/11 - 45%)
-- ✅ Average ~25% condensation per primitive
-- ⏳ 12 primitives await systematic application
+- ✅ Other OL primitives in progress (6/11 - 55%)
+- ✅ Average ~27% condensation per primitive
+- ⏳ 11 primitives await systematic application
 - ⏳ Consistency review pending
 
 **Session Achievements:**
-- 21 primitives refactored (~5,600 lines total)
+- 22 primitives refactored (~6,200 lines total)
 - Pattern fully documented and replicable
 - FileArtifact enriched (410 → 638 lines, +56%)
 - StorageEngine condensed (961 → 618 lines, -36%)
-- 2 commits pending push
+- ObservationStore condensed (769 → 574 lines, -25%)
+- 1 commit pending push
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
