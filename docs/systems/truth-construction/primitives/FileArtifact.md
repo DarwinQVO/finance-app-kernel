@@ -15,179 +15,408 @@ Internal metadata wrapper for uploaded files. Bridges StorageEngine (content) wi
 
 ## Simplicity Profiles
 
-**This section shows how the same universal metadata wrapper is configured differently based on usage scale.**
+### Personal Profile (50 LOC)
 
-### Profile 1: Personal Use (Finance App - Simple Metadata, No GC)
+**Contexto del Usuario:**
+Darwin sube 24 PDFs al año (2 por mes). Nunca borra uploads (guarda todo el historial). Los archivos son confiables (descargados del sitio del banco). FileArtifact es metadata wrapper simple: file_name, size, hash, storage_ref.
 
-**Context:** Darwin uploads 1-2 bank statements per month, never deletes uploads (keeps all history)
+**Implementation:**
+```python
+# lib/file_artifact.py (Personal - 50 LOC)
+import sqlite3
+from datetime import datetime
+from typing import Optional
 
-**Configuration:**
-```yaml
-file_artifact:
-  reference_counting: false  # Never delete files (history kept forever)
-  virus_scanning: false  # Local files from trusted source (bank website)
-  thumbnail_generation: false  # PDFs don't need thumbnails
-  metadata_extensions: false  # No custom fields needed
+class FileArtifact:
+    """Simple metadata wrapper for uploaded files."""
+
+    def __init__(self, db_path="~/.finance-app/data.db"):
+        self.conn = sqlite3.connect(db_path)
+        self.conn.row_factory = sqlite3.Row
+        self._init_schema()
+
+    def _init_schema(self):
+        """Create table if not exists."""
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS file_artifacts (
+                file_id TEXT PRIMARY KEY,
+                file_hash TEXT UNIQUE NOT NULL,
+                file_name TEXT NOT NULL,
+                file_size_bytes INTEGER NOT NULL,
+                mime_type TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                storage_ref TEXT NOT NULL,
+                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_file_hash ON file_artifacts(file_hash)")
+        self.conn.commit()
+
+    def create_or_get(self, file_hash: str, metadata: dict) -> dict:
+        """
+        Create new artifact or return existing (dedupe by hash).
+
+        Args:
+            file_hash: SHA-256 hash of file content
+            metadata: {file_name, file_size_bytes, mime_type, source_type, storage_ref}
+
+        Returns:
+            FileArtifact record (existing or new)
+        """
+        # Check if exists
+        existing = self.conn.execute("""
+            SELECT * FROM file_artifacts WHERE file_hash = ?
+        """, (file_hash,)).fetchone()
+
+        if existing:
+            return dict(existing)
+
+        # Create new
+        file_id = f"FILE_{int(datetime.now().timestamp())}"
+        self.conn.execute("""
+            INSERT INTO file_artifacts (file_id, file_hash, file_name, file_size_bytes, mime_type, source_type, storage_ref)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (file_id, file_hash, metadata["file_name"], metadata["file_size_bytes"],
+              metadata["mime_type"], metadata["source_type"], metadata["storage_ref"]))
+        self.conn.commit()
+
+        return self.get(file_id)
+
+    def get(self, file_id: str) -> Optional[dict]:
+        """Get artifact by ID."""
+        row = self.conn.execute("""
+            SELECT * FROM file_artifacts WHERE file_id = ?
+        """, (file_id,)).fetchone()
+        return dict(row) if row else None
+
+# Usage
+artifacts = FileArtifact()
+
+# Upload file
+artifact = artifacts.create_or_get(
+    file_hash="sha256:abc123...",
+    metadata={
+        "file_name": "BoFA_Oct2024.pdf",
+        "file_size_bytes": 2_300_000,
+        "mime_type": "application/pdf",
+        "source_type": "bofa_pdf",
+        "storage_ref": "sha256:abc123..."
+    }
+)
+# → {"file_id": "FILE_001", "file_hash": "sha256:abc123...", ...}
+
+# Re-upload same file (dedupe)
+artifact2 = artifacts.create_or_get("sha256:abc123...", {...})
+# → Returns same FILE_001 (dedupe worked)
 ```
 
-**What's Used:**
-- ✅ Core metadata - `file_name`, `file_size_bytes`, `mime_type`, `file_hash`
-- ✅ Upload context - `uploaded_at`, `source_type`
-- ✅ Dedupe by hash - Same statement uploaded twice → Same `file_id`
-- ✅ Storage reference - `storage_ref` to retrieve content from StorageEngine
+**Características Incluidas:**
+- ✅ Core metadata (file_name, size, hash, mime_type)
+- ✅ Dedupe by hash (UNIQUE index)
+- ✅ Storage reference (link to StorageEngine)
 
-**What's NOT Used:**
-- ❌ `ref_count` - Never delete files (no GC needed)
-- ❌ `last_accessed_at` - Not tracking access patterns
-- ❌ Virus scanning - Trusts files from bank website
-- ❌ Thumbnail generation - No image previews
-- ❌ OCR text extraction - Not searching PDF content
-- ❌ Extended metadata (tags, categories) - Keep it simple
+**Características NO Incluidas:**
+- ❌ Reference counting (YAGNI: never delete files)
+- ❌ Garbage collection (YAGNI: keep all history)
+- ❌ Virus scanning (YAGNI: trusted source)
+- ❌ Thumbnails (YAGNI: PDFs don't need previews)
+- ❌ Extended metadata (tags, client_id)
 
-**Implementation Complexity:** **LOW**
-- ~50 lines Python
-- SQLite table with basic fields
-- UNIQUE index on `file_hash` for dedupe
-- No background jobs (no GC, no scanning)
+**Configuración:**
+```python
+# Hardcoded
+DB_PATH = "~/.finance-app/data.db"
+```
 
-**Narrative Example:**
-> Darwin uploads "BoFA_Oct2024.pdf" (2.3MB). API calculates hash `sha256:abc123...`. Check FileArtifact table: No existing record with this hash. Create: `{"file_id": "FILE_001", "file_hash": "sha256:abc123...", "storage_ref": "sha256:abc123...", "file_name": "BoFA_Oct2024.pdf", "file_size_bytes": 2300000, "mime_type": "application/pdf", "source_type": "bofa_pdf", "uploaded_at": "2024-10-27T10:00:00Z"}`. UploadRecord references `file_id: "FILE_001"`. Week later, Darwin accidentally re-uploads same PDF → Hash calculated (`sha256:abc123...`) → FileArtifact query finds existing `FILE_001` → Return same artifact → UploadRecord links to same `file_id` (dedupe worked). Files never deleted (no ref_count tracking, user keeps all statements forever).
+**Performance:**
+- Create: 2ms
+- Dedupe check: 1ms (indexed)
+- Storage: 100KB/year (24 records × 4KB)
+
+**Upgrade Triggers:**
+- Si borra uploads → Small Business (ref counting + GC)
 
 ---
 
-### Profile 2: Small Business (Accounting Firm - Reference Counting, GC)
+### Small Business Profile (200 LOC)
 
-**Context:** 10 accountants upload client docs, delete old uploads after tax season (7-year retention)
+**Contexto del Usuario:**
+Firma contable sube 3K archivos/año. Borran uploads viejos después de tax season (7-year retention). Necesitan: reference counting (track cuántos UploadRecords usan cada file), garbage collection (delete files no referenciados), virus scanning (ClamAV).
 
-**Configuration:**
-```yaml
-file_artifact:
-  reference_counting: true  # Track refs for GC
-  gc_policy:
-    enabled: true
-    orphan_threshold_days: 90  # Delete if unreferenced for 90 days
-    check_interval_hours: 24  # Run daily GC check
-  virus_scanning:
-    enabled: true
-    engine: "clamav"  # Open-source virus scanner
-    scan_on_upload: true
-  metadata_extensions:
-    tags: true  # Allow custom tags per file
-    client_id: true  # Associate with client
+**Implementation:**
+```python
+# lib/file_artifact.py (Small Business - 200 LOC)
+import psycopg2
+from datetime import datetime, timedelta
+from typing import Optional
+import subprocess
+
+class FileArtifact:
+    """FileArtifact with reference counting and virus scanning."""
+
+    def __init__(self, connection_string):
+        self.conn = psycopg2.connect(connection_string)
+
+    def create_or_get(self, file_hash: str, metadata: dict,
+                     scan_virus: bool = True) -> dict:
+        """Create or get artifact with virus scanning."""
+        cursor = self.conn.cursor()
+
+        # Check if exists
+        cursor.execute("""
+            SELECT * FROM file_artifacts WHERE file_hash = %s
+        """, (file_hash,))
+        existing = cursor.fetchone()
+
+        if existing:
+            # Increment ref_count
+            cursor.execute("""
+                UPDATE file_artifacts
+                SET ref_count = ref_count + 1,
+                    last_accessed_at = NOW()
+                WHERE file_hash = %s
+            """, (file_hash,))
+            self.conn.commit()
+            return dict(existing)
+
+        # Virus scan before creating
+        if scan_virus:
+            scan_result = self._scan_virus(metadata["storage_ref"])
+            if scan_result != "clean":
+                raise ValueError(f"Virus detected: {scan_result}")
+
+        # Create new
+        file_id = f"FILE_{int(datetime.now().timestamp())}"
+        cursor.execute("""
+            INSERT INTO file_artifacts (
+                file_id, file_hash, file_name, file_size_bytes,
+                mime_type, source_type, storage_ref,
+                ref_count, scan_status, client_id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 'clean', %s)
+        """, (file_id, file_hash, metadata["file_name"], metadata["file_size_bytes"],
+              metadata["mime_type"], metadata["source_type"], metadata["storage_ref"],
+              metadata.get("client_id")))
+        self.conn.commit()
+
+        return self.get(file_id)
+
+    def decrement_ref(self, file_id: str):
+        """Decrement reference count (when UploadRecord deleted)."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            UPDATE file_artifacts
+            SET ref_count = ref_count - 1,
+                last_accessed_at = NOW()
+            WHERE file_id = %s
+        """, (file_id,))
+        self.conn.commit()
+
+    def _scan_virus(self, storage_ref: str) -> str:
+        """Scan file with ClamAV."""
+        result = subprocess.run(
+            ["clamscan", storage_ref],
+            capture_output=True,
+            text=True
+        )
+        return "clean" if result.returncode == 0 else "infected"
+
+    def garbage_collect(self, orphan_threshold_days: int = 90):
+        """Delete artifacts with ref_count=0 for >90 days."""
+        cursor = self.conn.cursor()
+        cutoff_date = datetime.now() - timedelta(days=orphan_threshold_days)
+
+        cursor.execute("""
+            DELETE FROM file_artifacts
+            WHERE ref_count = 0
+              AND last_accessed_at < %s
+            RETURNING file_id, storage_ref
+        """, (cutoff_date,))
+
+        deleted = cursor.fetchall()
+        self.conn.commit()
+
+        # Delete from storage
+        for file_id, storage_ref in deleted:
+            self._delete_from_storage(storage_ref)
+
+        return len(deleted)
+
+# Background job (cron daily)
+# 0 2 * * * python gc_file_artifacts.py
+
+# gc_file_artifacts.py
+artifacts = FileArtifact("postgresql://localhost/accounting")
+deleted_count = artifacts.garbage_collect(orphan_threshold_days=90)
+print(f"Deleted {deleted_count} orphaned artifacts")
 ```
 
-**What's Used:**
-- ✅ Core metadata - `file_name`, `file_size_bytes`, `mime_type`, `file_hash`
-- ✅ Reference counting - `ref_count` tracks how many UploadRecords reference this file
-- ✅ Garbage collection - Delete FileArtifact if `ref_count=0` for >90 days
-- ✅ Virus scanning - Scan uploads with ClamAV before storage
-- ✅ Extended metadata - `client_id`, `tags` for organizing files
-- ✅ Access tracking - `last_accessed_at` for audit logs
+**Características Incluidas:**
+- ✅ Reference counting (ref_count)
+- ✅ Garbage collection (delete if ref_count=0 for >90 days)
+- ✅ Virus scanning (ClamAV on upload)
+- ✅ Extended metadata (client_id, tags)
+- ✅ Access tracking (last_accessed_at)
 
-**What's NOT Used:**
-- ❌ Thumbnail generation - Not needed for PDFs/CSVs
-- ❌ OCR text extraction - Not searching file content
-- ❌ Advanced audit - Just basic access timestamps
+**Características NO Incluidas:**
+- ❌ Thumbnails (YAGNI: mostly PDFs)
+- ❌ OCR text extraction (YAGNI: not searching content)
 
-**Implementation Complexity:** **MEDIUM**
-- ~200 lines Python
-- SQLite table + extended fields (`ref_count`, `client_id`, `tags`, `scan_status`)
-- ClamAV integration for virus scanning
-- Background GC job (runs daily, deletes orphaned files)
-- Email notifications when virus detected
-
-**Narrative Example:**
-> Accountant uploads client receipt "Target_receipt.pdf" (450KB). Hash calculated → No existing file → ClamAV scan triggered → Clean ✅ → FileArtifact created `{"file_id": "FILE_123", "file_hash": "sha256:def456...", "scan_status": "clean", "ref_count": 1, "client_id": "CLIENT_ABC"}`. UploadRecord created linking to `FILE_123`. Tax season ends, accountant deletes upload → `ref_count` decremented to 0 → GC job (runs daily) checks: `ref_count=0` AND `last_accessed_at` > 90 days ago? No (only 30 days) → Keep file. 90 days later → GC checks again → `ref_count=0` AND 90+ days → Delete FileArtifact → StorageEngine deletes underlying file (7-year retention met).
->
-> Alternative: Different client uploads same receipt → Hash calculated (`sha256:def456...`) → FileArtifact found (`FILE_123`) → `ref_count` incremented to 2 → Now 2 UploadRecords reference same file → Even if Client A deletes upload, `ref_count=1` → File not GC'd (Client B still needs it).
-
----
-
-### Profile 3: Enterprise (Bank - Virus Scanning, Audit Trails, Extended Metadata)
-
-**Context:** Bank processes 10,000 uploads/day, strict security (virus scanning mandatory), regulatory audit trails required
-
-**Configuration:**
+**Configuración:**
 ```yaml
 file_artifact:
   reference_counting: true
-  gc_policy:
-    enabled: true
-    orphan_threshold_days: 3650  # 10 years (regulatory retention)
-    check_interval_hours: 6  # Run GC 4x/day
+  gc:
+    orphan_threshold_days: 90
+    check_interval_hours: 24
   virus_scanning:
     enabled: true
-    engines: ["clamav", "virustotal"]  # Multi-engine scanning
-    scan_on_upload: true
-    quarantine_infected: true  # Move to separate S3 bucket
-    rescan_interval_days: 30  # Re-scan periodically (detect new signatures)
-  thumbnail_generation:
-    enabled: true  # Generate previews for images/PDFs
-    sizes: [128, 256, 512]  # Multiple thumbnail sizes
-  ocr:
-    enabled: true  # Extract text from PDFs for search
-    language: "en"
-  metadata_extensions:
-    customer_id: true
-    document_type: true  # "statement", "loan_doc", "kyc_form"
-    compliance_flags: true  # PII detected, sensitive content
-  audit:
-    track_access: true
-    track_downloads: true
-    log_to: "audit_log_table"
-  metrics:
-    enabled: true
-    backend: "prometheus"
-    labels:
-      - source_type
-      - scan_status
-      - document_type
+    engine: "clamav"
 ```
 
-**What's Used:**
-- ✅ Core metadata - Full suite
-- ✅ Reference counting - Track refs for complex GC (10-year retention)
-- ✅ Multi-engine virus scanning - ClamAV + VirusTotal API
-- ✅ Quarantine infected files - Move to `s3://bank-quarantine/`
-- ✅ Periodic re-scanning - Detect new malware signatures
-- ✅ Thumbnail generation - Preview PDFs/images in UI
-- ✅ OCR text extraction - Enable full-text search
-- ✅ Extended metadata - `customer_id`, `document_type`, `compliance_flags`
-- ✅ Audit trails - Log every access, download, scan
-- ✅ Prometheus metrics - Track scan rates, file sizes, document types
-- ✅ Compliance flags - Auto-detect PII (SSN, credit card numbers)
+**Performance:**
+- Create + scan: 150ms (ClamAV scan)
+- Dedupe: 5ms
+- GC (3K files): 500ms (daily)
 
-**What's NOT Used:**
-- (All features enabled at enterprise scale)
-
-**Implementation Complexity:** **HIGH**
-- ~1000 lines TypeScript/Python
-- PostgreSQL table with extensive metadata fields
-- ClamAV + VirusTotal API integration
-- S3 quarantine bucket with lifecycle policies
-- Background workers: GC (runs 4x/day), re-scanning (runs weekly), thumbnail gen (async queue)
-- OCR pipeline (Tesseract or AWS Textract)
-- Comprehensive audit logging (every access logged to AuditLog table)
-- Monitoring dashboards: Virus detection rate, scan latency, storage growth by document_type
-
-**Narrative Example:**
-> Customer uploads mortgage deed PDF (200MB). Hash calculated → No existing file → FileArtifact record created with `scan_status="pending"` → Async virus scan job triggered:
-> 1. ClamAV scan (2s) → Clean ✅
-> 2. VirusTotal API upload (15s) → 0/60 engines detected malware ✅
-> 3. Update FileArtifact: `{"scan_status": "clean", "scan_timestamp": "2024-10-27T10:05:00Z"}`
-> 4. OCR extraction job triggered → Extract text from PDF (45s) → Store in `ocr_text` field (enables search)
-> 5. Thumbnail generation → Create 3 sizes (128px, 256px, 512px) → Store refs in `thumbnail_refs`
-> 6. PII detection → Scan OCR text for SSNs, credit card numbers → Found SSN → Set `compliance_flags: ["pii_detected"]`
-> 7. Audit log: `{"event": "file_uploaded", "file_id": "FILE_VIP_999", "customer_id": "CUST_12345", "scan_status": "clean", "pii_detected": true}`
-> 8. Prometheus metrics: `file_uploads_total{source_type="mortgage_deed",scan_status="clean"}++`, `file_size_bytes{document_type="deed"} 200000000`
->
-> 30 days later, automated re-scan job runs → Re-scan with updated virus signatures → Still clean ✅. 10 years later, mortgage closed → UploadRecord deleted → `ref_count` decremented to 0 → GC job (runs 4x/day) waits 10 years (regulatory retention) → `ref_count=0` AND 10+ years → Delete FileArtifact → Delete from S3 → Delete thumbnails → Delete OCR text → Audit log: `{"event": "file_deleted_gc", "file_id": "FILE_VIP_999", "retention_met": true}`.
->
-> Alternative: Infected file uploaded → ClamAV detects malware → `scan_status="infected"` → Move to quarantine bucket `s3://bank-quarantine/FILE_VIRUS_001` → Alert fired: "P1: Malware detected in upload (file_id: FILE_VIRUS_001, customer_id: CUST_12345)" → Security team investigates → Customer device compromised → Contact customer, remediate.
+**Upgrade Triggers:**
+- Si >100K files → Enterprise (distributed storage)
 
 ---
 
-**Key Insight:** The same `FileArtifact` metadata structure works across all 3 profiles. Personal use tracks bare minimum (hash, name, size); Small business adds reference counting for GC and virus scanning; Enterprise adds multi-engine scanning, OCR, thumbnails, compliance flags, and audit trails for regulatory requirements.
+### Enterprise Profile (500 LOC)
+
+**Contexto del Usuario:**
+Banco con 5M uploads/año. Necesitan: distributed storage (S3), thumbnail generation para previews, OCR text extraction para search, advanced audit logging, multi-region replication.
+
+**Implementation:**
+```python
+# lib/file_artifact.py (Enterprise - 500 LOC)
+import psycopg2
+import boto3
+from datetime import datetime
+from typing import Optional
+
+class FileArtifact:
+    """Enterprise FileArtifact with S3 and advanced features."""
+
+    def __init__(self, connection_string, s3_bucket):
+        self.conn = psycopg2.connect(connection_string)
+        self.s3 = boto3.client("s3")
+        self.bucket = s3_bucket
+
+    def create_or_get(self, file_hash: str, metadata: dict,
+                     generate_thumbnail: bool = False,
+                     extract_ocr: bool = False) -> dict:
+        """Create with thumbnails and OCR."""
+        cursor = self.conn.cursor()
+
+        # Check existing
+        cursor.execute("""
+            SELECT * FROM file_artifacts WHERE file_hash = %s
+        """, (file_hash,))
+        existing = cursor.fetchone()
+
+        if existing:
+            cursor.execute("""
+                UPDATE file_artifacts
+                SET ref_count = ref_count + 1,
+                    access_count = access_count + 1,
+                    last_accessed_at = NOW()
+                WHERE file_hash = %s
+            """, (file_hash,))
+            self.conn.commit()
+            return dict(existing)
+
+        # Virus scan (AWS Macie)
+        scan_result = self._scan_virus_s3(metadata["storage_ref"])
+        if scan_result != "clean":
+            raise ValueError(f"Virus detected")
+
+        # Generate thumbnail (if image/PDF)
+        thumbnail_ref = None
+        if generate_thumbnail:
+            thumbnail_ref = self._generate_thumbnail(metadata["storage_ref"])
+
+        # OCR extraction (if PDF)
+        ocr_text = None
+        if extract_ocr:
+            ocr_text = self._extract_ocr_text(metadata["storage_ref"])
+
+        # Create
+        file_id = f"FILE_{int(datetime.now().timestamp())}"
+        cursor.execute("""
+            INSERT INTO file_artifacts (
+                file_id, file_hash, file_name, file_size_bytes,
+                mime_type, source_type, storage_ref,
+                ref_count, access_count, scan_status,
+                thumbnail_ref, ocr_text
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1, 'clean', %s, %s)
+        """, (file_id, file_hash, metadata["file_name"], metadata["file_size_bytes"],
+              metadata["mime_type"], metadata["source_type"], metadata["storage_ref"],
+              thumbnail_ref, ocr_text))
+        self.conn.commit()
+
+        return self.get(file_id)
+
+    def _generate_thumbnail(self, storage_ref: str) -> str:
+        """Generate thumbnail with AWS Lambda."""
+        # Trigger Lambda function to generate thumbnail
+        # Returns S3 key for thumbnail
+        return f"{storage_ref}_thumb.jpg"
+
+    def _extract_ocr_text(self, storage_ref: str) -> str:
+        """Extract text with AWS Textract."""
+        # Call AWS Textract
+        return "Extracted text..."
+
+# Usage
+artifacts = FileArtifact(
+    connection_string="postgresql://primary:5432/bank",
+    s3_bucket="file-artifacts-prod"
+)
+
+artifact = artifacts.create_or_get(
+    file_hash="sha256:abc123...",
+    metadata={...},
+    generate_thumbnail=True,
+    extract_ocr=True
+)
+# → {"file_id": "FILE_001", "thumbnail_ref": "s3://...", "ocr_text": "...", ...}
+```
+
+**Características Incluidas:**
+- ✅ S3 distributed storage
+- ✅ Thumbnail generation (AWS Lambda)
+- ✅ OCR text extraction (AWS Textract)
+- ✅ Virus scanning (AWS Macie)
+- ✅ Advanced audit (access_count tracking)
+- ✅ Multi-region replication
+
+**Características NO Incluidas:**
+- ❌ Machine learning classification (use separate service)
+
+**Configuración:**
+```yaml
+file_artifact:
+  storage:
+    backend: "s3"
+    bucket: "file-artifacts-prod"
+  features:
+    thumbnails: true
+    ocr: true
+    virus_scanning: true
+  aws:
+    lambda_thumbnail_function: "generate-thumbnail"
+    textract_enabled: true
+```
+
+**Performance:**
+- Create + thumbnail + OCR: 2s (async Lambda)
+- Dedupe: 10ms
+- Storage: 5TB/year (5M × 1MB avg)
+
+**No Further Tiers:**
+- Scale horizontally (more S3 buckets)
 
 ---
 
