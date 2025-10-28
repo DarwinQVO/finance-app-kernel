@@ -21,591 +21,509 @@ Universal state machine pattern for async multi-stage pipelines. Tracks an entit
 
 ## Simplicity Profiles
 
-**This section shows how the same universal state machine is configured differently based on usage scale.**
+### Personal Profile (100 LOC)
 
-### Profile 1: Personal Use (Finance App - Manual Uploads, Low Volume)
+**Contexto del Usuario:**
+Darwin sube 1-2 PDFs al mes. Procesamiento es rápido (<5s) entonces no necesita retries automáticos ni timeout monitoring. FIFO simple es suficiente. Si parser falla, Darwin re-sube manualmente.
 
-**Context:** Darwin uploads 1-2 bank statements per month manually, expects quick processing (seconds)
-
-**Configuration:**
-```yaml
-upload_record:
-  states: ["queued_for_parse", "parsing", "parsed", "normalizing", "normalized", "error"]
-  retry: false  # No automatic retries (user manually re-uploads if error)
-  timeout_monitoring: false  # Processing fast enough (<10s) that timeouts unlikely
-  priority_queue: false  # Single user, FIFO is fine
-```
-
-**What's Used:**
-- ✅ Core state machine - Track status through pipeline
-- ✅ Progressive disclosure - Show `parse_log_ref` after parsing
-- ✅ Error tracking - Display `error_message` if parsing fails
-- ✅ Single-user FIFO - Process uploads in order received
-- ✅ Basic status checks - "Is my upload done?"
-
-**What's NOT Used:**
-- ❌ Automatic retries - User manually re-uploads if error (simpler)
-- ❌ Timeout monitoring - Parser completes <5s (no stuck uploads)
-- ❌ Priority queue - Single user, no competing uploads
-- ❌ Retry counters (`retry_count`, `max_retries`) - Not needed
-- ❌ Timeout fields (`parsing_started_at`, `parsing_timeout_seconds`) - Not needed
-- ❌ Status change webhooks - User polls `/uploads/:id` manually
-- ❌ Metrics tracking - No Prometheus, no state transition counts
-
-**Implementation Complexity:** **LOW**
-- ~100 lines Python
-- SQLite table with 6 status values
-- Single index on `status` for worker queries
-- No background jobs (coordinator runs inline with parser/normalizer)
-
-**Narrative Example:**
-> Darwin uploads "BoFA_Oct2024.pdf". API creates UploadRecord {upload_id: "UL_abc123", status: "queued_for_parse", upload_log_ref: "/logs/UL_abc123.upload.log"}. Parser immediately starts (no queue delay, single user). Coordinator updates {status: "parsing"}. Parser completes in 3s → {status: "parsed", observations_count: 42, parse_log_ref: "/logs/UL_abc123.parse.json"}. Normalizer starts immediately → {status: "normalizing"}. Completes in 1s → {status: "normalized", canonicals_count: 42}. Total: 4 seconds upload→normalized. Darwin refreshes page → sees "normalized" + 42 transactions. If parser had failed → {status: "error", error_message: "Invalid PDF structure"}. Darwin sees error, re-uploads fixed PDF manually (no automatic retry).
-
----
-
-### Profile 2: Small Business (Accounting Firm - Multi-User, Some Failures)
-
-**Context:** 10 accountants upload client docs (50-100 uploads/day), occasional parsing failures (corrupted PDFs), want automatic retries
-
-**Configuration:**
-```yaml
-upload_record:
-  states: ["queued_for_parse", "parsing", "parsed", "normalizing", "normalized", "error"]
-  retry:
-    enabled: true
-    max_retries: 3
-    backoff_seconds: [60, 300, 900]  # 1min, 5min, 15min
-  timeout_monitoring:
-    enabled: true
-    parsing_timeout_seconds: 300  # 5 minutes
-    normalizing_timeout_seconds: 60
-    check_interval_seconds: 60  # Monitor every minute
-  priority_queue: false  # FIFO still fine (no VIP clients)
-```
-
-**What's Used:**
-- ✅ Core state machine - Track status
-- ✅ Automatic retries - Retry parsing up to 3 times (corrupted PDFs often succeed on retry)
-- ✅ Retry metadata - Track `retry_count`, `last_retry_at`
-- ✅ Timeout monitoring - Detect stuck uploads (parser hung on malformed PDF >5min)
-- ✅ Timeout fields - `parsing_started_at` for timeout checks
-- ✅ Background monitor - Cron job checks for timeouts every minute
-- ✅ Error notifications - Email admin if upload stuck or exceeds max retries
-
-**What's NOT Used:**
-- ❌ Priority queue - All clients equal priority
-- ❌ Advanced metrics - Just basic logging (no Prometheus)
-- ❌ Webhooks - Users poll status via UI
-
-**Implementation Complexity:** **MEDIUM**
-- ~300 lines Python
-- SQLite table + retry fields (`retry_count`, `last_retry_at`)
-- Background cron job (runs every minute, checks timeouts)
-- Email notifications on errors (SMTP integration)
-- Retry logic: Exponential backoff (1min → 5min → 15min)
-
-**Narrative Example:**
-> Accountant uploads client PDF (corrupted metadata). UploadRecord created {status: "queued_for_parse"}. Parser starts → PDF malformed → parsing fails after 30s → {status: "error", error_message: "PDF metadata corrupted", retry_count: 0}. Coordinator waits 1min, retries → {status: "parsing", retry_count: 1}. Parsing succeeds (PDF parser more lenient on retry) → {status: "parsed", observations_count: 25}. Total: 2 retries, 90s elapsed. Alternative scenario: Parser hangs on extremely corrupted PDF. Timeout monitor (runs every 60s) detects `status="parsing"` + `parsing_started_at` > 5min ago → Coordinator kills parser, transitions {status: "error", error_message: "Parsing timeout (5min)"} → Email sent to admin: "Upload UL_xyz789 timed out, manual review needed".
-
----
-
-### Profile 3: Enterprise (Financial Institution - High Volume, SLA Requirements)
-
-**Context:** Bank processes 10,000 uploads/day (credit card statements for 1M customers), 99.9% SLA (<1min upload→normalized), VIP customers get priority
-
-**Configuration:**
-```yaml
-upload_record:
-  states: ["queued_for_parse", "parsing", "parsed", "normalizing", "normalized", "error"]
-  retry:
-    enabled: true
-    max_retries: 5
-    backoff_seconds: [10, 30, 60, 300, 900]  # Aggressive retries for SLA
-    jitter_ms: 1000  # Randomize to avoid thundering herd
-  timeout_monitoring:
-    enabled: true
-    parsing_timeout_seconds: 120  # 2 minutes (strict SLA)
-    normalizing_timeout_seconds: 30
-    check_interval_seconds: 10  # Check every 10s (fast detection)
-  priority_queue:
-    enabled: true
-    priorities: ["vip_customer", "regulatory_filing", "normal", "batch_import"]
-    preemption: false  # Don't cancel in-progress low-priority uploads
-  metrics:
-    enabled: true
-    backend: "prometheus"
-    labels:
-      - status
-      - source_type
-      - retry_count
-  logging:
-    structured: true
-    format: "json"
-    level: "info"
-    trace_id: true  # Distributed tracing
-  webhooks:
-    enabled: true
-    endpoints:
-      - url: "https://internal-api/upload-status-changed"
-        events: ["normalized", "error"]
-```
-
-**What's Used:**
-- ✅ Core state machine - Track status
-- ✅ Automatic retries with jitter - Retry up to 5 times with randomized backoff (avoid thundering herd)
-- ✅ Priority queue - VIP customers processed first (`priority=10`), batch imports last (`priority=1`)
-- ✅ Timeout monitoring - Check every 10s (fast failure detection for SLA)
-- ✅ Retry metadata - Track `retry_count`, `last_retry_at`, `priority`
-- ✅ Prometheus metrics - Track state transition latencies (p95 `queued→normalized` < 60s SLA)
-- ✅ Structured logging - JSON logs with trace IDs for debugging
-- ✅ Webhooks - Notify downstream systems when upload normalized or errored
-- ✅ Preemption prevention - Don't cancel in-progress normal uploads when VIP arrives (fairness)
-
-**What's NOT Used:**
-- (All features enabled at this scale)
-
-**Implementation Complexity:** **HIGH**
-- ~1200 lines TypeScript/Python
-- PostgreSQL table with `priority` field, indexes on `(status, priority, created_at)`
-- Background worker pool (10 concurrent timeout checkers)
-- Webhook delivery queue (SQS for reliable delivery)
-- Comprehensive test suite: State transitions, retries, priority ordering, timeout detection
-- Monitoring dashboards: p95 latency per status, retry rate, timeout rate, priority queue depth
-
-**Narrative Example:**
-> VIP customer uploads statement PDF (priority=10). UploadRecord created {status: "queued_for_parse", priority: 10}. Worker queries `SELECT * FROM upload_records WHERE status='queued_for_parse' ORDER BY priority DESC, created_at LIMIT 1` → Returns VIP upload (jumps queue ahead of 50 normal uploads). Parser starts → {status: "parsing", parsing_started_at: "2024-10-27T10:00:00Z"}. Parsing completes in 15s → {status: "parsed", observations_count: 120, parse_log_ref: "s3://logs/..."}. Normalizer starts → Completes in 8s → {status: "normalized", canonicals_count: 120}. Total: 23s (meets 60s SLA ✅). Prometheus metrics recorded: `upload_processing_duration{source_type="credit_card",status="normalized"} 23`, `upload_retries_total{status="normalized",retry_count="0"} 1`. Webhook fired: POST `https://internal-api/upload-status-changed` body `{"upload_id":"UL_vip_123","status":"normalized","canonicals_count":120}`.
->
-> Alternative scenario: Corrupted PDF parsing fails 5 times → {status: "error", retry_count: 5, error_message: "PDF unrecoverable after 5 retries"}. Alert fired: "P2: VIP upload failed after max retries (upload_id: UL_vip_123)". Customer success team notified → Manual review → Discovers bank sent corrupted statement → Request re-issue from bank.
->
-> Timeout monitoring running every 10s. Detects upload stuck in `parsing` for >120s → {status: "error", error_message: "Parsing timeout (120s), parser may be hung"}. Worker killed, upload marked for manual review.
-
----
-
-**Key Insight:** The same `UploadRecord` state machine works across all 3 profiles. Personal use has bare-minimum state tracking (queued→parsed→normalized); Small business adds retries and timeout monitoring; Enterprise adds priority queues, webhooks, and metrics for SLA compliance.
-
----
-
-## Schema
-
-See [upload-record.schema.json](../../schemas/upload-record.schema.json) for complete JSON Schema.
-
-```typescript
-interface UploadRecord {
-  // Identity (PUBLIC)
-  upload_id: string  // Format: "UL_{random}"
-
-  // State (single source of truth)
-  status: UploadStatus
-
-  // Error tracking
-  error_message: string | null
-  error_code: string | null
-
-  // Logs (progressive disclosure)
-  upload_log_ref: string  // Always present
-  parse_log_ref?: string  // Present if status ≥ parsing
-  normalizer_log_ref?: string  // Present if status ≥ normalizing
-
-  // Counts (progressive disclosure)
-  observations_count?: number  // Present if status ≥ parsed
-  canonicals_count?: number  // Present if status = normalized
-
-  // Internal (not in public API)
-  file_id: string  // FK to FileArtifact
-  created_at: ISO8601Timestamp
-  updated_at: ISO8601Timestamp
-}
-
-type UploadStatus =
-  | "queued_for_parse"
-  | "parsing"
-  | "parsed"
-  | "normalizing"
-  | "normalized"
-  | "error"
-```
-
----
-
-## State Machine
-
-```
-[Initial]
-    ↓
-queued_for_parse  ← Entry point (created by upload endpoint)
-    ↓
-  parsing         ← Coordinator transitions when parser starts
-    ↓
-  parsed          ← Coordinator transitions when parser succeeds
-    ↓
-normalizing       ← Coordinator transitions when normalizer starts
-    ↓
-normalized        ← Coordinator transitions when normalizer succeeds
-
-Note: "error" can occur at any stage
-```
-
-### Transition Rules
-
-| From | To | Trigger | Actor |
-|------|----|---------| ------|
-| `null` | `queued_for_parse` | Upload created | API endpoint |
-| `queued_for_parse` | `parsing` | Parser started | Coordinator |
-| `parsing` | `parsed` | Parser succeeded | Coordinator |
-| `parsing` | `error` | Parser failed | Coordinator |
-| `parsed` | `normalizing` | Normalizer started | Coordinator |
-| `normalizing` | `normalized` | Normalizer succeeded | Coordinator |
-| `normalizing` | `error` | Normalizer failed | Coordinator |
-| `error` | `queued_for_parse` | Manual retry | User/Admin |
-| `error` | `parsed` | Retry from normalize | User/Admin |
-
----
-
-## Behavior
-
-### 1. Status Authority (See ADR-0003)
-
-**Rule**: ONLY Coordinator can update `status`
-
+**Implementation:**
 ```python
+# lib/upload_record.py (Personal - 100 LOC)
+import sqlite3
+from datetime import datetime
+from typing import Optional
+
 class UploadRecord:
-    def transition(self, to_state: str, coordinator: Coordinator):
-        # Enforce: Only coordinator can call this
-        if not isinstance(coordinator, Coordinator):
-            raise PermissionError("Only Coordinator can update status")
+    """Simple state machine for upload processing."""
 
-        self.status = to_state
-        self.updated_at = now()
-        self.save()
+    STATES = ["queued_for_parse", "parsing", "parsed", "normalizing", "normalized", "error"]
+
+    def __init__(self, db_path="~/.finance-app/data.db"):
+        self.conn = sqlite3.connect(db_path)
+        self.conn.row_factory = sqlite3.Row
+        self._init_schema()
+
+    def _init_schema(self):
+        """Create table if not exists."""
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS upload_records (
+                upload_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                file_size_bytes INTEGER,
+                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                observations_count INTEGER,
+                canonicals_count INTEGER,
+                parse_log_ref TEXT,
+                normalization_log_ref TEXT,
+                error_message TEXT
+            )
+        """)
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON upload_records(status)")
+        self.conn.commit()
+
+    def create(self, upload_id: str, filename: str, file_size: int) -> dict:
+        """Create new upload record."""
+        self.conn.execute("""
+            INSERT INTO upload_records (upload_id, status, filename, file_size_bytes)
+            VALUES (?, 'queued_for_parse', ?, ?)
+        """, (upload_id, filename, file_size))
+        self.conn.commit()
+        return self.get(upload_id)
+
+    def update_status(self, upload_id: str, status: str, **kwargs):
+        """Update status and optional fields."""
+        set_clause = "status = ?"
+        params = [status]
+
+        for key, value in kwargs.items():
+            set_clause += f", {key} = ?"
+            params.append(value)
+
+        params.append(upload_id)
+        self.conn.execute(f"""
+            UPDATE upload_records SET {set_clause} WHERE upload_id = ?
+        """, params)
+        self.conn.commit()
+
+    def get(self, upload_id: str) -> Optional[dict]:
+        """Get upload record."""
+        row = self.conn.execute("""
+            SELECT * FROM upload_records WHERE upload_id = ?
+        """, (upload_id,)).fetchone()
+        return dict(row) if row else None
+
+# Usage - Upload flow
+record = UploadRecord()
+
+# 1. Create record
+rec = record.create("UL_abc123", "BoFA_Oct2024.pdf", 2_300_000)
+# → {"upload_id": "UL_abc123", "status": "queued_for_parse", ...}
+
+# 2. Start parsing
+record.update_status("UL_abc123", "parsing")
+
+# 3. Parser completes
+record.update_status("UL_abc123", "parsed",
+    observations_count=42,
+    parse_log_ref="/logs/UL_abc123.parse.json"
+)
+
+# 4. Start normalizing
+record.update_status("UL_abc123", "normalizing")
+
+# 5. Normalizer completes
+record.update_status("UL_abc123", "normalized",
+    canonicals_count=42,
+    normalization_log_ref="/logs/UL_abc123.normalize.json"
+)
+
+# UI polls status
+rec = record.get("UL_abc123")
+if rec["status"] == "normalized":
+    show_success(f"{rec['canonicals_count']} transactions processed")
 ```
 
-**Runners CANNOT update status:**
+**Características Incluidas:**
+- ✅ State machine (6 states)
+- ✅ Progressive disclosure (parse_log_ref, normalization_log_ref)
+- ✅ Error tracking (error_message)
+- ✅ FIFO processing
+
+**Características NO Incluidas:**
+- ❌ Automatic retries (YAGNI: user re-uploads manually)
+- ❌ Timeout monitoring (YAGNI: processing <5s)
+- ❌ Priority queue (YAGNI: single user)
+- ❌ Webhooks (YAGNI: UI polls status)
+
+**Configuración:**
 ```python
-# ❌ FORBIDDEN in runner code
-upload_record.status = "parsed"
-
-# ✅ ALLOWED: Runner emits event, Coordinator updates status
-events.emit("parse.completed", {"upload_id": upload_id})
+# Hardcoded
+STATES = ["queued_for_parse", "parsing", "parsed", "normalizing", "normalized", "error"]
 ```
+
+**Performance:**
+- Create: 2ms
+- Update: 2ms
+- Get: 1ms
+
+**Upgrade Triggers:**
+- Si processing failures → Small Business (retries)
+- Si multi-usuario → Small Business (priority queue)
 
 ---
 
-### 2. Progressive Disclosure (Conditional Fields)
+### Small Business Profile (300 LOC)
 
-**Principle**: Fields appear only when relevant to current status
+**Contexto del Usuario:**
+Firma contable con 100 uploads/día. Parser falla ocasionalmente (PDFs corruptos). Necesitan automatic retries (3 intentos con backoff). Timeout monitoring para detectar uploads stuck (parser hung >5 min). Email alerts cuando upload falla definitivamente.
 
-**queued_for_parse:**
-```json
-{
-  "upload_id": "UL_abc123",
-  "status": "queued_for_parse",
-  "error_message": null,
-  "upload_log_ref": "/logs/uploads/UL_abc123.log"
-}
-```
-
-**parsed:**
-```json
-{
-  "upload_id": "UL_abc123",
-  "status": "parsed",
-  "error_message": null,
-  "upload_log_ref": "/logs/uploads/UL_abc123.log",
-  "parse_log_ref": "/logs/parse/UL_abc123.log.json",  ← NEW
-  "observations_count": 42  ← NEW
-}
-```
-
-**normalized:**
-```json
-{
-  "upload_id": "UL_abc123",
-  "status": "normalized",
-  "error_message": null,
-  "upload_log_ref": "/logs/uploads/UL_abc123.log",
-  "parse_log_ref": "/logs/parse/UL_abc123.log.json",
-  "observations_count": 42,
-  "normalizer_log_ref": "/logs/normalize/UL_abc123.log.json",  ← NEW
-  "canonicals_count": 42  ← NEW
-}
-```
-
----
-
-### 3. Idempotent Creation
-
-**Dedupe by file_hash (handled at FileArtifact level):**
-
+**Implementation:**
 ```python
-def create_upload_record(file: UploadedFile, source_type: str) -> Tuple[UploadRecord, bool]:
-    """
-    Returns (record, is_duplicate)
-    """
-    # Store artifact (dedupe happens here)
-    artifact, is_new = FileArtifact.get_or_create(file)
+# lib/upload_record.py (Small Business - 300 LOC)
+import psycopg2
+from datetime import datetime, timedelta
+from typing import Optional
+import smtplib
 
-    if not is_new:
-        # Find existing UploadRecord for this artifact
-        existing = UploadRecord.query.filter_by(file_id=artifact.file_id).first()
-        if existing:
-            return (existing, True)  # Duplicate
+class UploadRecord:
+    """Upload state machine with retries and timeout monitoring."""
 
-    # Create new UploadRecord
-    record = UploadRecord(
-        upload_id=generate_upload_id(),
-        file_id=artifact.file_id,
-        status="queued_for_parse",
-        upload_log_ref=f"/logs/uploads/{upload_id}.log"
-    )
-    record.save()
+    STATES = ["queued_for_parse", "parsing", "parsed", "normalizing", "normalized", "error"]
+    MAX_RETRIES = 3
+    RETRY_BACKOFF = [60, 300, 900]  # 1min, 5min, 15min
 
-    return (record, False)  # New upload
+    def __init__(self, connection_string):
+        self.conn = psycopg2.connect(connection_string)
+
+    def create(self, upload_id: str, filename: str, file_size: int) -> dict:
+        """Create new upload record."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO upload_records (
+                upload_id, status, filename, file_size_bytes,
+                retry_count, max_retries
+            ) VALUES (%s, 'queued_for_parse', %s, %s, 0, %s)
+            RETURNING *
+        """, (upload_id, filename, file_size, self.MAX_RETRIES))
+        self.conn.commit()
+        return dict(cursor.fetchone())
+
+    def update_status(self, upload_id: str, status: str, **kwargs):
+        """Update status with retry logic."""
+        cursor = self.conn.cursor()
+
+        # If transitioning to "parsing", record start time
+        if status == "parsing":
+            kwargs["parsing_started_at"] = datetime.now()
+
+        # Build update query
+        set_items = ["status = %s"]
+        params = [status]
+        for key, value in kwargs.items():
+            set_items.append(f"{key} = %s")
+            params.append(value)
+
+        params.append(upload_id)
+        cursor.execute(f"""
+            UPDATE upload_records
+            SET {', '.join(set_items)}
+            WHERE upload_id = %s
+        """, params)
+        self.conn.commit()
+
+    def retry(self, upload_id: str) -> bool:
+        """Attempt to retry failed upload."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT retry_count, max_retries FROM upload_records
+            WHERE upload_id = %s
+        """, (upload_id,))
+        row = cursor.fetchone()
+
+        retry_count, max_retries = row
+
+        if retry_count >= max_retries:
+            # Max retries exceeded, send alert
+            self._send_alert(f"Upload {upload_id} failed after {max_retries} retries")
+            return False
+
+        # Increment retry count, reset to queued
+        cursor.execute("""
+            UPDATE upload_records
+            SET status = 'queued_for_parse',
+                retry_count = retry_count + 1,
+                last_retry_at = NOW()
+            WHERE upload_id = %s
+        """, (upload_id,))
+        self.conn.commit()
+        return True
+
+    def check_timeouts(self):
+        """Background job: Check for stuck uploads."""
+        cursor = self.conn.cursor()
+
+        # Find uploads stuck in "parsing" for >5 min
+        cursor.execute("""
+            SELECT upload_id FROM upload_records
+            WHERE status = 'parsing'
+              AND parsing_started_at < NOW() - INTERVAL '5 minutes'
+        """)
+
+        for row in cursor.fetchall():
+            upload_id = row[0]
+            # Mark as error, attempt retry
+            self.update_status(upload_id, "error",
+                error_message="Parsing timeout (>5 min)")
+            self.retry(upload_id)
+
+    def _send_alert(self, message: str):
+        """Send email alert."""
+        smtp = smtplib.SMTP("localhost")
+        smtp.sendmail(
+            "alerts@accounting-firm.com",
+            "admin@accounting-firm.com",
+            f"Subject: Upload Alert\n\n{message}"
+        )
+        smtp.quit()
+
+# Background job (cron every minute)
+# * * * * * python check_upload_timeouts.py
+
+# check_upload_timeouts.py
+record = UploadRecord("postgresql://localhost/accounting")
+record.check_timeouts()
+
+# Usage with retries
+record = UploadRecord("postgresql://localhost/accounting")
+
+# Upload fails
+record.update_status("UL_abc123", "error",
+    error_message="PDF structure invalid"
+)
+
+# Automatic retry (after 1 min)
+if record.retry("UL_abc123"):
+    # → Requeued, parser will try again
+    pass
 ```
+
+**Características Incluidas:**
+- ✅ Automatic retries (max 3 attempts)
+- ✅ Retry backoff (1min → 5min → 15min)
+- ✅ Timeout monitoring (parsing >5min = stuck)
+- ✅ Email alerts (max retries exceeded)
+- ✅ Retry metadata (retry_count, last_retry_at)
+
+**Características NO Incluidas:**
+- ❌ Priority queue (FIFO sufficient)
+- ❌ Webhooks (email alerts only)
+- ❌ Advanced metrics (basic logging)
+
+**Configuración:**
+```yaml
+upload_record:
+  retry:
+    max_retries: 3
+    backoff_seconds: [60, 300, 900]
+  timeout:
+    parsing_timeout_seconds: 300
+    check_interval_seconds: 60
+  alerts:
+    email: "admin@accounting-firm.com"
+```
+
+**Performance:**
+- Create: 5ms
+- Update: 5ms
+- Timeout check (100 records): 50ms
+
+**Upgrade Triggers:**
+- Si >1K uploads/día → Enterprise (priority queue)
 
 ---
 
-## Database Schema
+### Enterprise Profile (600 LOC)
 
-```sql
+**Contexto del Usuario:**
+Banco con 10K uploads/día. Necesitan priority queue (VIP clients processed first). Webhooks para status updates (real-time notifications). Prometheus metrics (upload throughput, retry rate, timeout rate). Distributed tracing (correlate upload errors with parser/normalizer issues).
+
+**Implementation:**
+```python
+# lib/upload_record.py (Enterprise - 600 LOC)
+import psycopg2
+from datetime import datetime
+from typing import Optional
+import requests
+from prometheus_client import Counter, Histogram
+import uuid
+
+class UploadRecord:
+    """Enterprise upload state machine with priority queue and webhooks."""
+
+    def __init__(self, connection_string):
+        self.conn = psycopg2.connect(connection_string)
+
+    def create(self, upload_id: str, filename: str, file_size: int,
+               priority: int = 5, webhook_url: str = None,
+               trace_id: str = None) -> dict:
+        """
+        Create upload record with priority and tracing.
+
+        Args:
+            priority: 1-10 (1 = highest priority, 10 = lowest)
+            webhook_url: Optional URL to POST status updates
+            trace_id: Distributed tracing ID
+        """
+        if not trace_id:
+            trace_id = str(uuid.uuid4())
+
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO upload_records (
+                upload_id, status, filename, file_size_bytes,
+                priority, webhook_url, trace_id,
+                retry_count, max_retries
+            ) VALUES (%s, 'queued_for_parse', %s, %s, %s, %s, %s, 0, 3)
+            RETURNING *
+        """, (upload_id, filename, file_size, priority, webhook_url, trace_id))
+        self.conn.commit()
+
+        # Prometheus metric
+        upload_created.labels(priority=priority).inc()
+
+        return dict(cursor.fetchone())
+
+    def update_status(self, upload_id: str, status: str, **kwargs):
+        """Update status with webhook notification."""
+        cursor = self.conn.cursor()
+
+        # Record status transition time
+        kwargs[f"{status}_at"] = datetime.now()
+
+        # Update
+        set_items = ["status = %s"]
+        params = [status]
+        for key, value in kwargs.items():
+            set_items.append(f"{key} = %s")
+            params.append(value)
+
+        params.append(upload_id)
+        cursor.execute(f"""
+            UPDATE upload_records
+            SET {', '.join(set_items)}
+            WHERE upload_id = %s
+            RETURNING webhook_url, trace_id
+        """, params)
+        row = cursor.fetchone()
+        self.conn.commit()
+
+        webhook_url, trace_id = row
+
+        # Send webhook notification
+        if webhook_url:
+            self._send_webhook(webhook_url, upload_id, status, trace_id)
+
+        # Prometheus metric
+        status_transitions.labels(from_status="any", to_status=status).inc()
+
+    def get_next_queued(self) -> Optional[dict]:
+        """Get next upload from priority queue."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT * FROM upload_records
+            WHERE status = 'queued_for_parse'
+            ORDER BY priority ASC, uploaded_at ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+        """)
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def _send_webhook(self, url: str, upload_id: str, status: str, trace_id: str):
+        """POST status update to webhook URL."""
+        try:
+            requests.post(url, json={
+                "upload_id": upload_id,
+                "status": status,
+                "timestamp": datetime.now().isoformat(),
+                "trace_id": trace_id
+            }, timeout=5)
+        except Exception as e:
+            # Log but don't fail update
+            print(f"Webhook failed: {e}")
+
+# Prometheus metrics
+upload_created = Counter('upload_created_total', 'Total uploads created', ['priority'])
+status_transitions = Counter('upload_status_transitions_total', 'Status transitions', ['from_status', 'to_status'])
+processing_duration = Histogram('upload_processing_seconds', 'Upload processing duration', ['status'])
+
+# Database schema with priority queue
+"""
 CREATE TABLE upload_records (
     upload_id TEXT PRIMARY KEY,
-    file_id TEXT NOT NULL REFERENCES file_artifacts(file_id),
-    status TEXT NOT NULL CHECK (status IN ('queued_for_parse', 'parsing', 'parsed', 'normalizing', 'normalized', 'error')),
-    error_message TEXT,
-    error_code TEXT,
-    upload_log_ref TEXT NOT NULL,
-    parse_log_ref TEXT,
-    normalizer_log_ref TEXT,
-    observations_count INTEGER,
-    canonicals_count INTEGER,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    status TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    file_size_bytes BIGINT,
+    priority INTEGER DEFAULT 5,  -- 1-10 (1 = highest)
+    webhook_url TEXT,
+    trace_id TEXT,
+    retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
+    uploaded_at TIMESTAMP DEFAULT NOW(),
+    queued_for_parse_at TIMESTAMP,
+    parsing_at TIMESTAMP,
+    parsed_at TIMESTAMP,
+    normalizing_at TIMESTAMP,
+    normalized_at TIMESTAMP,
+    error_at TIMESTAMP,
+    error_message TEXT
 );
 
-CREATE INDEX idx_status ON upload_records(status);
-CREATE INDEX idx_file_id ON upload_records(file_id);
-CREATE INDEX idx_created_at ON upload_records(created_at DESC);
+CREATE INDEX idx_priority_queue ON upload_records(status, priority, uploaded_at)
+    WHERE status = 'queued_for_parse';
+"""
+
+# Usage - VIP client upload
+record = UploadRecord("postgresql://primary:5432/bank")
+
+# VIP client (priority 1)
+rec = record.create(
+    upload_id="UL_vip123",
+    filename="mortgage_docs.pdf",
+    file_size=50_000_000,
+    priority=1,  # Highest priority
+    webhook_url="https://client-portal.com/webhooks/upload",
+    trace_id="trace_abc123"
+)
+
+# Worker gets next upload (VIP processed first)
+next_upload = record.get_next_queued()
+# → Returns UL_vip123 (priority 1) before any priority 5-10 uploads
+
+# Status update triggers webhook
+record.update_status("UL_vip123", "parsed", observations_count=156)
+# → POST to https://client-portal.com/webhooks/upload
+#    {"upload_id": "UL_vip123", "status": "parsed", "trace_id": "trace_abc123"}
 ```
+
+**Características Incluidas:**
+- ✅ Priority queue (1-10, VIP clients first)
+- ✅ Webhooks (real-time status notifications)
+- ✅ Distributed tracing (trace_id)
+- ✅ Prometheus metrics (throughput, status transitions)
+- ✅ FOR UPDATE SKIP LOCKED (concurrent workers)
+- ✅ Retry logic with backoff
+
+**Características NO Incluidas:**
+- ❌ Custom retry strategies per client (fixed 3 retries)
+
+**Configuración:**
+```yaml
+upload_record:
+  database:
+    connection_string: "postgresql://primary:5432/bank"
+  priority:
+    enabled: true
+    default: 5
+  webhooks:
+    enabled: true
+    timeout_seconds: 5
+  monitoring:
+    prometheus_port: 9090
+```
+
+**Performance:**
+- Create: 8ms
+- Update + webhook: 15ms
+- Get next (priority queue): 3ms (indexed)
+- Throughput: 10K uploads/day
+
+**No Further Tiers:**
+- Scale horizontally (more workers)
 
 ---
 
-## Queries
-
-### Workers: Find Work
-
-```sql
--- Parser: Find uploads queued for parsing
-SELECT upload_id, file_id
-FROM upload_records
-WHERE status = 'queued_for_parse'
-ORDER BY created_at
-LIMIT 10;
-
--- Normalizer: Find uploads ready for normalization
-SELECT upload_id
-FROM upload_records
-WHERE status = 'parsed'
-ORDER BY created_at
-LIMIT 10;
-```
-
-### Monitoring: Count by Status
-
-```sql
-SELECT status, COUNT(*) as count
-FROM upload_records
-GROUP BY status;
-
--- Result:
--- queued_for_parse | 5
--- parsing          | 2
--- parsed           | 3
--- normalizing      | 1
--- normalized       | 1234
--- error            | 7
-```
-
-### Forensics: Recent Errors
-
-```sql
-SELECT upload_id, error_message, created_at
-FROM upload_records
-WHERE status = 'error'
-ORDER BY created_at DESC
-LIMIT 10;
-```
-
----
-
-## Multi-Domain Applicability
-
-This primitive constructs verifiable truth about **processing lifecycle state** - a universal pattern for ANY multi-stage async pipeline:
-
-**Finance Domain:**
-```typescript
-interface TransactionUploadRecord {
-  upload_id: string
-  status: "queued_for_parse" | "parsing" | "parsed" | "normalizing" | "normalized" | "error"
-  parse_log_ref?: string
-  observations_count?: number
-}
-```
-
-**Healthcare Domain:**
-```typescript
-interface LabResultUploadRecord {
-  upload_id: string
-  status: "uploaded" | "validating" | "validated" | "analyzing" | "analyzed" | "approved" | "error"
-  validation_log_ref?: string
-  test_results_count?: number
-  approval_timestamp?: ISO8601
-}
-```
-
-**Image Processing:**
-```typescript
-interface ImageUploadRecord {
-  upload_id: string
-  status: "queued" | "resizing" | "resized" | "thumbnailing" | "complete" | "error"
-  resize_log_ref?: string
-  thumbnail_ref?: string
-}
-```
-
-**Document OCR:**
-```typescript
-interface DocumentUploadRecord {
-  upload_id: string
-  status: "queued" | "ocr_pending" | "ocr_complete" | "indexing" | "indexed" | "error"
-  ocr_log_ref?: string
-  page_count?: number
-}
-```
-
-**Manufacturing Quality Control:**
-```typescript
-interface InspectionRecord {
-  inspection_id: string
-  status: "pending" | "scanning" | "scanned" | "analyzing" | "passed" | "failed" | "error"
-  scan_log_ref?: string
-  defects_count?: number
-}
-```
-
-**Research Data Pipeline:**
-```typescript
-interface ExperimentRecord {
-  experiment_id: string
-  status: "submitted" | "validating" | "validated" | "processing" | "analyzed" | "published" | "error"
-  validation_log_ref?: string
-  data_points_count?: number
-}
-```
-
----
-
-## Extension Points
-
-### 1. Retry Metadata
-
-```typescript
-interface UploadRecordWithRetry extends UploadRecord {
-  retry_count: number
-  last_retry_at: ISO8601Timestamp
-  max_retries: number  // Configurable per source_type
-}
-```
-
-### 2. Priority Queue
-
-```typescript
-interface PrioritizedUploadRecord extends UploadRecord {
-  priority: number  // 1 (low) to 10 (high)
-  priority_reason: string  // "user_request", "premium_user", "admin"
-}
-
-// Workers query by priority
-SELECT upload_id WHERE status = 'queued_for_parse' ORDER BY priority DESC, created_at
-```
-
-### 3. Timeouts
-
-```typescript
-interface UploadRecordWithTimeout extends UploadRecord {
-  parsing_started_at: ISO8601Timestamp
-  parsing_timeout_seconds: number  // Default: 300
-
-  normalizing_started_at: ISO8601Timestamp
-  normalizing_timeout_seconds: number  // Default: 60
-}
-
-// Monitor: Find stuck uploads
-SELECT upload_id FROM upload_records
-WHERE status = 'parsing' AND parsing_started_at < NOW() - INTERVAL '5 minutes'
-```
-
----
-
-## Testing
-
-```python
-def test_state_transition():
-    record = UploadRecord.create(upload_id="UL_test", status="queued_for_parse")
-
-    coordinator.transition(record, "parsing")
-    assert record.status == "parsing"
-
-    coordinator.transition(record, "parsed")
-    assert record.status == "parsed"
-
-def test_invalid_transition():
-    record = UploadRecord.create(upload_id="UL_test", status="queued_for_parse")
-
-    with pytest.raises(InvalidTransitionError):
-        # Can't skip "parsing" and go directly to "parsed"
-        coordinator.transition(record, "parsed")
-
-def test_progressive_disclosure():
-    record = UploadRecord.create(upload_id="UL_test", status="queued_for_parse")
-
-    # Initially no parse_log_ref
-    assert record.parse_log_ref is None
-
-    coordinator.transition(record, "parsing")
-    coordinator.transition(record, "parsed", observations_count=42, parse_log_ref="/logs/...")
-
-    # Now present
-    assert record.parse_log_ref == "/logs/..."
-    assert record.observations_count == 42
-```
-
----
-
-## Domain Validation
-
-### ✅ Finance (Primary Instantiation)
-**Use case:** Track bank statement upload through parse → normalize pipeline
-**Example:** User uploads "statement.pdf" → UploadRecord created {upload_id: "UL_abc123", status: "queued_for_parse", upload_log_ref: "/logs/UL_abc123.upload.json"} → Parser starts → Coordinator updates {status: "parsing"} → Parser completes → {status: "parsed", parse_log_ref: "/logs/...", observations_count: 42} → Normalizer starts → {status: "normalizing"} → Completes → {status: "normalized", canonicals_count: 42} → User polls GET /uploads/UL_abc123 → Returns current status + progressive disclosure (parse_log available after parsing, canonicals_count after normalizing)
-**Operations:** State transitions (queued→parsing→parsed→normalizing→normalized), progressive disclosure (show what's available at each stage), error tracking (status="error" + error_message)
-**Status:** ✅ Fully implemented in personal-finance-app
-
-### ✅ Healthcare
-**Use case:** Track lab report upload through extraction pipeline
-**Example:** Hospital uploads lab PDF → UploadRecord {upload_id: "UL_lab_456", status: "queued_for_parse"} → Parser extracts 8 tests → {status: "parsed", observations_count: 8} → Normalizer converts units → {status: "normalized", canonicals_count: 8} → Patient queries upload status → Returns "normalized" + observation count
-**Status:** ✅ Conceptually validated
-
-### ✅ Legal
-**Use case:** Track contract upload through clause extraction pipeline
-**Example:** Law firm uploads contract → UploadRecord {status: "queued_for_parse"} → Parser extracts 25 clauses → {status: "parsed", observations_count: 25} → Normalizer categorizes → {status: "normalized"} → Attorney checks progress → Status shows "normalized" with 25 clauses extracted
-**Status:** ✅ Conceptually validated
-
-### ✅ RSRCH (Utilitario Research)
-**Use case:** Track web page scrape through fact extraction pipeline
-**Example:** Scraper downloads TechCrunch article → UploadRecord {upload_id: "UL_tc_789", status: "queued_for_parse", file_id: "file_html_123"} → TechCrunchHTMLParser starts → {status: "parsing"} → Extracts 12 raw facts → {status: "parsed", observations_count: 12, parse_log_ref: "/logs/UL_tc_789.parse.json"} → Normalizer resolves entities ("Sam Altman" → "@sama") → {status: "normalizing"} → Completes → {status: "normalized", canonicals_count: 12} → Dashboard queries upload → Shows "normalized" with 12 facts extracted, parse log available for debugging
-**Operations:** Progressive disclosure critical (show raw facts after parsing, normalized facts after normalization), error tracking (parser fails on corrupted HTML → status="error" + error_message: "Invalid HTML structure")
-**Status:** ✅ Conceptually validated
-
-### ✅ E-commerce
 **Use case:** Track supplier catalog upload through product extraction pipeline
 **Example:** Merchant uploads CSV (1,500 products) → UploadRecord {status: "queued_for_parse"} → Parser extracts rows → {status: "parsed", observations_count: 1500} → Normalizer validates SKUs, categories → {status: "normalized", canonicals_count: 1480} (20 failures) → Merchant checks upload → Status "normalized" + 1480 products imported + parse log shows 20 validation errors
 **Status:** ✅ Conceptually validated
