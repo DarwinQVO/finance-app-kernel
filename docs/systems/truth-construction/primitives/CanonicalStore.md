@@ -16,561 +16,492 @@ Persistent storage for validated canonical records (normalized, cleaned data). P
 
 ## Simplicity Profiles
 
-**This section shows how the same universal storage primitive is configured differently based on usage scale.**
+### Personal Profile (50 LOC)
 
-### Profile 1: Personal Use (Finance App - SQLite, Simple Queries)
+**Contexto del Usuario:**
+Darwin guarda ~500 transacciones normalizadas al año. Queries simples: "dame transacciones de Whole Foods en octubre", "total gastado en comida este año". SQLite embedded es suficiente. No necesita version history (re-normalize si reglas cambian).
 
-**Context:** Darwin's normalized transactions (~500/year), basic filtering by date/category/merchant
+**Implementation:**
+```python
+# lib/canonical_store.py (Personal - 50 LOC)
+import sqlite3
+from pathlib import Path
+from typing import List, Dict
 
-**Configuration:**
-```yaml
-canonical_store:
-  backend: "sqlite"
-  db_path: "~/.finance-app/data.db"
-  table_name: "canonicals"
-  indexes:
-    - upload_id
-    - date  # Filter by date range
-    - merchant  # Group by merchant
-    - category  # Filter by category
-  bitemporal: false  # No version history
-  compression: false  # Small dataset
-  full_text_search: false  # No FTS needed
+class CanonicalStore:
+    """SQLite storage for normalized canonical records."""
+
+    def __init__(self, db_path="~/.finance-app/data.db"):
+        self.db_path = Path(db_path).expanduser()
+        self.conn = sqlite3.connect(self.db_path)
+        self.conn.row_factory = sqlite3.Row
+        self._init_schema()
+
+    def _init_schema(self):
+        """Create table if not exists."""
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS canonicals (
+                canonical_id TEXT PRIMARY KEY,
+                upload_id TEXT NOT NULL,
+                observation_id TEXT NOT NULL,
+                date DATE NOT NULL,
+                amount REAL NOT NULL,
+                merchant TEXT NOT NULL,
+                category TEXT,
+                account TEXT NOT NULL,
+                normalized_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                normalizer_version TEXT NOT NULL
+            )
+        """)
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_date ON canonicals(date)")
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_merchant ON canonicals(merchant)")
+        self.conn.commit()
+
+    def upsert(self, canonical: Dict):
+        """Idempotent insert/update."""
+        self.conn.execute("""
+            INSERT OR REPLACE INTO canonicals (
+                canonical_id, upload_id, observation_id, date, amount,
+                merchant, category, account, normalizer_version
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            canonical["canonical_id"],
+            canonical["upload_id"],
+            canonical["observation_id"],
+            canonical["date"],
+            canonical["amount"],
+            canonical["merchant"],
+            canonical.get("category"),
+            canonical["account"],
+            canonical["normalizer_version"]
+        ))
+        self.conn.commit()
+
+    def query(self, filters: Dict = None) -> List[Dict]:
+        """Simple query with filters."""
+        query = "SELECT * FROM canonicals WHERE 1=1"
+        params = []
+
+        if filters:
+            if "date_from" in filters:
+                query += " AND date >= ?"
+                params.append(filters["date_from"])
+            if "merchant" in filters:
+                query += " AND merchant = ?"
+                params.append(filters["merchant"])
+
+        query += " ORDER BY date DESC"
+        return [dict(row) for row in self.conn.execute(query, params).fetchall()]
+
+# Usage
+store = CanonicalStore()
+
+# Store normalized transaction
+store.upsert({
+    "canonical_id": "CT_abc123_0",
+    "upload_id": "UL_abc123",
+    "observation_id": "UL_abc123:0",
+    "date": "2024-10-15",
+    "amount": -87.43,
+    "merchant": "Whole Foods Market",
+    "category": "Groceries",
+    "account": "Bank of America Checking",
+    "normalizer_version": "1.0"
+})
+
+# Query
+transactions = store.query({"date_from": "2024-10-01", "merchant": "Whole Foods Market"})
+# → [{"canonical_id": "CT_abc123_0", "date": "2024-10-15", "amount": -87.43, ...}]
 ```
 
-**What's Used:**
-- ✅ `upsert()` - Idempotent storage (canonical_id = PK)
-- ✅ `get_by_upload()` - Retrieve all canonicals for a statement
-- ✅ Simple `query()` - Filter by date range, category, merchant
-- ✅ SQLite backend - Embedded, no server
-- ✅ Basic indexes - date, merchant, category
-- ✅ Domain fields in JSON - Store as TEXT blob
+**Características Incluidas:**
+- ✅ SQLite backend (embedded, no server)
+- ✅ Idempotent upsert (canonical_id = PK)
+- ✅ Simple queries (date, merchant filters)
+- ✅ Basic indexes (date, merchant, category)
 
-**What's NOT Used:**
-- ❌ Bitemporal tracking - No valid_from/valid_to
-- ❌ Version history - Re-normalization overwrites old values (acceptable)
-- ❌ Partitioning - Single table (~500 rows/year)
-- ❌ Compression - Data tiny (~100KB/year)
-- ❌ Full-text search - No need to search inside descriptions
-- ❌ Computed columns - No materialized aggregates
-- ❌ Replication - Local file
-- ❌ Metrics - No Prometheus
+**Características NO Incluidas:**
+- ❌ Bitemporal tracking (YAGNI: re-normalize overwrites old values)
+- ❌ Version history (YAGNI: 500 rows/year, regenerate if needed)
+- ❌ Partitioning (YAGNI: single table works)
+- ❌ Compression (YAGNI: 100KB/year)
+- ❌ Full-text search (YAGNI: exact merchant match sufficient)
 
-**Database Schema (SQLite):**
-```sql
-CREATE TABLE canonicals (
-    canonical_id TEXT PRIMARY KEY,  -- "CT_abc123_0"
-    upload_id TEXT NOT NULL,
-    observation_id TEXT NOT NULL,  -- "UL_abc123:0" (link back to raw)
-
-    -- Normalized data (stored as JSON TEXT)
-    date DATE NOT NULL,  -- Parsed: "2024-10-15"
-    amount REAL NOT NULL,  -- Parsed: -87.43
-    merchant TEXT NOT NULL,  -- Cleaned: "Whole Foods Market"
-    category TEXT,  -- Assigned: "Groceries"
-    account TEXT NOT NULL,  -- "Bank of America Checking"
-
-    -- Metadata
-    normalized_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    normalizer_version TEXT NOT NULL
-);
-
-CREATE INDEX idx_upload_id ON canonicals(upload_id);
-CREATE INDEX idx_date ON canonicals(date);
-CREATE INDEX idx_merchant ON canonicals(merchant);
-CREATE INDEX idx_category ON canonicals(category);
+**Configuración:**
+```python
+# Hardcoded
+DB_PATH = "~/.finance-app/data.db"
 ```
 
-**Implementation Complexity:** **LOW**
-- ~90 lines Python
-- Uses sqlite3 stdlib
-- No ORM (direct SQL)
-- Simple queries (WHERE date BETWEEN ? AND ?)
-- No tests
+**Performance:**
+- Upsert: 2ms
+- Query (500 rows): 5ms
+- Storage: 100KB/year
 
-**Narrative Example:**
-> Normalizer processes 42 observations from "BoFA_Oct2024.pdf". For each observation:
-> 1. Clean merchant: "WHOLE FOODS #1234" → "Whole Foods Market"
-> 2. Parse date: "10/15/2024" → datetime.date(2024, 10, 15)
-> 3. Parse amount: "-$87.43" → -87.43
-> 4. Assign category: "Whole Foods Market" → "Groceries" (hardcoded rule)
-> 5. Create canonical_id: "CT_" + hash(upload_id + row_id) → "CT_abc123_0"
-> 6. Call `canonical_store.upsert(CanonicalTransaction(...))`
->
-> SQLite: `INSERT INTO canonicals (...) ON CONFLICT (canonical_id) DO UPDATE ...`
->
-> Week later, Darwin updates categorization rules: "Whole Foods" → "Groceries & Household" (more specific). Re-run normalizer → Same 42 observations → Produces 42 updated canonicals with `category="Groceries & Household"` → Each `upsert()` finds existing canonical_id → Updates category field → Old categorization overwritten (acceptable for personal use).
->
-> Darwin filters: "Show October groceries" → Query: `SELECT * FROM canonicals WHERE date >= '2024-10-01' AND date < '2024-11-01' AND category = 'Groceries' ORDER BY date DESC` → Index on (date, category) → Returns 8 transactions in <10ms.
+**Upgrade Triggers:**
+- Si >10K rows → Small Business (better indexes)
+- Si need version history → Small Business (bitemporal)
 
 ---
 
-### Profile 2: Small Business (Accounting Firm - Multi-Client, Moderate Volume)
+### Small Business Profile (150 LOC)
 
-**Context:** 50 clients × 600 documents/year = ~30K canonicals/year, need client isolation and retention policies
+**Contexto del Usuario:**
+Firma contable con 50K transacciones normalizadas. Necesitan bitemporal tracking: "qué valor tenía este campo el 15 de octubre?" (audit compliance). PostgreSQL para better performance. Computed columns para agregaciones rápidas.
 
-**Configuration:**
-```yaml
-canonical_store:
-  backend: "sqlite"
-  db_path: "/var/accounting-data/canonicals.db"
-  table_name: "canonicals"
-  indexes:
-    - upload_id
-    - client_id  # Isolate by client
-    - date
-    - merchant
-    - category
-    - normalized_at  # Retention queries
-  bitemporal: false
-  compression: false
-  full_text_search:
-    enabled: true
-    fields: [merchant, description]  # FTS on merchant names
-  retention:
-    enabled: true
-    retention_years: 7  # IRS requirement
-  query_optimization:
-    analyze_on_startup: true
-    cache_size_mb: 200
-```
+**Implementation:**
+```python
+# lib/canonical_store.py (Small Business - 150 LOC)
+import psycopg2
+from typing import List, Dict
+from datetime import datetime
 
-**What's Used:**
-- ✅ All basic methods - upsert, get_by_upload, query, delete
-- ✅ Client isolation - `client_id` field + index
-- ✅ Full-text search - FTS5 on merchant/description fields
-- ✅ Retention policy - Delete canonicals >7 years old
-- ✅ Query optimization - ANALYZE, increased cache
-- ✅ Extended indexes - date, merchant, category, client_id, normalized_at
+class CanonicalStore:
+    """PostgreSQL storage with bitemporal tracking."""
 
-**What's NOT Used:**
-- ❌ Bitemporal - No version history
-- ❌ Partitioning - 30K rows/year manageable
-- ❌ Compression - Data footprint acceptable (~15MB/year)
-- ❌ Replication - Single server
-- ❌ Advanced metrics - Basic logging only
+    def __init__(self, connection_string):
+        self.conn = psycopg2.connect(connection_string)
 
-**Database Schema (SQLite with FTS5):**
-```sql
+    def upsert(self, canonical: Dict, valid_from: datetime = None):
+        """
+        Idempotent upsert with bitemporal tracking.
+
+        Args:
+            canonical: Canonical record
+            valid_from: When this value became valid (defaults to now)
+        """
+        if not valid_from:
+            valid_from = datetime.now()
+
+        # Close previous version (set valid_to)
+        self.conn.execute("""
+            UPDATE canonicals
+            SET valid_to = %s
+            WHERE canonical_id = %s
+              AND valid_to IS NULL
+        """, (valid_from, canonical["canonical_id"]))
+
+        # Insert new version
+        self.conn.execute("""
+            INSERT INTO canonicals (
+                canonical_id, upload_id, observation_id,
+                date, amount, merchant, category, account,
+                normalizer_version,
+                valid_from, valid_to, transaction_time
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, NOW())
+        """, (
+            canonical["canonical_id"],
+            canonical["upload_id"],
+            canonical["observation_id"],
+            canonical["date"],
+            canonical["amount"],
+            canonical["merchant"],
+            canonical.get("category"),
+            canonical["account"],
+            canonical["normalizer_version"],
+            valid_from
+        ))
+        self.conn.commit()
+
+    def query_as_of(self, as_of_date: datetime, filters: Dict = None) -> List[Dict]:
+        """
+        Query canonical records as they were at a specific date.
+
+        Args:
+            as_of_date: Point-in-time to query
+            filters: Additional filters (date range, merchant, etc.)
+        """
+        query = """
+            SELECT * FROM canonicals
+            WHERE valid_from <= %s
+              AND (valid_to IS NULL OR valid_to > %s)
+        """
+        params = [as_of_date, as_of_date]
+
+        if filters:
+            if "date_from" in filters:
+                query += " AND date >= %s"
+                params.append(filters["date_from"])
+
+        query += " ORDER BY date DESC"
+        cursor = self.conn.execute(query, params)
+        return [dict(row) for row in cursor.fetchall()]
+
+# Schema
+"""
 CREATE TABLE canonicals (
-    canonical_id TEXT PRIMARY KEY,
-    upload_id TEXT NOT NULL,
-    observation_id TEXT NOT NULL,
-    client_id TEXT NOT NULL,  -- Added: Client isolation
-
-    -- Normalized data
-    date DATE NOT NULL,
-    amount REAL NOT NULL,
-    merchant TEXT NOT NULL,
-    description TEXT,  -- Added: Full transaction description
-    category TEXT,
-    account TEXT NOT NULL,
-
-    -- Metadata
-    normalized_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    normalizer_version TEXT NOT NULL
-);
-
--- Indexes
-CREATE INDEX idx_upload_id ON canonicals(upload_id);
-CREATE INDEX idx_client_id ON canonicals(client_id);
-CREATE INDEX idx_date ON canonicals(date);
-CREATE INDEX idx_merchant ON canonicals(merchant);
-CREATE INDEX idx_category ON canonicals(category);
-CREATE INDEX idx_normalized_at ON canonicals(normalized_at);
-
--- Full-text search
-CREATE VIRTUAL TABLE canonicals_fts USING fts5(
-    canonical_id UNINDEXED,
-    merchant,
-    description,
-    content=canonicals,
-    content_rowid=rowid
-);
-
--- Trigger to keep FTS in sync
-CREATE TRIGGER canonicals_fts_insert AFTER INSERT ON canonicals BEGIN
-    INSERT INTO canonicals_fts(rowid, canonical_id, merchant, description)
-    VALUES (new.rowid, new.canonical_id, new.merchant, new.description);
-END;
-```
-
-**Implementation Complexity:** **MEDIUM**
-- ~250 lines Python
-- SQLite with FTS5 extension
-- SQLAlchemy ORM (handles FTS triggers)
-- Unit tests (test FTS queries, client isolation)
-- Background retention job (deletes canonicals >7 years)
-
-**Narrative Example:**
-> Accountant uploads client's business expenses (250 transactions). Normalizer produces 250 canonicals with `client_id="CLIENT_ABC"`. All upserted to CanonicalStore.
->
-> Accountant searches: "Find all Starbucks purchases for Client ABC" → Query uses FTS:
-> ```sql
-> SELECT c.* FROM canonicals c
-> JOIN canonicals_fts fts ON c.rowid = fts.rowid
-> WHERE fts.merchant MATCH 'Starbucks' AND c.client_id = 'CLIENT_ABC'
-> ORDER BY c.date DESC;
-> ```
-> FTS index scans merchant field → Finds 15 matches in 20ms (vs 200ms full table scan).
->
-> 7 years later, retention job runs:
-> ```sql
-> DELETE FROM canonicals
-> WHERE normalized_at < date('now', '-7 years');
-> ```
-> Removes 210K old canonicals (30K/year × 7 years) → Frees 100MB disk space (IRS retention met).
-
----
-
-### Profile 3: Enterprise (Bank - High Volume, Bitemporal, Analytics)
-
-**Context:** 10,000 statements/day = ~12M transactions/month = 144M canonicals/year, need bitemporal tracking for audit, analytics on read replicas
-
-**Configuration:**
-```yaml
-canonical_store:
-  backend: "postgresql"
-  connection:
-    host: "canonicals-primary.internal"
-    port: 5432
-    database: "canonicals"
-    pool_size: 100
-    max_overflow: 200
-  table_name: "canonicals"
-  partitioning:
-    enabled: true
-    strategy: "range"
-    partition_by: "date"  # Transaction date, not normalized_at
-    partition_interval: "1 month"
-    retention_months: 120  # 10 years (banking regulation)
-  indexes:
-    - upload_id
-    - customer_id
-    - date
-    - merchant
-    - category
-    - account_id
-    - normalized_at
-  bitemporal:
-    enabled: true
-    valid_time_columns: [valid_from, valid_to]
-    transaction_time_columns: [tx_from, tx_to]
-  compression:
-    enabled: true
-    algorithm: "zstd"
-    level: 3
-  full_text_search:
-    enabled: true
-    engine: "elasticsearch"  # Offload FTS to Elasticsearch
-    sync_mode: "async"
-  replication:
-    enabled: true
-    replicas: 3  # Read replicas for analytics
-    sync_mode: "async"
-  query_optimization:
-    vacuum_schedule: "daily"
-    analyze_schedule: "hourly"
-    parallel_workers: 16
-  materialized_views:
-    - name: "monthly_spending_by_merchant"
-      refresh: "hourly"
-    - name: "category_totals_ytd"
-      refresh: "daily"
-  metrics:
-    enabled: true
-    backend: "prometheus"
-    labels: [partition, category, account_type]
-  audit:
-    log_all_writes: true
-    log_destination: "audit_log_table"
-```
-
-**What's Used:**
-- ✅ All methods + advanced queries
-- ✅ PostgreSQL backend - Scalable to 144M rows/year
-- ✅ Monthly partitioning by transaction date - 120 partitions (10 years)
-- ✅ Bitemporal tracking - Track when normalization rules changed
-- ✅ Compression - zstd on JSON fields (40% savings)
-- ✅ Read replicas - 3 replicas for analytics (no impact on writes)
-- ✅ Elasticsearch integration - Offload full-text search
-- ✅ Materialized views - Pre-computed aggregates for dashboards
-- ✅ Comprehensive indexes - Fast queries on all dimensions
-- ✅ Prometheus metrics - Track query latency, partition sizes
-- ✅ Audit logging - Log every write (compliance)
-- ✅ Retention + archival - Delete after 10 years, archive to Glacier
-
-**Database Schema (PostgreSQL with Bitemporal):**
-```sql
--- Parent table
-CREATE TABLE canonicals (
+    id SERIAL PRIMARY KEY,
     canonical_id TEXT NOT NULL,
     upload_id TEXT NOT NULL,
     observation_id TEXT NOT NULL,
-    customer_id TEXT NOT NULL,
-
-    -- Normalized data
-    date DATE NOT NULL,  -- Transaction date (partition key)
-    amount DECIMAL(15,2) NOT NULL,
+    date DATE NOT NULL,
+    amount NUMERIC(12,2) NOT NULL,
     merchant TEXT NOT NULL,
-    merchant_id TEXT,  -- Link to merchant entity table
-    description TEXT,
-    category TEXT NOT NULL,
-    category_id TEXT,  -- Link to category taxonomy
-    account_id TEXT NOT NULL,
-
-    -- Bitemporal tracking
-    valid_from TIMESTAMPTZ NOT NULL,  -- When this version became true
-    valid_to TIMESTAMPTZ NOT NULL,  -- When this version stopped being true
-    tx_from TIMESTAMPTZ NOT NULL DEFAULT NOW(),  -- When we recorded this
-    tx_to TIMESTAMPTZ NOT NULL DEFAULT 'infinity',  -- When we superseded this
-
-    -- Metadata
-    normalized_at TIMESTAMPTZ NOT NULL,
+    category TEXT,
+    account TEXT NOT NULL,
     normalizer_version TEXT NOT NULL,
-    rule_set_version TEXT NOT NULL,
-    confidence_score DECIMAL(3,2),
-    applied_rules TEXT[],
+    -- Bitemporal tracking
+    valid_from TIMESTAMP NOT NULL,    -- When value became valid
+    valid_to TIMESTAMP,                -- When value stopped being valid (NULL = current)
+    transaction_time TIMESTAMP DEFAULT NOW(),  -- When record was inserted
+    UNIQUE (canonical_id, valid_from)
+);
 
-    PRIMARY KEY (canonical_id, date, tx_from)  -- Partition key included
+CREATE INDEX idx_canonical_id ON canonicals(canonical_id);
+CREATE INDEX idx_valid_from ON canonicals(valid_from);
+CREATE INDEX idx_valid_to ON canonicals(valid_to);
+CREATE INDEX idx_date ON canonicals(date);
+"""
+
+# Usage
+store = CanonicalStore("postgresql://localhost/accounting")
+
+# Store normalized transaction (version 1)
+store.upsert({
+    "canonical_id": "CT_abc123_0",
+    "upload_id": "UL_abc123",
+    "observation_id": "UL_abc123:0",
+    "date": "2024-10-15",
+    "amount": -87.43,
+    "merchant": "Whole Foods Market",
+    "category": "Groceries",
+    "account": "BoA Checking",
+    "normalizer_version": "1.0"
+}, valid_from=datetime(2024, 10, 15))
+
+# Later: Re-normalize with better rules (version 2)
+store.upsert({
+    "canonical_id": "CT_abc123_0",
+    "upload_id": "UL_abc123",
+    "observation_id": "UL_abc123:0",
+    "date": "2024-10-15",
+    "amount": -87.43,
+    "merchant": "Whole Foods Market - Downtown",  # Better normalization
+    "category": "Groceries",
+    "account": "BoA Checking",
+    "normalizer_version": "2.0"
+}, valid_from=datetime(2024, 11, 1))
+
+# Query as of October 20 (gets version 1)
+txns = store.query_as_of(as_of_date=datetime(2024, 10, 20))
+# → merchant = "Whole Foods Market"
+
+# Query as of November 5 (gets version 2)
+txns = store.query_as_of(as_of_date=datetime(2024, 11, 5))
+# → merchant = "Whole Foods Market - Downtown"
+```
+
+**Características Incluidas:**
+- ✅ PostgreSQL backend
+- ✅ Bitemporal tracking (valid_from, valid_to)
+- ✅ Point-in-time queries (query_as_of)
+- ✅ Version history (audit compliance)
+- ✅ Better indexes
+
+**Características NO Incluidas:**
+- ❌ Partitioning (50K rows manageable)
+- ❌ Compression (YAGNI)
+- ❌ Replication (single server)
+
+**Configuración:**
+```yaml
+canonical_store:
+  backend: "postgresql"
+  connection_string: "postgresql://localhost/accounting"
+  bitemporal: true
+```
+
+**Performance:**
+- Upsert: 5ms
+- Query (50K rows): 50ms
+- As-of query: 50ms (indexed)
+
+**Upgrade Triggers:**
+- Si >1M rows → Enterprise (partitioning)
+
+---
+
+### Enterprise Profile (400 LOC)
+
+**Contexto del Usuario:**
+Banco con 8.5M transacciones. Necesitan: partitioning por fecha (query performance), compression (storage costs), read replicas (scale queries), computed columns para aggregations (monthly totals pre-calculated).
+
+**Implementation:**
+```python
+# lib/canonical_store.py (Enterprise - 400 LOC)
+import psycopg2
+from typing import List, Dict
+from datetime import datetime
+
+class CanonicalStore:
+    """
+    Enterprise PostgreSQL storage with partitioning and replicas.
+
+    Features:
+    - Monthly partitions (8.5M rows → ~700K/partition)
+    - Compression (pg_toast)
+    - Read replicas
+    - Computed columns (monthly aggregates)
+    """
+
+    def __init__(self, primary_conn_string, replica_conn_strings: List[str] = None):
+        self.primary = psycopg2.connect(primary_conn_string)
+        self.replicas = [psycopg2.connect(cs) for cs in (replica_conn_strings or [])]
+        self._current_replica = 0
+
+    def upsert(self, canonical: Dict, valid_from: datetime = None):
+        """Write to primary with bitemporal tracking."""
+        if not valid_from:
+            valid_from = datetime.now()
+
+        # Determine partition (based on transaction date)
+        partition_name = f"canonicals_{canonical['date'][:7].replace('-', '_')}"  # "canonicals_2024_10"
+
+        # Close previous version
+        self.primary.execute(f"""
+            UPDATE {partition_name}
+            SET valid_to = %s
+            WHERE canonical_id = %s AND valid_to IS NULL
+        """, (valid_from, canonical["canonical_id"]))
+
+        # Insert new version
+        self.primary.execute(f"""
+            INSERT INTO {partition_name} (
+                canonical_id, upload_id, observation_id,
+                date, amount, merchant, category, account,
+                normalizer_version, valid_from, valid_to, transaction_time
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, NOW())
+        """, (
+            canonical["canonical_id"],
+            canonical["upload_id"],
+            canonical["observation_id"],
+            canonical["date"],
+            canonical["amount"],
+            canonical["merchant"],
+            canonical.get("category"),
+            canonical["account"],
+            canonical["normalizer_version"],
+            valid_from
+        ))
+        self.primary.commit()
+
+        # Update materialized view (monthly aggregates)
+        self._refresh_monthly_aggregates(canonical["date"][:7])
+
+    def query_with_replica(self, filters: Dict = None) -> List[Dict]:
+        """Query from read replica (load balancing)."""
+        replica = self.replicas[self._current_replica]
+        self._current_replica = (self._current_replica + 1) % len(self.replicas)
+
+        query = "SELECT * FROM canonicals WHERE valid_to IS NULL"
+        params = []
+
+        if filters:
+            if "date_from" in filters:
+                query += " AND date >= %s"
+                params.append(filters["date_from"])
+
+        cursor = replica.execute(query, params)
+        return [dict(row) for row in cursor.fetchall()]
+
+    def _refresh_monthly_aggregates(self, month: str):
+        """Refresh materialized view for monthly totals."""
+        self.primary.execute(f"""
+            REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_aggregates_{month.replace('-', '_')}
+        """)
+        self.primary.commit()
+
+# Partitioning Schema
+"""
+-- Parent table (partitioned by date)
+CREATE TABLE canonicals (
+    canonical_id TEXT NOT NULL,
+    date DATE NOT NULL,
+    amount NUMERIC(12,2),
+    merchant TEXT,
+    category TEXT,
+    valid_from TIMESTAMP NOT NULL,
+    valid_to TIMESTAMP,
+    PRIMARY KEY (canonical_id, date, valid_from)
 ) PARTITION BY RANGE (date);
 
--- Monthly partitions
+-- Create monthly partitions
 CREATE TABLE canonicals_2024_10 PARTITION OF canonicals
     FOR VALUES FROM ('2024-10-01') TO ('2024-11-01');
--- ... 120 partitions
 
--- Indexes (per partition)
-CREATE INDEX idx_canonicals_2024_10_upload ON canonicals_2024_10(upload_id);
-CREATE INDEX idx_canonicals_2024_10_customer ON canonicals_2024_10(customer_id);
-CREATE INDEX idx_canonicals_2024_10_merchant ON canonicals_2024_10(merchant);
-CREATE INDEX idx_canonicals_2024_10_category ON canonicals_2024_10(category);
-CREATE INDEX idx_canonicals_2024_10_bitemporal ON canonicals_2024_10(valid_from, valid_to, tx_from, tx_to);
+CREATE TABLE canonicals_2024_11 PARTITION OF canonicals
+    FOR VALUES FROM ('2024-11-01') TO ('2024-12-01');
 
--- Materialized view for analytics
-CREATE MATERIALIZED VIEW monthly_spending_by_merchant AS
+-- Compression (TOAST)
+ALTER TABLE canonicals SET (toast_tuple_target = 128);
+
+-- Computed columns (materialized views)
+CREATE MATERIALIZED VIEW monthly_aggregates_2024_10 AS
 SELECT
-    DATE_TRUNC('month', date) as month,
-    merchant,
     category,
     COUNT(*) as transaction_count,
     SUM(amount) as total_amount
-FROM canonicals
-WHERE tx_to = 'infinity'  -- Current version only
-GROUP BY DATE_TRUNC('month', date), merchant, category;
+FROM canonicals_2024_10
+WHERE valid_to IS NULL
+GROUP BY category;
 
-CREATE INDEX idx_monthly_spending_month ON monthly_spending_by_merchant(month);
-```
+CREATE INDEX idx_monthly_agg_category ON monthly_aggregates_2024_10(category);
+"""
 
-**Implementation Complexity:** **HIGH**
-- ~1800 lines Python/TypeScript
-- SQLAlchemy with PostgreSQL dialect
-- Bitemporal query helpers (get_as_of, get_history)
-- Elasticsearch sync worker (async)
-- Partition manager (auto-create monthly partitions)
-- Materialized view refresh scheduler
-- Compression layer
-- Comprehensive test suite
-- Monitoring dashboards
-
-**Narrative Example:**
-> Bank processes credit card statement (1,500 transactions). Normalizer produces 1,500 canonicals:
-> ```python
-> canonical = CanonicalTransaction(
->     canonical_id="CT_12345_0",
->     date=date(2024, 10, 15),
->     amount=-87.43,
->     merchant="Starbucks",
->     merchant_id="MER_starbucks_001",
->     category="Food & Drink",
->     valid_from=datetime.now(),
->     valid_to=datetime(9999, 12, 31),  # Current version
->     tx_from=datetime.now(),
->     tx_to=datetime(9999, 12, 31)
-> )
-> canonical_store.upsert(canonical)
-> ```
-> PostgreSQL:
-> 1. Determines partition: `date='2024-10-15'` → Routes to `canonicals_2024_10`
-> 2. Compresses merchant/description with zstd: 200 bytes → 80 bytes
-> 3. Inserts with bitemporal columns
-> 4. Async worker syncs to Elasticsearch for full-text search
-> 5. Prometheus metric: `canonical_upserts_total{partition="2024_10",category="food_drink"} ++`
->
-> Total: 1,500 canonicals inserted in 4.5 seconds (3ms per row).
->
-> **Bitemporal update** (rule change):
-> Bank updates merchant normalization rules: "STARBUCKS #1234" → "Starbucks Coffee" (more specific). Re-run normalizer on October data:
-> 1. Query existing canonicals: `SELECT * FROM canonicals WHERE date >= '2024-10-01' AND merchant LIKE 'Starbucks%' AND tx_to = 'infinity'`
-> 2. For each match, INSERT new row with updated merchant:
-> ```sql
-> -- Close old version
-> UPDATE canonicals SET tx_to = NOW() WHERE canonical_id = 'CT_12345_0' AND tx_to = 'infinity';
->
-> -- Insert new version
-> INSERT INTO canonicals (canonical_id, merchant, valid_from, valid_to, tx_from, tx_to, ...)
-> VALUES ('CT_12345_0', 'Starbucks Coffee', '2024-10-15', 'infinity', NOW(), 'infinity', ...);
-> ```
-> 3. Now `SELECT * FROM canonicals WHERE canonical_id = 'CT_12345_0' AND tx_to = 'infinity'` returns new version with "Starbucks Coffee"
-> 4. Audit log records rule change: `{"event":"merchant_rule_updated","affected_canonicals":150,"old_value":"Starbucks","new_value":"Starbucks Coffee"}`
->
-> **Bitemporal query** (audit: "What did we think the merchant was on Oct 20?"):
-> ```sql
-> SELECT * FROM canonicals
-> WHERE canonical_id = 'CT_12345_0'
->   AND valid_from <= '2024-10-15'
->   AND valid_to > '2024-10-15'
->   AND tx_from <= '2024-10-20'
->   AND tx_to > '2024-10-20';
-> ```
-> Returns version that was current on Oct 20 (before rule change).
->
-> **Analytics query** (on read replica):
-> ```sql
-> SELECT * FROM monthly_spending_by_merchant
-> WHERE month = '2024-10-01' AND category = 'Food & Drink'
-> ORDER BY total_amount DESC
-> LIMIT 10;
-> ```
-> Materialized view pre-computed → Returns in 50ms (vs 30s full scan).
-
----
-
-**Key Insight:** The same `CanonicalStore` interface works across all 3 profiles. Personal uses SQLite single table (90 lines); Small business adds FTS and retention (250 lines); Enterprise uses PostgreSQL with bitemporal tracking, partitioning, Elasticsearch, and materialized views (1800 lines). All use the same `upsert(canonical_id)` idempotency guarantee.
-
----
-
-## Interface Contract
-
-```python
-from typing import List, Optional
-
-class CanonicalStore:
-    def upsert(self, canonical: Canonical) -> None:
-        """
-        Insert or update canonical by canonical_id (idempotent).
-        Enables re-normalization with updated rules.
-        """
-        pass
-
-    def get_by_upload(self, upload_id: str) -> List[Canonical]:
-        """Retrieve all canonicals for an upload."""
-        pass
-
-    def get_by_id(self, canonical_id: str) -> Optional[Canonical]:
-        """Retrieve single canonical by ID."""
-        pass
-
-    def query(self, filters: dict) -> List[Canonical]:
-        """
-        Query canonicals by criteria.
-        Examples: date range, account, category, amount range.
-        """
-        pass
-
-    def delete_by_upload(self, upload_id: str) -> int:
-        """Delete all canonicals for upload. Returns count deleted."""
-        pass
-```
-
----
-
-## Behavior
-
-**Idempotent upserts (re-normalization):**
-```python
-# First normalization
-canonical_v1 = Canonical(
-    canonical_id="CT_abc123",
-    observation_id="UL_test:0",
-    category="Uncategorized"  # No rule for merchant yet
+# Usage
+store = CanonicalStore(
+    primary_conn_string="postgresql://primary:5432/bank",
+    replica_conn_strings=[
+        "postgresql://replica1:5432/bank",
+        "postgresql://replica2:5432/bank"
+    ]
 )
-store.upsert(canonical_v1)
 
-# Update rules, re-normalize
-canonical_v2 = Canonical(
-    canonical_id="CT_abc123",  # Same ID
-    observation_id="UL_test:0",
-    category="Food & Drink"  # Rule added
-)
-store.upsert(canonical_v2)  # Overwrites v1
+# Write to primary
+store.upsert({...}, valid_from=datetime.now())
 
-assert store.get_by_id("CT_abc123").category == "Food & Drink"
+# Read from replica (load balanced)
+txns = store.query_with_replica({"date_from": "2024-10-01"})
 ```
 
----
+**Características Incluidas:**
+- ✅ Monthly partitioning (700K rows/partition)
+- ✅ Compression (TOAST)
+- ✅ Read replicas (3 nodes, load balanced)
+- ✅ Materialized views (monthly aggregates)
+- ✅ Bitemporal tracking
 
-## Storage Schema
+**Características NO Incluidas:**
+- ❌ Multi-region replication (single datacenter sufficient)
 
-```sql
-CREATE TABLE canonicals (
-    canonical_id TEXT PRIMARY KEY,
-    upload_id TEXT NOT NULL,
-    observation_id TEXT NOT NULL,  -- Link back to raw data
-    normalized_at TIMESTAMPTZ NOT NULL,
-    normalizer_version TEXT NOT NULL,
-    rule_set_version TEXT,
-
-    -- Domain-specific fields (JSONB for flexibility)
-    canonical_data JSONB NOT NULL,
-
-    -- Metadata
-    confidence_score DECIMAL(3,2),
-    applied_rules TEXT[],
-    flags TEXT[]
-);
-
-CREATE INDEX idx_canonicals_upload_id ON canonicals(upload_id);
-CREATE INDEX idx_canonicals_normalized_at ON canonicals(normalized_at);
+**Configuración:**
+```yaml
+canonical_store:
+  backend: "postgresql"
+  primary: "postgresql://primary:5432/bank"
+  replicas:
+    - "postgresql://replica1:5432/bank"
+    - "postgresql://replica2:5432/bank"
+  partitioning:
+    strategy: "monthly"
+    retention_months: 60
+  compression:
+    enabled: true
+  materialized_views:
+    refresh_schedule: "0 2 * * *"  # 2 AM daily
 ```
 
----
+**Performance:**
+- Upsert (primary): 8ms
+- Query (replica, 8.5M rows): 100ms (partition pruning)
+- Aggregate query (materialized view): 5ms
+- Storage: 4.5GB (compressed)
 
-## Multi-Domain Applicability
-
-**Finance:** Store CanonicalTransaction (validated dates, amounts, categories)
-**Healthcare:** Store CanonicalLabResult (validated test values, units)
-**Legal:** Store CanonicalClause (categorized contract clauses)
-**Research (RSRCH - Utilitario):** Store CanonicalFact (validated founder/company facts with multi-source provenance, normalized entity names)
-**Manufacturing:** Store CanonicalMeasurement (calibrated sensor values)
-**Media:** Store CanonicalUtterance (cleaned transcripts with speaker IDs)
+**No Further Tiers:**
+- Scale horizontally (more replicas)
 
 ---
 
-## Domain Validation
-
-### ✅ Finance (Primary Instantiation)
-**Use case:** Store validated canonical transactions after normalization
-**Example:** Normalizer processes 42 ObservationTransaction records → produces 42 CanonicalTransaction records with `canonical_id="CT_abc123_0"`, `canonical_data={"date": "2025-01-15T00:00:00Z", "amount": -5.75, "merchant": "Starbucks", "category": "Food & Drink"}` (ISO dates, Decimal amounts, clean strings) → CanonicalStore upserts 42 records
-**Schema:** `CanonicalTransaction` (canonical_id, upload_id, canonical_data: {date, amount, merchant, category, account})
-**Regeneration:** Update merchant rules → re-normalize → upsert with same canonical_id → overwrites old canonicals with improved merchant names
-**Status:** ✅ Fully implemented in personal-finance-app
-
-### ✅ Healthcare
-**Use case:** Store validated canonical lab results after normalization
-**Example:** Normalizer processes 8 ObservationLabResult records → produces 8 CanonicalLabResult records with `canonical_id="CLR_lab456_0"`, `canonical_data={"test_code": "LOINC:2345-7", "value": 95.0, "unit": "mg/dL", "normal_range": "70-100", "flag": "normal"}` (standardized codes, validated ranges) → CanonicalStore upserts 8 records
-**Schema:** `CanonicalLabResult` (canonical_id, upload_id, canonical_data: {test_code, value, unit, normal_range, test_date})
-**Regeneration:** Update LOINC mapping rules → re-normalize → upsert with updated test codes
-**Status:** ✅ Conceptually validated via examples in this doc
-
-### ✅ Legal
-**Use case:** Store validated canonical clauses after normalization
-**Example:** Normalizer processes 47 ObservationClause records → produces 47 CanonicalClause records with `canonical_id="CC_contract789_0"`, `canonical_data={"clause_type": "payment_terms", "obligation_type": "payment", "deadline_days": 30, "enforceability": "mandatory"}` (classified clause types) → CanonicalStore upserts 47 records
-**Schema:** `CanonicalClause` (canonical_id, upload_id, canonical_data: {clause_type, obligation_type, deadline_days, enforceability})
-**Regeneration:** Update clause classification rules → re-normalize → upsert with improved clause types
-**Status:** ✅ Conceptually validated via examples in this doc
-
-### ✅ RSRCH (Utilitario Research)
-**Use case:** Store validated canonical facts after entity resolution
-**Example:** Normalizer processes 12 RawFact records → produces 12 CanonicalFact records with `canonical_id="CF_article101_0"`, `canonical_data={"entity_name": "Sam Altman", "entity_type": "person", "company": "OpenAI", "investment_amount": 375000000, "fact_type": "investment", "source_url": "techcrunch.com/..."}` (normalized entity names, parsed amounts) → CanonicalStore upserts 12 records
-**Schema:** `CanonicalFact` (canonical_id, upload_id, canonical_data: {entity_name, entity_type, company, investment_amount, fact_type})
-**Regeneration:** Update entity resolution rules ("@sama" → "Sam Altman") → re-normalize → upsert with canonical entity names
-**Status:** ✅ Conceptually validated via examples in this doc
-
-### ✅ E-commerce
-**Use case:** Store validated canonical products after normalization
-**Example:** Normalizer processes 1,500 ObservationProduct records → produces 1,500 CanonicalProduct records with `canonical_id="CP_catalog202_0"`, `canonical_data={"SKU": "IPHONE15-256-BLU", "title": "iPhone 15 Pro Max 256GB", "price": 1199.99, "category": ["Electronics", "Phones"], "availability": "in_stock"}` (clean titles, parsed prices, category hierarchies) → CanonicalStore upserts 1,500 records
-**Schema:** `CanonicalProduct` (canonical_id, upload_id, canonical_data: {SKU, title, price, category, availability})
 **Regeneration:** Update product title cleaning rules → re-normalize → upsert with cleaner titles
 **Status:** ✅ Conceptually validated via examples in this doc
 
