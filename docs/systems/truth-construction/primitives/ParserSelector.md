@@ -327,90 +327,52 @@ def calculate_confidence(
 
 ## Simplicity Profiles
 
-The same ParserSelector interface supports three implementation scales: Personal (no auto-selection), Small Business (simple pattern matching), Enterprise (ML-based confidence scoring).
+### Personal Profile (0 LOC)
 
-### Personal Profile (0 LOC - Not Needed)
-
-**Darwin's Approach:** No parser selection - always use the same parser
-
-**Why Darwin doesn't need this:**
-- Darwin has exactly 1 parser (BofAPDFParser)
-- All uploads are Bank of America PDFs
-- No selection logic needed when there's only one option
-
-**What Darwin DOESN'T need:**
-- ❌ Filename pattern matching
-- ❌ Confidence scoring
-- ❌ Alternative parser suggestions
-- ❌ User override UI
+**Contexto del Usuario:**
+Darwin tiene 1 parser (BofAPDFParser). Todos los uploads son PDFs de Bank of America. No necesita lógica de selección cuando solo hay 1 opción. Upload flow = siempre usar BofAPDFParser.
 
 **Implementation:**
-
-Darwin skips this primitive entirely.
-
-**Darwin's upload flow:**
 ```python
-# Simple hardcoded parser selection
+# No implementation needed (0 LOC)
+# Darwin always uses same parser
+
 def handle_upload(pdf_path):
-    parser = BofAPDFParser()  # Always use BoFA parser
+    parser = BofAPDFParser()  # Always BoFA
     observations = parser.parse(pdf_path)
     store_observations(observations)
 ```
 
-**Decision Context:**
-- Darwin only banks with Bank of America
-- All statements are same PDF format
-- No need for selection when there's only one parser
-- YAGNI: Skip ParserSelector when you have 1 parser
+**Características Incluidas:**
+- ✅ Hardcoded parser (always BofAPDFParser)
+
+**Características NO Incluidas:**
+- ❌ Filename pattern matching (YAGNI: 1 parser)
+- ❌ Confidence scoring (YAGNI: no selection)
+- ❌ Alternative suggestions (YAGNI: no alternatives)
+- ❌ User override UI (YAGNI: always same parser)
+
+**Configuración:**
+```python
+# No config needed
+```
+
+**Performance:**
+- N/A (no selection logic)
+
+**Upgrade Triggers:**
+- Si >1 banco → Small Business (pattern matching)
 
 ---
 
 ### Small Business Profile (60 LOC)
 
-**Use Case:** Accounting firm with 8 bank parsers, simple filename pattern matching
-
-**What they need (vs Personal):**
-- ✅ **Filename pattern matching** (simple regex per parser)
-- ✅ **File type matching** (.pdf vs .csv vs .ofx)
-- ✅ **Fallback to manual selection** (if no match)
-- ❌ No confidence scoring (pattern match or no match)
-- ❌ No user preferences
-- ❌ No ML model
+**Contexto del Usuario:**
+Firma contable con 8 parsers (BoFA, Chase, Wells Fargo, etc.). Necesitan filename pattern matching: "Bank_of_America_Statement.pdf" → bofa_pdf. Simple regex per parser. Si no match → fallback a manual selection.
 
 **Implementation:**
-
-**Config File (config/parser-patterns.yaml):**
-```yaml
-parsers:
-  - parser_id: "bofa_pdf"
-    filename_patterns:
-      - ".*[Bb]ank.*[Oo]f.*[Aa]merica.*\\.pdf"
-      - ".*BofA.*\\.pdf"
-      - ".*BOA.*\\.pdf"
-    file_types: ["pdf"]
-
-  - parser_id: "chase_csv"
-    filename_patterns:
-      - ".*[Cc]hase.*\\.csv"
-    file_types: ["csv"]
-
-  - parser_id: "wells_fargo_pdf"
-    filename_patterns:
-      - ".*Wells.*Fargo.*\\.pdf"
-      - ".*WF.*Statement.*\\.pdf"
-    file_types: ["pdf"]
-
-  - parser_id: "amex_ofx"
-    filename_patterns:
-      - ".*[Aa]merican.*[Ee]xpress.*\\.ofx"
-      - ".*Amex.*\\.ofx"
-    file_types: ["ofx", "qfx"]
-```
-
-**Code Example (60 LOC):**
 ```python
-# parser_selector.py (Small Business)
-
+# lib/parser_selector.py (Small Business - 60 LOC)
 import yaml
 import re
 from pathlib import Path
@@ -429,383 +391,342 @@ class ParserSelector:
         Returns:
             parser_id if match found, None if no match
         """
+        file_ext = Path(filename).suffix.lower().lstrip('.')
+
         for parser in self.config["parsers"]:
-            # Try each filename pattern
+            # Check file type
+            if file_ext not in parser["file_types"]:
+                continue
+
+            # Check filename patterns
             for pattern in parser["filename_patterns"]:
-                if re.search(pattern, filename, re.IGNORECASE):
+                if re.match(pattern, filename, re.IGNORECASE):
                     return parser["parser_id"]
 
-        return None  # No match
-
-    def get_parser_by_file_type(self, file_type: str) -> Optional[str]:
-        """
-        Get first parser that supports file type.
-
-        Fallback if filename pattern doesn't match.
-        """
-        for parser in self.config["parsers"]:
-            if file_type.lower() in parser["file_types"]:
-                return parser["parser_id"]
-
+        # No match found
         return None
+
+# YAML Config
+"""
+# config/parser-patterns.yaml
+
+parsers:
+  - parser_id: "bofa_pdf"
+    filename_patterns:
+      - ".*[Bb]ank.*[Oo]f.*[Aa]merica.*\\.pdf"
+      - ".*BofA.*\\.pdf"
+    file_types: ["pdf"]
+
+  - parser_id: "chase_csv"
+    filename_patterns:
+      - ".*[Cc]hase.*\\.csv"
+    file_types: ["csv"]
+
+  - parser_id: "wells_fargo_pdf"
+    filename_patterns:
+      - ".*Wells.*Fargo.*\\.pdf"
+    file_types: ["pdf"]
+"""
+
+# Usage
+selector = ParserSelector()
+
+# Auto-select parser
+parser_id = selector.select_parser("Bank_of_America_Statement_Nov_2024.pdf")
+# → "bofa_pdf"
+
+parser_id = selector.select_parser("Chase_Activity_Nov_2024.csv")
+# → "chase_csv"
+
+parser_id = selector.select_parser("random_file.pdf")
+# → None (no match → show manual selection UI)
 ```
 
-**Usage:**
-```python
-selector = ParserSelector("config/parser-patterns.yaml")
+**Características Incluidas:**
+- ✅ Filename pattern matching (regex)
+- ✅ File type filtering (.pdf/.csv/.ofx)
+- ✅ Fallback to manual selection (if None)
+- ✅ YAML config (non-developers can add patterns)
 
-# High-confidence match
-parser_id = selector.select_parser("BofA_Statement_Nov2024.pdf")
-# Returns: "bofa_pdf"
+**Características NO Incluidas:**
+- ❌ Confidence scoring (pattern match = 100%, no match = 0%)
+- ❌ User preferences (no history tracking)
+- ❌ ML model (regex sufficient for 8 parsers)
 
-# Low-confidence match (no filename pattern match, fallback to file type)
-parser_id = selector.select_parser("statement_123.pdf")
-if not parser_id:
-    # Fallback to file type
-    parser_id = selector.get_parser_by_file_type("pdf")
-    # Returns: First PDF parser (could be bofa_pdf or wells_fargo_pdf)
-    print(f"⚠️ Auto-selected {parser_id} based on file type. Please confirm.")
-
-# No match
-parser_id = selector.select_parser("unknown_file.txt")
-# Returns: None
-if not parser_id:
-    print("❌ No parser found. Please select manually.")
+**Configuración:**
+```yaml
+parser_selector:
+  config_path: "config/parser-patterns.yaml"
 ```
 
-**UI Flow:**
-```python
-# Upload handler
-def handle_upload(filename):
-    parser_id = selector.select_parser(filename)
+**Performance:**
+- Selection: 2ms (8 regex matches)
+- Memory: 10KB (YAML config)
 
-    if parser_id:
-        print(f"✓ Auto-selected parser: {parser_id}")
-        proceed_with_parsing(parser_id)
-    else:
-        # Show manual selection UI
-        print("Please select parser:")
-        print("1. Bank of America PDF")
-        print("2. Chase CSV")
-        print("3. Wells Fargo PDF")
-        print("4. Amex OFX")
-        choice = input("Enter number: ")
-        parser_id = get_parser_by_choice(choice)
-        proceed_with_parsing(parser_id)
-```
-
-**Testing:**
-- ✅ Unit test: Each filename pattern matches correct parser
-- ✅ Unit test: File type fallback works
-- ✅ Unit test: Unknown files return None
-
-**Decision Context:**
-- Accounting firm has 8 banks → 8 parsers with distinct filename patterns
-- Simple regex matching sufficient (95% accuracy)
-- Manual fallback acceptable for ambiguous files (5% of uploads)
+**Upgrade Triggers:**
+- Si >20 parsers → Enterprise (ML model)
+- Si low match rate → Enterprise (confidence scoring)
 
 ---
 
 ### Enterprise Profile (400 LOC)
 
-**Use Case:** Multi-tenant platform with 50+ parsers, ML-based confidence scoring
-
-**What they need (vs Small Business):**
-- ✅ All Small Business features (pattern matching, file type matching)
-- ✅ **Confidence scoring** (0.0-1.0 based on multiple signals)
-- ✅ **Ranked alternatives** (show top 3 matches with confidence)
-- ✅ **User preferences** (boost preferred parsers)
-- ✅ **Capability matching** (parser must support required fields)
-- ✅ **ML model** (learn from user overrides to improve accuracy)
-- ✅ **Selection logging** (audit trail for parser choice)
+**Contexto del Usuario:**
+50+ parsers. Filename patterns no son confiables (bancos cambian formatos). Necesitan: ML confidence scoring (analizar PDF content, no solo filename), user preferences (si usuario siempre corrige bofa_pdf → chase_csv, aprender), alternative suggestions (top 3 parsers con confidence).
 
 **Implementation:**
-
-**Database Schema:**
-```sql
-CREATE TABLE parser_registrations (
-    parser_id TEXT PRIMARY KEY,
-    version TEXT NOT NULL,
-    filename_patterns TEXT[],
-    file_types TEXT[],
-    capabilities TEXT[],  -- ["date", "amount", "merchant"]
-    priority INTEGER DEFAULT 0
-);
-
-CREATE TABLE user_parser_preferences (
-    user_id TEXT NOT NULL,
-    parser_id TEXT NOT NULL,
-    preference_score FLOAT DEFAULT 1.0,  -- Learned from overrides
-    PRIMARY KEY (user_id, parser_id)
-);
-
-CREATE TABLE parser_selection_log (
-    selection_id TEXT PRIMARY KEY,
-    upload_id TEXT NOT NULL,
-    filename TEXT NOT NULL,
-    auto_selected_parser TEXT,
-    actual_selected_parser TEXT,  -- May differ if user overrode
-    confidence FLOAT,
-    alternatives JSONB,
-    selected_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-**Code Example (400 LOC - excerpt):**
 ```python
-# parser_selector.py (Enterprise)
-
-import re
-from typing import List, Optional, Dict
-from dataclasses import dataclass
+# lib/parser_selector.py (Enterprise - 400 LOC)
 import psycopg2
-from psycopg2.extras import DictCursor
+from typing import List, Tuple
+from dataclasses import dataclass
+import pickle
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
 
 @dataclass
-class RankedParser:
+class ParserSuggestion:
     parser_id: str
-    version: str
     confidence: float
     reason: str
 
-@dataclass
-class ParserSelection:
-    selected_parser: RankedParser
-    alternatives: List[RankedParser]
-
 class ParserSelector:
-    """Enterprise parser selection with ML-based confidence scoring."""
+    """ML-based parser selection with confidence scoring."""
 
-    def __init__(self, db_conn_string: str):
-        self.db_conn_string = db_conn_string
+    def __init__(self, db_connection_string, model_path="models/parser_selector.pkl"):
+        self.conn = psycopg2.connect(db_connection_string)
+        self.model = self._load_model(model_path)
+        self.vectorizer = self._load_vectorizer(model_path)
+
+    def _load_model(self, path):
+        """Load trained ML model (Logistic Regression)."""
+        with open(path, "rb") as f:
+            return pickle.load(f)
+
+    def _load_vectorizer(self, path):
+        """Load TF-IDF vectorizer."""
+        with open(path.replace(".pkl", "_vectorizer.pkl"), "rb") as f:
+            return pickle.load(f)
 
     def select_parser(
         self,
         filename: str,
-        file_type: str,
-        required_capabilities: Optional[List[str]] = None,
-        user_id: Optional[str] = None,
-        min_confidence: float = 0.7
-    ) -> Optional[ParserSelection]:
+        file_content_sample: str,
+        user_id: str = None
+    ) -> List[ParserSuggestion]:
         """
-        Auto-select parser with confidence scoring.
+        Select parser with ML confidence scoring.
 
         Args:
             filename: Uploaded filename
-            file_type: File extension (pdf, csv, ofx)
-            required_capabilities: Optional required fields
-            user_id: Optional user ID (for preference boost)
-            min_confidence: Minimum confidence threshold
+            file_content_sample: First 500 chars of file (for text extraction)
+            user_id: User ID (for personalized suggestions)
 
         Returns:
-            ParserSelection with top choice + alternatives, or None if confidence < min
+            List of ParserSuggestion (top 3, sorted by confidence)
         """
-        # Rank all parsers
-        ranked = self.rank_parsers(filename, file_type, required_capabilities, user_id)
+        # Feature extraction
+        features = self._extract_features(filename, file_content_sample)
 
-        if not ranked or ranked[0].confidence < min_confidence:
-            return None
+        # ML prediction (probabilities for each parser)
+        probabilities = self.model.predict_proba([features])[0]
+        parser_ids = self.model.classes_
 
-        return ParserSelection(
-            selected_parser=ranked[0],
-            alternatives=ranked[1:4]  # Top 3 alternatives
-        )
-
-    def rank_parsers(
-        self,
-        filename: str,
-        file_type: str,
-        required_capabilities: Optional[List[str]] = None,
-        user_id: Optional[str] = None
-    ) -> List[RankedParser]:
-        """Rank all parsers by confidence score."""
-        conn = psycopg2.connect(self.db_conn_string)
-        cursor = conn.cursor(cursor_factory=DictCursor)
-
-        cursor.execute("""
-            SELECT parser_id, version, filename_patterns, file_types, capabilities, priority
-            FROM parser_registrations
-            WHERE ? = ANY(file_types)
-            ORDER BY priority DESC
-        """, (file_type,))
-
-        parsers = cursor.fetchall()
-
-        # Get user preferences if available
-        user_prefs = {}
+        # Get user preferences (personalization)
         if user_id:
-            cursor.execute("""
-                SELECT parser_id, preference_score
-                FROM user_parser_preferences
-                WHERE user_id = %s
-            """, (user_id,))
-            user_prefs = {row["parser_id"]: row["preference_score"] for row in cursor.fetchall()}
+            user_prefs = self._get_user_preferences(user_id)
+            # Boost probabilities for user's preferred parsers
+            for i, parser_id in enumerate(parser_ids):
+                if parser_id in user_prefs:
+                    probabilities[i] *= user_prefs[parser_id]
 
-        conn.close()
+        # Sort by confidence
+        suggestions = []
+        for parser_id, confidence in zip(parser_ids, probabilities):
+            if confidence > 0.05:  # Threshold: 5%
+                reason = self._explain_selection(parser_id, filename, file_content_sample)
+                suggestions.append(ParserSuggestion(
+                    parser_id=parser_id,
+                    confidence=confidence,
+                    reason=reason
+                ))
 
-        # Score each parser
-        ranked = []
-        for parser in parsers:
-            score, reason = self._calculate_score(
-                parser=parser,
-                filename=filename,
-                file_type=file_type,
-                required_capabilities=required_capabilities,
-                user_preference_score=user_prefs.get(parser["parser_id"], 1.0)
-            )
+        # Sort by confidence DESC, return top 3
+        suggestions.sort(key=lambda x: x.confidence, reverse=True)
+        return suggestions[:3]
 
-            ranked.append(RankedParser(
-                parser_id=parser["parser_id"],
-                version=parser["version"],
-                confidence=score,
-                reason=reason
-            ))
+    def _extract_features(self, filename: str, content_sample: str) -> list:
+        """
+        Extract features for ML model.
 
-        # Sort by confidence descending
-        ranked.sort(key=lambda p: p.confidence, reverse=True)
+        Features:
+        - Filename (TF-IDF on words)
+        - Content sample (TF-IDF on first 500 chars)
+        - File extension
+        """
+        # TF-IDF on filename + content
+        text = f"{filename} {content_sample}"
+        features = self.vectorizer.transform([text]).toarray()[0]
+        return features
 
-        return ranked
+    def _get_user_preferences(self, user_id: str) -> dict:
+        """
+        Get user's parser preferences (historical corrections).
 
-    def _calculate_score(
-        self,
-        parser: Dict,
-        filename: str,
-        file_type: str,
-        required_capabilities: Optional[List[str]],
-        user_preference_score: float
-    ) -> tuple[float, str]:
-        """Calculate confidence score for parser."""
-        score = 0.0
+        If user frequently corrects bofa_pdf → chase_csv,
+        boost chase_csv confidence for this user.
+
+        Returns:
+            {parser_id: boost_factor} (e.g., {"chase_csv": 1.5})
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT corrected_parser_id, COUNT(*) as correction_count
+            FROM parser_corrections
+            WHERE user_id = %s
+            GROUP BY corrected_parser_id
+        """, (user_id,))
+
+        prefs = {}
+        for parser_id, count in cursor.fetchall():
+            # Boost factor: 1.0 + (count / 10) capped at 2.0
+            boost = min(1.0 + (count / 10), 2.0)
+            prefs[parser_id] = boost
+
+        return prefs
+
+    def _explain_selection(self, parser_id: str, filename: str, content: str) -> str:
+        """Generate human-readable reason for parser selection."""
         reasons = []
 
-        # 1. Filename pattern match (0.6 weight)
-        filename_match = False
-        for pattern in parser["filename_patterns"]:
-            if re.search(pattern, filename, re.IGNORECASE):
-                score += 0.6
-                reasons.append(f"Filename matches pattern '{pattern}'")
-                filename_match = True
-                break
+        # Check filename match
+        if parser_id.lower() in filename.lower():
+            reasons.append(f"Filename contains '{parser_id}'")
 
-        # 2. File type match (0.3 weight)
-        if file_type.lower() in parser["file_types"]:
-            score += 0.3
-            reasons.append(f"File type '{file_type}' supported")
+        # Check content keywords (bank-specific)
+        bank_keywords = {
+            "bofa_pdf": ["Bank of America", "BofA"],
+            "chase_csv": ["JPMorgan Chase", "Chase"],
+            "wells_fargo_pdf": ["Wells Fargo", "WF"]
+        }
+        if parser_id in bank_keywords:
+            for keyword in bank_keywords[parser_id]:
+                if keyword.lower() in content.lower():
+                    reasons.append(f"Content contains '{keyword}'")
 
-        # 3. Required capabilities (0.1 weight)
-        if required_capabilities:
-            parser_caps = set(parser["capabilities"])
-            required_caps = set(required_capabilities)
-            if required_caps.issubset(parser_caps):
-                score += 0.1
-                reasons.append("All required capabilities supported")
-            else:
-                missing = required_caps - parser_caps
-                reasons.append(f"Missing capabilities: {missing}")
+        return " • ".join(reasons) if reasons else "ML model prediction"
 
-        # 4. User preference boost (multiply by learned score)
-        if user_preference_score > 1.0:
-            score *= user_preference_score
-            reasons.append(f"User preference boost ({user_preference_score:.2f}x)")
-
-        # Cap at 1.0
-        score = min(score, 1.0)
-
-        reason = ", ".join(reasons) if reasons else "No match"
-        return (score, reason)
-
-    def log_selection(
-        self,
-        upload_id: str,
-        filename: str,
-        auto_selected: Optional[str],
-        actual_selected: str,
-        confidence: Optional[float],
-        alternatives: List[RankedParser]
-    ):
-        """Log parser selection for ML training."""
-        conn = psycopg2.connect(self.db_conn_string)
-        cursor = conn.cursor()
-
+    def record_correction(self, user_id: str, suggested_parser: str, corrected_parser: str):
+        """Record when user corrects parser selection (for learning)."""
+        cursor = self.conn.cursor()
         cursor.execute("""
-            INSERT INTO parser_selection_log
-            (upload_id, filename, auto_selected_parser, actual_selected_parser,
-             confidence, alternatives)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (
-            upload_id,
-            filename,
-            auto_selected,
-            actual_selected,
-            confidence,
-            json.dumps([{"parser_id": p.parser_id, "confidence": p.confidence} for p in alternatives])
-        ))
+            INSERT INTO parser_corrections (user_id, suggested_parser_id, corrected_parser_id, timestamp)
+            VALUES (%s, %s, %s, NOW())
+        """, (user_id, suggested_parser, corrected_parser))
+        self.conn.commit()
 
-        conn.commit()
-        conn.close()
+# Database Schema
+"""
+CREATE TABLE parser_corrections (
+    id SERIAL PRIMARY KEY,
+    user_id UUID NOT NULL,
+    suggested_parser_id TEXT NOT NULL,
+    corrected_parser_id TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT NOW()
+);
 
-        # If user overrode selection, update preference
-        if auto_selected and auto_selected != actual_selected:
-            self._update_user_preference(upload_id, actual_selected, boost=1.1)
+CREATE INDEX idx_parser_corrections_user ON parser_corrections (user_id, corrected_parser_id);
+"""
 
-    def _update_user_preference(self, upload_id: str, parser_id: str, boost: float):
-        """Update user preference based on override."""
-        # Get user_id from upload
-        # Update preference_score *= boost
-        pass  # Implementation omitted
-```
-
-**Usage Example:**
-```python
-selector = ParserSelector("postgresql://localhost/parsers")
-
-# Auto-select with confidence
-selection = selector.select_parser(
-    filename="BofA_Statement_Nov2024.pdf",
-    file_type="pdf",
-    required_capabilities=["date", "amount", "merchant"],
-    user_id="user_123",
-    min_confidence=0.7
+# Usage
+selector = ParserSelector(
+    db_connection_string="postgresql://localhost/app",
+    model_path="models/parser_selector.pkl"
 )
 
-if selection:
-    print(f"✓ Auto-selected: {selection.selected_parser.parser_id}")
-    print(f"  Confidence: {selection.selected_parser.confidence:.0%}")
-    print(f"  Reason: {selection.selected_parser.reason}")
-
-    if selection.selected_parser.confidence < 0.9:
-        print("\nAlternatives:")
-        for alt in selection.alternatives:
-            print(f"  - {alt.parser_id} ({alt.confidence:.0%})")
-else:
-    print("❌ No parser found with confidence ≥ 70%")
-    print("Please select manually from all available parsers")
-
-# Log selection
-selector.log_selection(
-    upload_id="UL_123",
-    filename="BofA_Statement_Nov2024.pdf",
-    auto_selected=selection.selected_parser.parser_id if selection else None,
-    actual_selected="bofa_pdf",  # User's final choice
-    confidence=selection.selected_parser.confidence if selection else None,
-    alternatives=selection.alternatives if selection else []
+# Get suggestions with confidence
+suggestions = selector.select_parser(
+    filename="Statement_Nov_2024.pdf",
+    file_content_sample="Bank of America... Account ending in 1234...",
+    user_id="user_abc"
 )
+
+# → [
+#     ParserSuggestion(parser_id="bofa_pdf", confidence=0.92, reason="Content contains 'Bank of America'"),
+#     ParserSuggestion(parser_id="chase_csv", confidence=0.05, reason="ML model prediction"),
+#     ParserSuggestion(parser_id="wells_fargo_pdf", confidence=0.03, reason="ML model prediction")
+# ]
+
+# If user corrects selection
+if user_selected_parser != suggestions[0].parser_id:
+    selector.record_correction(
+        user_id="user_abc",
+        suggested_parser=suggestions[0].parser_id,
+        corrected_parser=user_selected_parser
+    )
 ```
 
-**ML-Based Preference Learning:**
+**ML Model Training:**
 ```python
-# Over time, learn user preferences
-# User always overrides "generic_pdf" → "bofa_pdf" for "statement.pdf"
-# After 5 overrides:
-#   user_parser_preferences.preference_score["bofa_pdf"] → 1.5
-# Next upload "statement.pdf":
-#   bofa_pdf score: 0.3 (file type only) * 1.5 (preference) = 0.45
-#   generic_pdf score: 0.3 (file type only) * 1.0 = 0.30
-# Auto-selects bofa_pdf instead of generic_pdf
+# Training script (run offline, updates model weekly)
+from sklearn.linear_model import LogisticRegression
+from sklearn.feature_extraction.text import TfidfVectorizer
+import pickle
+
+# Training data: historical uploads with labeled parsers
+training_data = [
+    ("Bank_of_America_Nov.pdf", "Bank of America... Account...", "bofa_pdf"),
+    ("Chase_Activity.csv", "JPMorgan Chase... Transactions...", "chase_csv"),
+    # ... 10K+ examples
+]
+
+# Feature extraction
+X = [f"{filename} {content}" for filename, content, _ in training_data]
+y = [parser_id for _, _, parser_id in training_data]
+
+vectorizer = TfidfVectorizer(max_features=500)
+X_tfidf = vectorizer.fit_transform(X)
+
+# Train model
+model = LogisticRegression(multi_class="multinomial")
+model.fit(X_tfidf, y)
+
+# Save model
+with open("models/parser_selector.pkl", "wb") as f:
+    pickle.dump(model, f)
+with open("models/parser_selector_vectorizer.pkl", "wb") as f:
+    pickle.dump(vectorizer, f)
 ```
 
-**Testing:**
-- ✅ Unit tests for confidence scoring
+**Características Incluidas:**
+- ✅ ML confidence scoring (Logistic Regression)
+- ✅ Content-based features (TF-IDF on first 500 chars)
+- ✅ User preferences (learn from corrections)
+- ✅ Top 3 suggestions (with confidence + reason)
+- ✅ Weekly model retraining
+
+**Características NO Incluidas:**
+- ❌ Deep learning (Logistic Regression sufficient, 92% accuracy)
+
+**Configuración:**
+```yaml
+parser_selector:
+  model_path: "models/parser_selector.pkl"
+  confidence_threshold: 0.05
+  max_suggestions: 3
+  retrain_schedule: "weekly"
+```
+
+**Performance:**
+- Selection: 50ms (ML inference)
+- Accuracy: 92% (matches user's intended parser)
+- Model size: 5MB (TF-IDF + Logistic Regression)
+
+**No Further Tiers:**
+- Continue retraining model with new data
+
+---
+
 - ✅ Integration tests with test database
 - ✅ ML preference learning validation
 - ✅ User override tracking accuracy
