@@ -232,613 +232,387 @@ manager.mark_deprecated(
 
 ## Simplicity Profiles
 
-The same ParserVersionManager interface supports three implementation scales: Personal (no version management), Small Business (YAML version history), Enterprise (database with deprecation + sunset tracking).
+### Personal Profile (0 LOC)
 
-### Personal Profile (0 LOC - Not Needed)
-
-**Darwin's Approach:** No parser version management
-
-**Why Darwin doesn't need this:**
-- Darwin has exactly 1 parser (BofAPDFParser)
-- Parser version never changes (stable BoFA PDF format)
-- If BoFA changes PDF format → Darwin updates parser code directly
-- No versioning, no deprecation, no compatibility matrix
-
-**What Darwin DOESN'T need:**
-- ❌ Version tracking (parser doesn't change)
-- ❌ Deprecation dates
-- ❌ Breaking change documentation
-- ❌ Migration guides
-- ❌ Compatibility matrix
+**Contexto del Usuario:**
+Darwin siempre usa la última versión del parser. No necesita cambiar entre v1/v2/v3. No tiene múltiples parsers corriendo simultáneamente. Upgrading al nuevo parser = simplemente actualizar el código.
 
 **Implementation:**
-
-None! Darwin skips this primitive entirely.
-
-**If Darwin's parser DOES change:**
 ```python
-# Simple approach: Just update the parser code
-# Old:
-def parse_merchant(line):
-    return extract_text(line, pattern="MERCHANT: (.+)")
+# No implementation needed (0 LOC)
 
-# New:
-def parse_merchant(line):
-    # BoFA changed format on 2024-11-01
-    return extract_text(line, pattern="Merchant Name: (.+)")
+# Darwin always uses latest parser version
+from parsers.bofa_pdf import BofAPDFParser  # Always imports latest
+
+parser = BofAPDFParser()  # Latest version by default
 ```
 
-**Decision Context:**
-- Darwin's PDF format has been stable for 3 years
-- If format changes → Darwin updates code once
-- No need to support multiple parser versions simultaneously
-- YAGNI: Skip ParserVersionManager when you have 1 parser
+**Características Incluidas:**
+- ✅ Siempre usa última versión (import directo)
+
+**Características NO Incluidas:**
+- ❌ Version pinning (YAGNI: single user, always upgrade)
+- ❌ Rollback (YAGNI: can revert git commit)
+- ❌ A/B testing (YAGNI: no comparison needed)
+- ❌ Compatibility matrix (YAGNI: no old data to migrate)
+
+**Configuración:**
+```python
+# No config needed
+```
+
+**Performance:**
+- N/A (no versioning logic)
+
+**Upgrade Triggers:**
+- Si necesita versioning → Small Business
 
 ---
 
 ### Small Business Profile (80 LOC)
 
-**Use Case:** Accounting firm with 8 bank parsers, occasional breaking changes
-
-**What they need (vs Personal):**
-- ✅ **Version history** (track which parser version was used for each upload)
-- ✅ **Breaking change documentation** (notes on what changed between versions)
-- ✅ **Simple YAML file** (version metadata without database)
-- ❌ No deprecation/sunset dates (manual migration is fine)
-- ❌ No compatibility matrix (small scale, changes are rare)
+**Contexto del Usuario:**
+Empresa tiene 8 parsers. Cuando actualizan un parser de v1 → v2, necesitan testear v2 con datos históricos antes de hacer rollout completo. Necesitan: version pinning en config, backward compatibility checks, gradual migration.
 
 **Implementation:**
-
-**Config File (config/parser-versions.yaml):**
-```yaml
-parsers:
-  bofa_pdf:
-    versions:
-      - version: "1.0.0"
-        released: "2023-01-15"
-        description: "Initial BoFA PDF parser"
-        breaking_changes: []
-
-      - version: "1.5.0"
-        released: "2023-08-01"
-        description: "Added merchant normalization"
-        breaking_changes: []
-
-      - version: "2.0.0"
-        released: "2024-11-01"
-        description: "Merchant → counterparty rename"
-        breaking_changes:
-          - "Renamed 'merchant' field to 'counterparty'"
-          - "Balance field now required"
-        notes: "Update consumers to use 'counterparty' instead of 'merchant'"
-
-  chase_csv:
-    versions:
-      - version: "1.0.0"
-        released: "2023-02-01"
-        description: "Initial Chase CSV parser"
-        breaking_changes: []
-
-      - version: "1.1.0"
-        released: "2024-05-15"
-        description: "Added transaction type field"
-        breaking_changes: []
-```
-
-**Code Example (80 LOC):**
 ```python
-# parser_version_manager.py (Small Business)
-
+# lib/parser_version_manager.py (Small Business - 80 LOC)
 import yaml
-from pathlib import Path
-from dataclasses import dataclass
-from datetime import datetime
-from typing import List, Optional, Dict
-
-@dataclass
-class ParserVersion:
-    version: str
-    released: str
-    description: str
-    breaking_changes: List[str]
-    notes: Optional[str] = None
 
 class ParserVersionManager:
-    """Simple YAML-based parser version tracking."""
+    """YAML-based parser version management."""
 
-    def __init__(self, config_path: str = "config/parser-versions.yaml"):
-        self.config_path = Path(config_path)
-        self._versions: Dict[str, List[ParserVersion]] = {}
-        self._load()
+    def __init__(self, config_path="config/parser_versions.yaml"):
+        self.config_path = config_path
+        self._load_config()
 
-    def _load(self):
-        """Load version history from YAML."""
-        config = yaml.safe_load(self.config_path.read_text())
+    def _load_config(self):
+        """Load version config."""
+        with open(self.config_path, "r") as f:
+            self.config = yaml.safe_load(f)
 
-        for parser_id, parser_data in config.get("parsers", {}).items():
-            versions = []
-            for v in parser_data.get("versions", []):
-                versions.append(ParserVersion(
-                    version=v["version"],
-                    released=v["released"],
-                    description=v.get("description", ""),
-                    breaking_changes=v.get("breaking_changes", []),
-                    notes=v.get("notes")
-                ))
-            self._versions[parser_id] = versions
+    def get_parser_version(self, source_type: str) -> str:
+        """
+        Get pinned version for source_type.
 
-    def get_latest_version(self, parser_id: str) -> str:
-        """Get latest version number."""
-        versions = self._versions.get(parser_id, [])
-        if not versions:
-            return "1.0.0"  # Default
+        Returns: "v1.0.0" | "v2.0.0" | "latest"
+        """
+        return self.config["parser_versions"].get(source_type, "latest")
 
-        # Return last version (assumes YAML is in chronological order)
-        return versions[-1].version
+    def supports_version(self, source_type: str, version: str) -> bool:
+        """Check if version is available."""
+        available = self.config["available_versions"].get(source_type, [])
+        return version in available or version == "latest"
 
-    def get_version_info(self, parser_id: str, version: str) -> Optional[ParserVersion]:
-        """Get metadata for specific version."""
-        versions = self._versions.get(parser_id, [])
-        for v in versions:
-            if v.version == version:
-                return v
-        return None
+    def pin_version(self, source_type: str, version: str):
+        """Pin parser to specific version."""
+        self.config["parser_versions"][source_type] = version
 
-    def list_versions(self, parser_id: str) -> List[ParserVersion]:
-        """List all versions for parser."""
-        return self._versions.get(parser_id, [])
+        with open(self.config_path, "w") as f:
+            yaml.dump(self.config, f)
 
-    def get_breaking_changes(self, parser_id: str, from_version: str, to_version: str) -> List[str]:
-        """Get all breaking changes between two versions."""
-        versions = self._versions.get(parser_id, [])
+# YAML Config
+"""
+# config/parser_versions.yaml
 
-        # Find version range
-        from_idx = None
-        to_idx = None
-        for i, v in enumerate(versions):
-            if v.version == from_version:
-                from_idx = i
-            if v.version == to_version:
-                to_idx = i
+parser_versions:
+  bofa_pdf: v2.0.0        # Pinned to v2
+  chase_csv: v1.5.0       # Pinned to v1.5
+  wells_fargo_pdf: latest # Always use latest
 
-        if from_idx is None or to_idx is None:
-            return []
+available_versions:
+  bofa_pdf: [v1.0.0, v2.0.0]
+  chase_csv: [v1.0.0, v1.5.0, v2.0.0]
+  wells_fargo_pdf: [v1.0.0, v1.2.0]
+"""
 
-        # Collect all breaking changes in range
-        all_changes = []
-        for v in versions[from_idx + 1 : to_idx + 1]:
-            all_changes.extend(v.breaking_changes)
+# Usage
+version_mgr = ParserVersionManager()
 
-        return all_changes
+# Get pinned version for parser
+version = version_mgr.get_parser_version("bofa_pdf")
+# → "v2.0.0"
+
+# Pin parser to specific version (before testing v3)
+version_mgr.pin_version("bofa_pdf", "v2.0.0")
+
+# Load parser with specific version
+from parsers.bofa_pdf_v2 import BofAPDFParserV2
+parser = BofAPDFParserV2()
 ```
 
-**Usage:**
-```python
-# Load version manager
-vm = ParserVersionManager("config/parser-versions.yaml")
+**Características Incluidas:**
+- ✅ Version pinning (YAML config)
+- ✅ Multiple versions available
+- ✅ Manual version management
+- ✅ Gradual migration (pin some parsers to v2, others to v1)
 
-# Get latest version
-latest = vm.get_latest_version("bofa_pdf")
-# Returns: "2.0.0"
+**Características NO Incluidas:**
+- ❌ Automatic rollback (manual config change)
+- ❌ Compatibility matrix (manual testing)
+- ❌ Database storage (YAML sufficient for 8 parsers)
 
-# Check version info
-info = vm.get_version_info("bofa_pdf", "2.0.0")
-print(f"Released: {info.released}")
-print(f"Changes: {info.breaking_changes}")
-
-# Output:
-# Released: 2024-11-01
-# Changes: ['Renamed merchant to counterparty', 'Balance field now required']
-
-# Migration check
-changes = vm.get_breaking_changes("bofa_pdf", "1.5.0", "2.0.0")
-if changes:
-    print("⚠️ Migration required:")
-    for change in changes:
-        print(f"  - {change}")
-```
-
-**Adding new version (manual YAML edit):**
+**Configuración:**
 ```yaml
-# config/parser-versions.yaml
-parsers:
-  bofa_pdf:
-    versions:
-      # ... existing versions ...
-
-      - version: "2.1.0"
-        released: "2024-12-01"
-        description: "Added transaction type field"
-        breaking_changes: []
-        notes: "New field: transaction_type (debit/credit)"
+parser_versions:
+  config_path: "config/parser_versions.yaml"
 ```
 
-**Testing:**
-- ✅ Unit test: Load YAML, verify versions parsed correctly
-- ✅ Unit test: get_breaking_changes returns correct range
-- Manual verification: Check version history matches reality
+**Performance:**
+- Load config: 10ms (YAML parse)
+- Lookup: 0ms (dict lookup)
 
-**Monitoring:**
-- Startup log: "Loaded version history for 8 parsers"
-
-**Decision Context:**
-- Accounting firm releases parser updates 2-3 times/year
-- YAML file sufficient for version history (no database needed)
-- Breaking changes documented for manual migration planning
-- No automated deprecation (admin manually notifies users)
+**Upgrade Triggers:**
+- Si >20 parsers → Enterprise (database)
+- Si necesitan automatic rollback → Enterprise
+- Si multi-tenant → Enterprise
 
 ---
 
 ### Enterprise Profile (650 LOC)
 
-**Use Case:** Multi-tenant platform with automated deprecation, sunset enforcement, migration guides
-
-**What they need (vs Small Business):**
-- ✅ All Small Business features (version history, breaking changes)
-- ✅ **Database-backed storage** (PostgreSQL with version lifecycle tracking)
-- ✅ **Deprecation management** (mark versions deprecated with sunset dates)
-- ✅ **Sunset enforcement** (prevent uploads using sunset versions)
-- ✅ **Migration guide URLs** (link to upgrade documentation)
-- ✅ **Compatibility matrix** (track which schema versions each parser supports)
-- ✅ **Automated notifications** (email tenants 30/14/7 days before sunset)
+**Contexto del Usuario:**
+50+ parsers, cada uno con múltiples versiones (v1, v2, v3). Necesitan: automatic compatibility checking (v3 compatible con datos parseados por v1?), automatic rollback si v3 accuracy <95%, migration tracking (cuántos uploads usaron v1 vs v2), deprecation warnings.
 
 **Implementation:**
-
-**Database Schema:**
-```sql
-CREATE TABLE parser_versions (
-    id SERIAL PRIMARY KEY,
-    parser_id TEXT NOT NULL,
-    version TEXT NOT NULL,
-    released_at TIMESTAMPTZ NOT NULL,
-    deprecated BOOLEAN DEFAULT FALSE,
-    sunset_date DATE,
-    breaking_changes TEXT[],
-    migration_guide_url TEXT,
-    compatible_schemas TEXT[],  -- e.g., ["observation-transaction-v1", "observation-transaction-v2"]
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(parser_id, version)
-);
-
-CREATE INDEX idx_parser_versions_lookup ON parser_versions(parser_id, version);
-CREATE INDEX idx_parser_versions_sunset ON parser_versions(sunset_date) WHERE deprecated = TRUE;
-
-CREATE TABLE version_sunset_notifications (
-    parser_id TEXT NOT NULL,
-    version TEXT NOT NULL,
-    tenant_id TEXT NOT NULL,
-    notification_type TEXT NOT NULL,  -- '30_day', '14_day', '7_day'
-    sent_at TIMESTAMPTZ DEFAULT NOW(),
-    PRIMARY KEY (parser_id, version, tenant_id, notification_type)
-);
-```
-
-**Code Example (650 LOC - excerpt):**
 ```python
-# parser_version_manager.py (Enterprise)
-
+# lib/parser_version_manager.py (Enterprise - 650 LOC)
 import psycopg2
-from psycopg2.extras import DictCursor
-from datetime import datetime, date, timedelta
-from typing import List, Optional, Dict
+from typing import Dict, List
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 @dataclass
 class ParserVersion:
-    parser_id: str
+    source_type: str
     version: str
-    released_at: datetime
+    parser_class: str
+    min_compatible_version: str  # Can parse data from this version onward
     deprecated: bool
-    sunset_date: Optional[date]
-    breaking_changes: List[str]
-    migration_guide_url: Optional[str]
-    compatible_schemas: List[str]
-
-class InvalidVersionError(Exception):
-    pass
-
-class VersionSunsetError(Exception):
-    pass
+    deprecation_date: datetime
+    accuracy_threshold: float = 0.95  # Auto-rollback if accuracy < 95%
 
 class ParserVersionManager:
-    """Enterprise version management with deprecation + sunset tracking."""
+    """Database-backed parser version manager with compatibility tracking."""
 
-    def __init__(self, db_conn_string: str):
-        self.db_conn_string = db_conn_string
-        self._init_db()
+    def __init__(self, db_connection_string):
+        self.conn = psycopg2.connect(db_connection_string)
 
-    def _init_db(self):
-        """Create tables if not exist."""
-        conn = psycopg2.connect(self.db_conn_string)
-        cursor = conn.cursor()
-        # ... (schema creation from above)
-        conn.commit()
-        conn.close()
-
-    def create_version(
-        self,
-        parser_id: str,
-        version: str,
-        breaking_changes: Optional[List[str]] = None,
-        compatible_schemas: Optional[List[str]] = None
-    ) -> ParserVersion:
-        """Register a new parser version."""
-        # Validate semantic version format
-        if not self._is_valid_semver(version):
-            raise InvalidVersionError(f"Invalid semantic version: {version}")
-
-        conn = psycopg2.connect(self.db_conn_string)
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            INSERT INTO parser_versions
-            (parser_id, version, released_at, breaking_changes, compatible_schemas)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (
-            parser_id,
-            version,
-            datetime.now(),
-            breaking_changes or [],
-            compatible_schemas or []
-        ))
-
-        conn.commit()
-        conn.close()
-
-        return ParserVersion(
-            parser_id=parser_id,
-            version=version,
-            released_at=datetime.now(),
-            deprecated=False,
-            sunset_date=None,
-            breaking_changes=breaking_changes or [],
-            migration_guide_url=None,
-            compatible_schemas=compatible_schemas or []
-        )
-
-    def mark_deprecated(
-        self,
-        parser_id: str,
-        version: str,
-        sunset_date: date,
-        migration_guide_url: Optional[str] = None
-    ):
-        """Mark version as deprecated with sunset date."""
-        # Enforce 30-day minimum notice
-        if sunset_date < date.today() + timedelta(days=30):
-            raise InvalidVersionError("Sunset date must be at least 30 days in future")
-
-        conn = psycopg2.connect(self.db_conn_string)
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            UPDATE parser_versions
-            SET deprecated = TRUE,
-                sunset_date = %s,
-                migration_guide_url = %s
-            WHERE parser_id = %s AND version = %s
-        """, (sunset_date, migration_guide_url, parser_id, version))
-
-        if cursor.rowcount == 0:
-            conn.close()
-            raise InvalidVersionError(f"Version not found: {parser_id}:{version}")
-
-        conn.commit()
-        conn.close()
-
-        # Trigger notification workflow
-        self._schedule_deprecation_notifications(parser_id, version, sunset_date)
-
-    def get_latest_version(self, parser_id: str) -> Optional[str]:
-        """Get latest non-deprecated version."""
-        conn = psycopg2.connect(self.db_conn_string)
-        cursor = conn.cursor(cursor_factory=DictCursor)
-
-        cursor.execute("""
-            SELECT version FROM parser_versions
-            WHERE parser_id = %s AND deprecated = FALSE
-            ORDER BY released_at DESC
-            LIMIT 1
-        """, (parser_id,))
-
-        row = cursor.fetchone()
-        conn.close()
-
-        return row["version"] if row else None
-
-    def validate_version_usable(self, parser_id: str, version: str):
+    def get_active_version(self, source_type: str, tenant_id: str = None) -> ParserVersion:
         """
-        Check if version is usable (not sunset).
+        Get active parser version.
 
-        Raises:
-            VersionSunsetError: If version is sunset
+        Logic:
+        1. Check tenant override
+        2. Fallback to global active version
+        3. Check if deprecated (warn)
+        4. Return ParserVersion
         """
-        conn = psycopg2.connect(self.db_conn_string)
-        cursor = conn.cursor(cursor_factory=DictCursor)
+        cursor = self.conn.cursor()
 
-        cursor.execute("""
-            SELECT deprecated, sunset_date, migration_guide_url
-            FROM parser_versions
-            WHERE parser_id = %s AND version = %s
-        """, (parser_id, version))
+        # Tenant override?
+        if tenant_id:
+            cursor.execute("""
+                SELECT source_type, version, parser_class, min_compatible_version,
+                       deprecated, deprecation_date, accuracy_threshold
+                FROM parser_versions
+                WHERE source_type = %s
+                  AND tenant_id = %s
+                  AND active = true
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (source_type, tenant_id))
+            row = cursor.fetchone()
 
-        row = cursor.fetchone()
-        conn.close()
+        # Global version
+        if not row:
+            cursor.execute("""
+                SELECT source_type, version, parser_class, min_compatible_version,
+                       deprecated, deprecation_date, accuracy_threshold
+                FROM parser_versions
+                WHERE source_type = %s
+                  AND tenant_id IS NULL
+                  AND active = true
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (source_type,))
+            row = cursor.fetchone()
 
         if not row:
-            raise InvalidVersionError(f"Version not found: {parser_id}:{version}")
+            raise ValueError(f"No active version for {source_type}")
 
-        if row["deprecated"] and row["sunset_date"] and row["sunset_date"] <= date.today():
-            raise VersionSunsetError(
-                f"Parser {parser_id} version {version} is sunset as of {row['sunset_date']}. "
-                f"Please upgrade to latest version. "
-                f"Migration guide: {row['migration_guide_url']}"
-            )
+        version = ParserVersion(*row)
 
-    def get_compatibility_matrix(self, parser_id: str) -> Dict[str, List[str]]:
-        """Get schema compatibility for all parser versions."""
-        conn = psycopg2.connect(self.db_conn_string)
-        cursor = conn.cursor(cursor_factory=DictCursor)
+        # Deprecation warning
+        if version.deprecated and version.deprecation_date < datetime.now():
+            self._log_deprecation_warning(source_type, version.version)
 
-        cursor.execute("""
-            SELECT version, compatible_schemas
-            FROM parser_versions
-            WHERE parser_id = %s
-            ORDER BY released_at DESC
-        """, (parser_id,))
+        return version
 
-        rows = cursor.fetchall()
-        conn.close()
-
-        return {
-            row["version"]: row["compatible_schemas"]
-            for row in rows
-        }
-
-    def get_breaking_changes_since(
-        self,
-        parser_id: str,
-        from_version: str
-    ) -> List[Dict]:
-        """Get all breaking changes since a specific version."""
-        conn = psycopg2.connect(self.db_conn_string)
-        cursor = conn.cursor(cursor_factory=DictCursor)
-
-        cursor.execute("""
-            SELECT version, released_at, breaking_changes
-            FROM parser_versions
-            WHERE parser_id = %s
-                AND released_at > (
-                    SELECT released_at FROM parser_versions
-                    WHERE parser_id = %s AND version = %s
-                )
-            ORDER BY released_at ASC
-        """, (parser_id, parser_id, from_version))
-
-        rows = cursor.fetchall()
-        conn.close()
-
-        changes = []
-        for row in rows:
-            if row["breaking_changes"]:
-                changes.append({
-                    "version": row["version"],
-                    "released_at": row["released_at"].isoformat(),
-                    "breaking_changes": row["breaking_changes"]
-                })
-
-        return changes
-
-    def _schedule_deprecation_notifications(
-        self,
-        parser_id: str,
-        version: str,
-        sunset_date: date
-    ):
-        """Schedule notifications at 30/14/7 days before sunset."""
-        # This would integrate with a job scheduler (Celery, Airflow, etc.)
-        # For now, just log
-        print(f"Scheduled sunset notifications for {parser_id}:{version} (sunset: {sunset_date})")
-
-    def send_pending_notifications(self):
+    def is_compatible(self, source_type: str, from_version: str, to_version: str) -> bool:
         """
-        Send deprecation notifications for upcoming sunsets.
+        Check if to_version can parse data from from_version.
 
-        Called daily by cron job.
+        Example:
+            is_compatible("bofa_pdf", "v1.0.0", "v3.0.0")
+            → True if v3 min_compatible_version <= v1.0.0
         """
-        conn = psycopg2.connect(self.db_conn_string)
-        cursor = conn.cursor(cursor_factory=DictCursor)
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT min_compatible_version
+            FROM parser_versions
+            WHERE source_type = %s AND version = %s
+        """, (source_type, to_version))
 
-        # Find versions with upcoming sunsets (30, 14, 7 days)
-        for days_before in [30, 14, 7]:
-            target_date = date.today() + timedelta(days=days_before)
+        row = cursor.fetchone()
+        if not row:
+            return False
 
-            cursor.execute("""
-                SELECT parser_id, version, sunset_date, migration_guide_url
-                FROM parser_versions
-                WHERE deprecated = TRUE
-                    AND sunset_date = %s
-            """, (target_date,))
+        min_compat = row[0]
+        return self._version_compare(from_version, min_compat) >= 0
 
-            for row in cursor.fetchall():
-                self._send_notification(
-                    parser_id=row["parser_id"],
-                    version=row["version"],
-                    sunset_date=row["sunset_date"],
-                    migration_guide_url=row["migration_guide_url"],
-                    days_before=days_before
-                )
+    def track_usage(self, source_type: str, version: str, upload_id: str, success: bool, accuracy: float = None):
+        """Track parser version usage for migration analytics."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO parser_version_usage (
+                source_type, version, upload_id, success, accuracy, timestamp
+            ) VALUES (%s, %s, %s, %s, %s, NOW())
+        """, (source_type, version, upload_id, success, accuracy))
+        self.conn.commit()
 
-        conn.close()
+        # Auto-rollback if accuracy < threshold
+        if accuracy is not None:
+            self._check_auto_rollback(source_type, version, accuracy)
 
-    def _send_notification(
-        self,
-        parser_id: str,
-        version: str,
-        sunset_date: date,
-        migration_guide_url: Optional[str],
-        days_before: int
-    ):
-        """Send email notification to all tenants using this parser version."""
-        # Query for tenants using this parser
-        # Send email via SMTP/SendGrid
-        # Record notification in version_sunset_notifications table
-        print(f"📧 Sending {days_before}-day sunset notice for {parser_id}:{version}")
+    def _check_auto_rollback(self, source_type: str, version: str, current_accuracy: float):
+        """
+        Auto-rollback if accuracy drops below threshold.
 
-    def _is_valid_semver(self, version: str) -> bool:
-        """Validate semantic version format (major.minor.patch)."""
-        import re
-        pattern = r'^\d+\.\d+\.\d+$'
-        return bool(re.match(pattern, version))
-```
+        Logic:
+        - Check last 100 uploads for this version
+        - If avg accuracy < threshold → rollback to previous version
+        - Send alert
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT AVG(accuracy) as avg_accuracy
+            FROM parser_version_usage
+            WHERE source_type = %s
+              AND version = %s
+              AND timestamp > NOW() - INTERVAL '24 hours'
+            HAVING COUNT(*) >= 100
+        """, (source_type, version))
 
-**Usage Example (Version Lifecycle):**
-```python
-vm = ParserVersionManager("postgresql://localhost/parsers")
+        row = cursor.fetchone()
+        if not row:
+            return  # Not enough data yet
 
-# Step 1: Create new version
-vm.create_version(
-    parser_id="bofa_pdf",
-    version="2.0.0",
-    breaking_changes=[
-        "Renamed 'merchant' field to 'counterparty'",
-        "Balance field now required"
-    ],
-    compatible_schemas=["observation-transaction-v2"]
+        avg_accuracy = row[0]
+        threshold = self._get_accuracy_threshold(source_type, version)
+
+        if avg_accuracy < threshold:
+            # Rollback to previous version
+            previous_version = self._get_previous_version(source_type, version)
+            self._rollback_version(source_type, previous_version)
+            self._send_alert(f"Auto-rollback: {source_type} {version} → {previous_version} (accuracy {avg_accuracy:.2%} < {threshold:.2%})")
+
+    def _version_compare(self, v1: str, v2: str) -> int:
+        """Compare semantic versions. Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal."""
+        v1_parts = [int(x) for x in v1.lstrip('v').split('.')]
+        v2_parts = [int(x) for x in v2.lstrip('v').split('.')]
+
+        for i in range(max(len(v1_parts), len(v2_parts))):
+            v1_val = v1_parts[i] if i < len(v1_parts) else 0
+            v2_val = v2_parts[i] if i < len(v2_parts) else 0
+            if v1_val > v2_val:
+                return 1
+            elif v1_val < v2_val:
+                return -1
+        return 0
+
+# Database Schema
+"""
+CREATE TABLE parser_versions (
+    id SERIAL PRIMARY KEY,
+    source_type TEXT NOT NULL,
+    version TEXT NOT NULL,
+    parser_class TEXT NOT NULL,
+    min_compatible_version TEXT,  -- Can parse data from this version onward
+    deprecated BOOLEAN DEFAULT false,
+    deprecation_date TIMESTAMP,
+    accuracy_threshold FLOAT DEFAULT 0.95,
+    active BOOLEAN DEFAULT true,
+    tenant_id UUID,               -- NULL = global
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (source_type, version, tenant_id)
+);
+
+CREATE TABLE parser_version_usage (
+    id SERIAL PRIMARY KEY,
+    source_type TEXT NOT NULL,
+    version TEXT NOT NULL,
+    upload_id TEXT NOT NULL,
+    success BOOLEAN,
+    accuracy FLOAT,
+    timestamp TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_version_usage_tracking ON parser_version_usage (source_type, version, timestamp DESC);
+"""
+
+# Usage
+version_mgr = ParserVersionManager(db_connection_string="postgresql://localhost/app")
+
+# Get active version for parser
+version = version_mgr.get_active_version("bofa_pdf")
+# → ParserVersion(source_type="bofa_pdf", version="v3.0.0", ...)
+
+# Check compatibility before migration
+can_migrate = version_mgr.is_compatible("bofa_pdf", from_version="v1.0.0", to_version="v3.0.0")
+# → True (v3 can parse v1 data)
+
+# Track usage for auto-rollback
+version_mgr.track_usage(
+    source_type="bofa_pdf",
+    version="v3.0.0",
+    upload_id="UL_abc123",
+    success=True,
+    accuracy=0.92  # Below threshold → triggers auto-rollback after 100 uploads
 )
-
-# Step 2: Deprecate old version (30-day notice)
-vm.mark_deprecated(
-    parser_id="bofa_pdf",
-    version="1.5.0",
-    sunset_date=date(2024, 12, 31),
-    migration_guide_url="https://docs.example.com/parsers/bofa/v2-migration"
-)
-
-# Step 3: Upload validation (prevents sunset version usage)
-try:
-    vm.validate_version_usable("bofa_pdf", "1.5.0")
-except VersionSunsetError as e:
-    print(f"❌ {e}")
-    # Reject upload
 ```
 
-**Automated Notification Schedule:**
-```python
-# Cron job runs daily
-def daily_notification_job():
-    vm = ParserVersionManager("postgresql://localhost/parsers")
-    vm.send_pending_notifications()
+**Características Incluidas:**
+- ✅ Database-backed versioning (PostgreSQL)
+- ✅ Compatibility matrix (min_compatible_version)
+- ✅ Automatic rollback (if accuracy < 95%)
+- ✅ Usage tracking (migration analytics)
+- ✅ Deprecation warnings
+- ✅ Per-tenant version overrides
 
-# Sends emails:
-# - 30 days before sunset: "Parser version will be sunset in 30 days"
-# - 14 days before sunset: "Parser version will be sunset in 14 days"
-# - 7 days before sunset: "URGENT: Parser version will be sunset in 7 days"
+**Características NO Incluidas:**
+- ❌ Machine learning for rollback (threshold-based is sufficient)
+
+**Configuración:**
+```yaml
+parser_version_manager:
+  database:
+    connection_string: "postgresql://db:5432/app"
+  accuracy_threshold: 0.95  # Auto-rollback if < 95%
+  deprecation_warning_days: 90
 ```
 
-**Testing:**
-- ✅ Unit tests for all version operations
-- ✅ Integration tests with test database
+**Performance:**
+- Get active version: 5ms (DB query + cache)
+- Compatibility check: 3ms
+- Usage tracking: 10ms (async insert)
+- Auto-rollback check: 50ms (aggregate query, every 100th upload)
+
+**No Further Tiers:**
+- Scale horizontally (read replicas)
+
+---
+
 - ✅ Sunset enforcement validation
 - ✅ Notification scheduling logic
 
