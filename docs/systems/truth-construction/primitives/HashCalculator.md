@@ -12,149 +12,398 @@
 Streaming hash calculation for large files without loading entire content into memory. Enables deduplication and integrity verification.
 
 ---
-
 ## Simplicity Profiles
 
-**This section shows how the same universal primitive is configured differently based on usage scale.**
+### Personal Profile (30 LOC)
 
-### Profile 1: Personal Use (Finance App - Small PDFs, ~2MB)
+**Contexto del Usuario:**
+Darwin sube 24 PDFs al año (~2MB cada uno). HashCalculator simple: load file en memoria, calcular SHA-256, return hash. No streaming necesario (files <10MB).
 
-**Context:** Darwin uploads 1-2 bank statements per month (PDFs, ~2MB each) to personal finance app
+**Implementation:**
+```python
+# lib/hash_calculator.py (Personal - 30 LOC)
+import hashlib
 
-**Configuration:**
-```yaml
-hash_calculator:
-  algorithm: "sha256"
-  chunk_size_kb: 8
-  verify_on_retrieve: false  # Trust filesystem integrity
+class HashCalculator:
+    """Simple in-memory hash calculation for small files."""
+
+    def __init__(self, algorithm="sha256"):
+        self.algorithm = algorithm
+
+    def calculate_hash(self, content: bytes) -> str:
+        """
+        Calculate hash from bytes (in-memory).
+
+        For files <10MB - simple and fast.
+        """
+        hasher = hashlib.sha256()
+        hasher.update(content)
+        digest = hasher.hexdigest()
+        return f"sha256:{digest}"
+
+    def verify_hash(self, content: bytes, expected_hash: str) -> bool:
+        """Verify content matches hash."""
+        actual_hash = self.calculate_hash(content)
+        return actual_hash == expected_hash
+
+# Usage
+calculator = HashCalculator()
+
+# Read file into memory
+with open("BoFA_Oct2024.pdf", "rb") as f:
+    content = f.read()  # 2.3MB loaded into RAM
+
+# Calculate hash
+hash_ref = calculator.calculate_hash(content)
+# → "sha256:abc123..."
+
+# Verify (if needed)
+is_valid = calculator.verify_hash(content, "sha256:abc123...")
+# → True
 ```
 
-**What's Used:**
-- ✅ `calculateHash()` - In-memory hashing for small PDFs (<10MB)
-- ✅ SHA-256 algorithm - Standard, well-tested
-- ✅ Basic deduplication - Same hash = same file
+**Características Incluidas:**
+- ✅ SHA-256 algorithm (standard, well-tested)
+- ✅ In-memory hashing (simple, fast for small files)
+- ✅ Basic deduplication (same hash = same file)
+- ✅ Hash verification (compare expected vs actual)
 
-**What's NOT Used:**
-- ❌ `calculateHashStreaming()` - Files fit in memory (<10MB)
-- ❌ `verifyHash()` on retrieval - Filesystem trusted (no corruption expected)
-- ❌ Multi-algorithm support - SHA-256 sufficient
-- ❌ Chunk size tuning - Default 8KB works fine
-- ❌ Performance metrics - No latency tracking
-- ❌ Integrity verification - No re-hashing on retrieval
+**Características NO Incluidas:**
+- ❌ Streaming (YAGNI: files <10MB fit in memory)
+- ❌ Multi-algorithm support (YAGNI: SHA-256 sufficient)
+- ❌ Chunk size tuning (YAGNI: single update call)
+- ❌ Performance metrics (YAGNI: no latency tracking)
+- ❌ Integrity verification on retrieval (YAGNI: filesystem trusted)
 
-**Implementation Complexity:** **LOW**
-- ~30 lines Python
-- Uses stdlib `hashlib.sha256()` only
-- No configuration file (hardcoded algorithm)
-- No tests (verify manually that dedupe works)
+**Configuración:**
+```python
+# Hardcoded
+ALGORITHM = "sha256"
+```
 
-**Narrative Example:**
-> Darwin selects "BoFA_Oct2024.pdf" (2.3MB) in upload dialog. The app reads file into memory (2.3MB RAM), calls `HashCalculator.calculateHash(file_bytes)`. The calculator iterates once with `hasher.update(file_bytes)`, returns `sha256:abc123...` in 25ms. Later, Darwin accidentally re-uploads same file. Hash calculated again (`sha256:abc123...`), matches existing → "Already uploaded" message shown. No streaming needed (file fits in RAM).
+**Performance:**
+- Hash calculation: 25ms (2MB file)
+- Memory usage: 2MB (file size)
+- CPU: Single-threaded, O(n) where n=file size
+
+**Upgrade Triggers:**
+- Si files >10MB → Small Business (streaming)
+- Si integrity verification needed → Small Business (verify on retrieve)
 
 ---
 
-### Profile 2: Small Business (Accounting Firm - Mixed File Sizes, up to 100MB)
+### Small Business Profile (100 LOC)
 
-**Context:** Accounting firm processes client documents (receipts, tax forms, large scanned PDFs) with files ranging 100KB-100MB
+**Contexto del Usuario:**
+Firma contable procesa 100-100MB archivos (receipts pequeños, PDFs grandes escaneados). Necesitan: streaming para >10MB files, integrity verification (detect corruption), auto-selection (in-memory vs streaming based on size).
 
-**Configuration:**
+**Implementation:**
+```python
+# lib/hash_calculator.py (Small Business - 100 LOC)
+import hashlib
+from typing import BinaryIO
+
+class HashCalculator:
+    """Hash calculator with automatic streaming for large files."""
+
+    def __init__(self, algorithm="sha256", streaming_threshold_mb=10):
+        self.algorithm = algorithm
+        self.streaming_threshold_mb = streaming_threshold_mb
+        self.chunk_size_kb = 16  # 16KB chunks
+
+    def calculate_hash(self, content: bytes) -> str:
+        """In-memory hash for small files."""
+        hasher = hashlib.sha256()
+        hasher.update(content)
+        return f"sha256:{hasher.hexdigest()}"
+
+    def calculate_hash_streaming(self, stream: BinaryIO) -> str:
+        """
+        Streaming hash for large files (memory efficient).
+
+        Memory usage: O(chunk_size) regardless of file size.
+        """
+        hasher = hashlib.sha256()
+        chunk_size = self.chunk_size_kb * 1024
+
+        while True:
+            chunk = stream.read(chunk_size)
+            if not chunk:
+                break
+            hasher.update(chunk)
+
+        return f"sha256:{hasher.hexdigest()}"
+
+    def calculate_hash_auto(self, file_path: str) -> str:
+        """
+        Auto-select in-memory or streaming based on file size.
+
+        <10MB → in-memory (faster)
+        >10MB → streaming (memory efficient)
+        """
+        import os
+        file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+
+        if file_size_mb < self.streaming_threshold_mb:
+            # Small file: in-memory
+            with open(file_path, "rb") as f:
+                content = f.read()
+            return self.calculate_hash(content)
+        else:
+            # Large file: streaming
+            with open(file_path, "rb") as f:
+                return self.calculate_hash_streaming(f)
+
+    def verify_hash(self, content: bytes, expected_hash: str) -> bool:
+        """Verify content matches hash (detect corruption)."""
+        actual_hash = self.calculate_hash(content)
+        if actual_hash != expected_hash:
+            print(f"Hash mismatch! Expected: {expected_hash}, Got: {actual_hash}")
+            return False
+        return True
+
+# Usage
+calculator = HashCalculator(streaming_threshold_mb=10)
+
+# Small file (850KB) → in-memory
+hash1 = calculator.calculate_hash_auto("receipt.pdf")
+# → Uses in-memory (5ms)
+
+# Large file (78MB) → streaming
+hash2 = calculator.calculate_hash_auto("scanned_binder.pdf")
+# → Uses streaming (780ms, 16KB memory)
+
+# Verify on retrieval
+with open("scanned_binder.pdf", "rb") as f:
+    content = f.read()
+is_valid = calculator.verify_hash(content, hash2)
+# → True (no corruption)
+```
+
+**Características Incluidas:**
+- ✅ In-memory hashing (for small files <10MB)
+- ✅ Streaming hashing (for large files >10MB, 16KB chunks)
+- ✅ Auto-selection (based on file size threshold)
+- ✅ Integrity verification (detect corruption on retrieval)
+- ✅ Configurable threshold (default 10MB)
+
+**Características NO Incluidas:**
+- ❌ Multi-algorithm support (SHA-256 only)
+- ❌ Advanced metrics (no Prometheus)
+- ❌ Custom chunk sizes per file type (fixed 16KB)
+- ❌ Malware detection (no known-bad hash database)
+
+**Configuración:**
 ```yaml
 hash_calculator:
   algorithm: "sha256"
-  chunk_size_kb: 16  # Larger chunks for efficiency
-  verify_on_retrieve: true  # Detect corruption
-  streaming_threshold_mb: 10  # Use streaming for files >10MB
+  streaming_threshold_mb: 10
+  chunk_size_kb: 16
+  verify_on_retrieve: true
 ```
 
-**What's Used:**
-- ✅ `calculateHash()` - For small files (<10MB)
-- ✅ `calculateHashStreaming()` - For large scanned PDFs (>10MB)
-- ✅ `verifyHash()` - Re-hash on retrieval to detect corruption
-- ✅ Automatic selection - Switch to streaming when file >10MB
-- ✅ SHA-256 standard - No custom algorithms needed
+**Performance:**
+- Small file (850KB): 5ms in-memory
+- Large file (78MB): 780ms streaming, 16KB memory
+- Verification: Same as calculation time
 
-**What's NOT Used:**
-- ❌ Multi-algorithm support - SHA-256 only
-- ❌ Advanced metrics - No Prometheus, just basic logging
-- ❌ Custom chunk sizes per file type - Fixed 16KB
-
-**Implementation Complexity:** **MEDIUM**
-- ~100 lines Python
-- Auto-detects file size, routes to in-memory or streaming
-- Basic logging: "Hashing file (streaming=true, size=45MB, latency=450ms)"
-- Unit tests: Verify streaming matches in-memory for same file
-
-**Narrative Example:**
-> Client uploads tax return PDF (850KB). HashCalculator checks size (< 10MB), uses `calculateHash()` in-memory (5ms). Next client uploads scanned binder (78MB). HashCalculator checks size (> 10MB), uses `calculateHashStreaming()` with 16KB chunks (780ms, O(16KB) memory). Both files stored with hashes. Week later, accountant retrieves 78MB binder. `verifyHash()` re-hashes file → Matches stored hash → No corruption. If mismatch detected → Alert "File corrupted, re-upload needed".
+**Upgrade Triggers:**
+- Si >100MB files → Enterprise (larger chunks, 64KB)
+- Si regulatory compliance → Enterprise (double verification, malware detection)
 
 ---
 
-### Profile 3: Enterprise (Bank - Large Files, Regulatory Compliance)
+### Enterprise Profile (800 LOC)
 
-**Context:** Bank processes mortgage applications (loan docs, deed scans, appraisals) with files ranging 1MB-500MB, GLBA/SOX compliance requires integrity verification
+**Contexto del Usuario:**
+Banco procesa 1MB-500MB archivos (mortgage deeds, loan docs). Necesitan: always streaming (regulatory audit trail), double verification (on storage + retrieval), malware detection (check against known-bad hashes), Prometheus metrics, quarantine corrupted files.
 
-**Configuration:**
+**Implementation:**
+```python
+# lib/hash_calculator.py (Enterprise - 800 LOC)
+import hashlib
+import boto3
+from typing import BinaryIO, Iterator
+from prometheus_client import Counter, Histogram
+from datetime import datetime
+
+class HashCalculator:
+    """Enterprise hash calculator with compliance features."""
+
+    # Prometheus metrics
+    calculations_total = Counter('hash_calculations_total', 'Total hash calculations', ['algorithm', 'document_type'])
+    calculation_duration = Histogram('hash_calculation_duration_seconds', 'Hash calculation latency', ['file_size_bucket'])
+    verifications_total = Counter('hash_verifications_total', 'Total verifications', ['status'])
+    malware_detections = Counter('hash_malware_detections_total', 'Malware detections')
+
+    def __init__(self, algorithm="sha256", chunk_size_kb=64,
+                 malware_db_path="/var/malware_hashes.db"):
+        self.algorithm = algorithm
+        self.chunk_size = chunk_size_kb * 1024
+        self.malware_db = self._load_malware_db(malware_db_path)
+        self.s3 = boto3.client('s3')
+
+    def calculate_hash_streaming(self, stream: BinaryIO,
+                                 document_type: str = "unknown") -> str:
+        """
+        Always streaming (even small files, for regulatory consistency).
+
+        Logs progress every 10% for large files.
+        """
+        hasher = hashlib.sha256()
+        total_bytes = 0
+        start_time = datetime.now()
+
+        while True:
+            chunk = stream.read(self.chunk_size)
+            if not chunk:
+                break
+
+            hasher.update(chunk)
+            total_bytes += len(chunk)
+
+            # Log progress every 10MB
+            if total_bytes % (10 * 1024 * 1024) == 0:
+                progress_mb = total_bytes / (1024 * 1024)
+                print(f"Hashing progress: {progress_mb:.1f}MB")
+
+        hash_value = f"sha256:{hasher.hexdigest()}"
+
+        # Check malware database
+        if hash_value in self.malware_db:
+            self.malware_detections.inc()
+            raise ValueError(f"Malware detected! Hash: {hash_value[:16]}...")
+
+        # Metrics
+        duration = (datetime.now() - start_time).total_seconds()
+        size_bucket = self._get_size_bucket(total_bytes)
+        self.calculation_duration.labels(file_size_bucket=size_bucket).observe(duration)
+        self.calculations_total.labels(algorithm=self.algorithm, document_type=document_type).inc()
+
+        return hash_value
+
+    def verify_hash_double(self, s3_bucket: str, s3_key: str,
+                          expected_hash: str) -> bool:
+        """
+        Double verification (regulatory requirement):
+        1. Verify immediately after upload
+        2. Verify again on retrieval
+
+        If mismatch → quarantine file.
+        """
+        # Stream from S3 and hash
+        response = self.s3.get_object(Bucket=s3_bucket, Key=s3_key)
+        actual_hash = self.calculate_hash_streaming(response['Body'])
+
+        if actual_hash != expected_hash:
+            # Hash mismatch - quarantine
+            self._quarantine_file(s3_bucket, s3_key, expected_hash, actual_hash)
+            self.verifications_total.labels(status='failed').inc()
+            return False
+
+        self.verifications_total.labels(status='success').inc()
+        return True
+
+    def _quarantine_file(self, bucket: str, key: str,
+                        expected: str, actual: str):
+        """
+        Move corrupted file to quarantine bucket.
+
+        Alerts compliance team.
+        """
+        quarantine_bucket = f"{bucket}-quarantine"
+        quarantine_key = f"corrupted/{key}"
+
+        self.s3.copy_object(
+            CopySource={'Bucket': bucket, 'Key': key},
+            Bucket=quarantine_bucket,
+            Key=quarantine_key
+        )
+
+        # Alert
+        print(f"P1 ALERT: File quarantined! Expected: {expected[:16]}..., Got: {actual[:16]}...")
+
+    def _get_size_bucket(self, bytes_size: int) -> str:
+        """Categorize file size for metrics."""
+        mb = bytes_size / (1024 * 1024)
+        if mb < 10:
+            return "0-10MB"
+        elif mb < 100:
+            return "10-100MB"
+        else:
+            return "100-500MB"
+
+    def _load_malware_db(self, db_path: str) -> set:
+        """Load known-bad hash database (updated daily)."""
+        # Load from file or database
+        return set()  # Placeholder
+
+# Usage
+calculator = HashCalculator(chunk_size_kb=64)
+
+# Upload 200MB deed scan
+with open("mortgage_deed.pdf", "rb") as f:
+    hash_value = calculator.calculate_hash_streaming(f, document_type="deed")
+    # → "sha256:def456..." (2.1s, logs progress every 10MB)
+
+# Upload to S3
+s3.upload_file("mortgage_deed.pdf", "bank-documents", "deed_123.pdf")
+
+# Verify immediately after upload
+is_valid = calculator.verify_hash_double(
+    s3_bucket="bank-documents",
+    s3_key="deed_123.pdf",
+    expected_hash=hash_value
+)
+# → True (storage integrity confirmed)
+
+# 10 years later: verify on retrieval
+is_still_valid = calculator.verify_hash_double(
+    s3_bucket="bank-documents",
+    s3_key="deed_123.pdf",
+    expected_hash=hash_value
+)
+# → If False: file quarantined, P1 alert fired
+```
+
+**Características Incluidas:**
+- ✅ Always streaming (64KB chunks, regulatory audit trail)
+- ✅ Double verification (on storage + retrieval, SOX/GLBA compliance)
+- ✅ Malware detection (check hash against known-bad database)
+- ✅ Prometheus metrics (p95 latency, mismatch rate, malware detections)
+- ✅ Quarantine on mismatch (move to separate S3 bucket)
+- ✅ Progress logging (every 10MB for large files)
+- ✅ Multi-algorithm support (SHA-256 + BLAKE2b fallback)
+
+**Características NO Incluidas:**
+- ❌ In-memory hashing (always stream for consistency)
+
+**Configuración:**
 ```yaml
 hash_calculator:
   algorithm: "sha256"
-  fallback_algorithm: "blake2b"  # Future-proofing if SHA-256 broken
-  chunk_size_kb: 64  # Optimized for network transfer
-  verify_on_retrieve: true  # Always verify (regulatory requirement)
-  verify_on_storage: true  # Double-check hash after write
-  streaming_threshold_mb: 1  # Always stream (even small files, for consistency)
-  metrics:
+  fallback_algorithm: "blake2b"
+  chunk_size_kb: 64
+  verify_on_storage: true
+  verify_on_retrieve: true
+  malware_detection:
     enabled: true
-    backend: "prometheus"
-    labels:
-      - document_type
-      - file_size_bucket
-  logging:
-    structured: true
-    format: "json"
-    level: "info"
-    include_hash_prefix: true  # Log first 8 chars for debugging
-  integrity_checks:
-    detect_known_malware_hashes: true  # Block known malicious files
-    quarantine_on_mismatch: true  # Move corrupted files to quarantine
+    db_path: "/var/malware_hashes.db"
+  quarantine:
+    enabled: true
+    bucket_suffix: "-quarantine"
+  metrics:
+    prometheus_port: 9090
 ```
 
-**What's Used:**
-- ✅ `calculateHashStreaming()` - Always streaming (even 1MB files, for consistency)
-- ✅ `verifyHash()` on storage AND retrieval - Double verification (regulatory compliance)
-- ✅ Multi-algorithm support - SHA-256 + BLAKE2b fallback (future-proofing)
-- ✅ Large chunk size (64KB) - Optimized for S3 network transfer
-- ✅ Prometheus metrics - Track p95 latency, hash mismatch rate, malware detections
-- ✅ Structured logging - JSON logs with trace IDs, hash prefixes for debugging
-- ✅ Malware detection - Check hash against known-bad hash database
-- ✅ Quarantine on mismatch - Move corrupted files to separate S3 bucket
-- ✅ Integrity verification required - SOX/GLBA compliance (prove file integrity)
+**Performance:**
+- 200MB file: 2.1s (64KB chunks)
+- Memory usage: 64KB constant (streaming)
+- Verification: Same as calculation (re-hash)
+- Malware check: <1ms (hash set lookup)
 
-**What's NOT Used:**
-- ❌ In-memory hashing - Always stream (regulatory requirement for audit trail)
-
-**Implementation Complexity:** **HIGH**
-- ~800 lines TypeScript/Python
-- Dependencies: Prometheus client, Winston (logging), AWS SDK (S3 integrity checks)
-- Malware hash database (updated daily from threat intel feeds)
-- Comprehensive test suite: Unit tests, integrity mismatch scenarios, corruption detection
-- Monitoring dashboards: Hash calculation latency (p50/p95/p99), mismatch rate (alert if >0.1%), malware detection count
-- On-call runbook: P1 incident (integrity check failures spike → investigate S3 corruption/attack)
-
-**Narrative Example:**
-> Customer submits mortgage app with 200MB deed scan. API receives upload, streams to `HashCalculator.calculateHashStreaming()`. As 64KB chunks arrive:
-> 1. Update SHA-256 hash incrementally (64KB × 3125 iterations = 200MB)
-> 2. Log progress every 10%: `{"trace_id":"abc-123","progress":"30%","bytes_hashed":60000000}`
-> 3. After final chunk, finalize hash: `sha256:def456...` (calculation took 2.1s)
-> 4. Check malware database: Hash not in known-bad list ✅
-> 5. Write file to S3, immediately verify: Re-hash from S3 → Matches `sha256:def456...` ✅ (storage integrity confirmed)
-> 6. Record Prometheus metrics: `hash_calculation_latency{document_type="deed",file_size_bucket="100-500MB"} 2.1`, `hash_verifications_total{status="success"}++`
-> 7. Log structured JSON: `{"trace_id":"abc-123","operation":"hash_calculate","hash":"sha256:def456...","size_bytes":209715200,"latency_ms":2100,"verification":"passed"}`
->
-> 10 years later, compliance audit retrieves deed. `verifyHash()` re-hashes from S3 → Hash mismatch! (`sha256:def456...` expected, got `sha256:xyz999...`) → File quarantined to `s3://bank-quarantine/corrupted/`, alert fired: "P1: Integrity failure on deed #12345, possible bit rot or tampering". Compliance officer investigates → S3 bit rot detected → Restores from backup → Re-verifies hash → Passes.
-
----
-
-**Key Insight:** The same `HashCalculator` interface (`calculateHash`, `verifyHash`) works across all 3 profiles. Personal use stays in-memory for simplicity; Small business adds streaming for large files; Enterprise always streams with double verification and malware checks for compliance.
+**No Further Tiers:**
+- Scale horizontally (parallel hash calculations)
 
 ---
 
@@ -177,254 +426,67 @@ type Hash = string  // Format: "sha256:hexdigest"
 
 ---
 
-## Implementation
+## Behavior Specifications
 
-### In-Memory (Small Files)
+### 1. Streaming Hash Calculation
 
-```python
-import hashlib
+**Property**: O(chunk_size) memory usage regardless of file size
 
-class HashCalculator:
-    def __init__(self, algorithm: str = "sha256"):
-        self.algorithm = algorithm
+**Guarantees:**
+- No OOM errors for large files
+- Incremental hash updates
+- Same hash as in-memory for same content
 
-    def calculate_hash(self, content: bytes) -> str:
-        hasher = hashlib.sha256()
-        hasher.update(content)
-        digest = hasher.hexdigest()
-        return f"sha256:{digest}"
-```
+### 2. Hash Format
 
----
+**Format**: `algorithm:hexdigest`
 
-### Streaming (Large Files)
-
-```python
-def calculate_hash_streaming(self, stream: BinaryIO, chunk_size: int = 8192) -> str:
-    """
-    Calculate hash without loading entire file into memory.
-
-    Memory usage: O(chunk_size) regardless of file size
-    """
-    hasher = hashlib.sha256()
-
-    while True:
-        chunk = stream.read(chunk_size)
-        if not chunk:
-            break
-        hasher.update(chunk)
-
-    digest = hasher.hexdigest()
-    return f"sha256:{digest}"
-```
-
-**Example usage:**
-
-```python
-with open("large_file.pdf", "rb") as f:
-    hash = calculator.calculate_hash_streaming(f)
-```
-
----
-
-### Multipart Upload (HTTP Streaming)
-
-```python
-def calculate_hash_from_request(request: HTTPRequest) -> str:
-    """
-    Calculate hash during upload (before saving to disk).
-    """
-    hasher = hashlib.sha256()
-
-    for chunk in request.iter_content(chunk_size=8192):
-        hasher.update(chunk)
-
-    return f"sha256:{hasher.hexdigest()}"
-```
-
----
-
-## Configuration
-
-```yaml
-hash_calculator:
-  algorithm: "sha256"  # or "sha512", "blake2b"
-  chunk_size_kb: 8
-  verify_on_retrieve: true  # Re-hash on retrieval to detect corruption
-```
-
----
-
-## Performance Characteristics
-
-| File Size | In-Memory | Streaming | Notes |
-|-----------|-----------|-----------|-------|
-| 1MB | 5ms | 10ms | Overhead of chunking |
-| 10MB | 50ms | 60ms | In-memory starts thrashing |
-| 100MB | OOM risk | 600ms | Streaming wins |
-| 1GB | ❌ Crash | 6s | Only streaming viable |
-
-**Recommendation**: Always use streaming for files > 10MB
-
----
-
-## Algorithm Comparison
-
-| Algorithm | Digest Length | Speed | Collision Resistance |
-|-----------|---------------|-------|----------------------|
-| SHA-256 | 64 hex chars | Fast | Excellent (2^256) |
-| SHA-512 | 128 hex chars | Slower | Excellent (2^512) |
-| BLAKE2b | 128 hex chars | Fastest | Excellent |
-| MD5 | 32 hex chars | Very fast | ❌ Broken (collisions found) |
-
-**Recommendation**: SHA-256 (standard, well-tested, fast enough)
-
----
-
-## Testing
-
-```python
-def test_consistent_hashing():
-    content = b"hello world"
-
-    hash1 = calculator.calculate_hash(content)
-    hash2 = calculator.calculate_hash(content)
-
-    assert hash1 == hash2
-
-def test_streaming_matches_in_memory():
-    content = b"test data" * 10000  # 90KB
-
-    in_memory_hash = calculator.calculate_hash(content)
-
-    stream = BytesIO(content)
-    streaming_hash = calculator.calculate_hash_streaming(stream)
-
-    assert in_memory_hash == streaming_hash
-
-def test_known_hash():
-    # Verify against known SHA-256 hash
-    content = b"The quick brown fox jumps over the lazy dog"
-    expected = "sha256:d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592"
-
-    assert calculator.calculate_hash(content) == expected
-```
-
----
-
-## Security Considerations
-
-### 1. Collision Resistance
-
-**SHA-256**: No practical collisions known (as of 2025)
-
-**Attack scenario**: Attacker uploads File A (malicious), gets hash H. Later uploads File B (benign) engineered to have same hash H.
-
-**Mitigation**: SHA-256 collision resistance makes this computationally infeasible (2^128 operations).
-
-### 2. Hash as Capability
-
-**Risk**: If hash is exposed publicly, anyone with hash can retrieve content.
-
-**Mitigation**: Don't expose `file_hash` in public API. Use `upload_id` + access control.
-
----
-
-## Extension Points
-
-### Multi-Algorithm Support
-
-```python
-class MultiHashCalculator(HashCalculator):
-    def calculate_hash(self, content: bytes) -> Dict[str, str]:
-        return {
-            "sha256": self._sha256(content),
-            "blake2b": self._blake2b(content)
-        }
-```
-
-**Use case**: Future-proofing (if SHA-256 broken, have backup hash)
-
----
-
-## Multi-Domain Applicability
-
-This primitive constructs verifiable truth about **content identity through cryptographic hashing** - a universal concept across ALL domains:
-
-**Finance Domain:**
-- Dedupe uploaded statements
-- Verify transaction document integrity
-
-**Healthcare Domain:**
-- Dedupe lab results, medical images
-- Verify patient record integrity (HIPAA)
-
-**Legal Domain:**
-- Verify document integrity (chain of custody)
-- Detect tampering in evidence files
-
-**Research Domain (RSRCH - Utilitario):**
-- Verify integrity of scraped web pages (detect if TechCrunch article changed)
-- Detect duplicate podcast transcripts (same Lex Fridman episode scraped twice)
-- Ensure reproducibility of fact extraction (same source hash → same facts)
-
-**Software Development:**
-- Verify build artifacts
-- Detect code changes (Git uses SHA-1 hashing)
-
-**Digital Forensics:**
-- Evidence integrity verification
-- Timeline reconstruction
-
-**Generic Systems:**
-- Any file deduplication system
-- Any system requiring tamper detection
-- Any system needing content-addressable storage
+**Examples:**
+- `sha256:abc123...` (64 hex chars)
+- `blake2b:def456...` (128 hex chars)
 
 ---
 
 ## Domain Validation
 
 ### ✅ Finance (Primary Instantiation)
-**Use case:** Deduplicate uploaded bank statements and verify document integrity
-**Example:** User uploads "bofa_jan2024.pdf" (2.5MB) → HashCalculator.calculate_hash_streaming(file_stream, chunk_size=8192) → Returns "sha256:abc123..." (calculated in 50ms, O(8KB) memory) → StorageEngine checks if hash exists → Finds duplicate (same statement uploaded from mobile + desktop) → Returns existing ref, saves 2.5MB storage → Later user retrieves statement → HashCalculator.verifyHash() re-calculates hash → Matches stored hash → No corruption detected
-**Operations:** calculate_hash_streaming (memory-efficient for large PDFs), verifyHash (integrity check on retrieval), deduplication (same hash = same content)
-**Performance:** <50ms for 10MB PDF (streaming), <600ms for 100MB file, O(chunk_size) memory regardless of file size
+**Use case:** Calculate hash for uploaded bank statement PDFs (deduplication + integrity)
+**Example:** User uploads "BoFA_Oct2024.pdf" (2.3MB) → Hash calculated `sha256:abc123...` → Stored with hash → Later upload of same file → Same hash calculated → Dedupe detected
 **Status:** ✅ Fully implemented in personal-finance-app
 
 ### ✅ Healthcare
-**Use case:** Deduplicate medical images (DICOM files) and verify integrity for HIPAA compliance
-**Example:** Hospital uploads chest X-ray DICOM (15MB) → HashCalculator.calculate_hash_streaming() calculates SHA-256 (150ms) → Returns "sha256:xyz789..." → Same X-ray uploaded from radiologist workstation + patient portal → Hash matches → Storage dedupe saves 15MB → 6 months later, audit retrieves image → HashCalculator.verifyHash() re-hashes → Mismatch detected → Image corrupted → Alert fired for re-upload (HIPAA integrity requirement)
-**Operations:** Streaming critical for DICOM files (15-500MB), integrity verification (detect corruption, required by HIPAA), collision resistance (SHA-256 ensures 2 different images never have same hash)
-**Performance:** <1.5s for 150MB DICOM file (streaming, 8KB chunks)
+**Use case:** Calculate hash for medical images (DICOM integrity verification)
+**Example:** Hospital uploads X-ray DICOM (15MB) → Hash calculated → Stored → Later retrieval → Hash verified → Detects any corruption/tampering
 **Status:** ✅ Conceptually validated
 
 ### ✅ Legal
-**Use case:** Verify document integrity for chain of custody (evidence admissibility)
-**Example:** Attorney uploads signed contract PDF (500KB) → HashCalculator.calculate_hash() returns "sha256:def456..." → Hash stored in ProvenanceLedger with timestamp "2024-10-25T10:30:00Z" → 3 months later, opposing counsel questions document authenticity → HashCalculator.verifyHash() re-hashes contract → Matches stored hash → Proves document unchanged since upload (chain of custody intact) → Hash admitted as evidence of integrity
-**Operations:** Hash as tamper detection (any byte change → different hash), provenance tracking (hash + timestamp = proof of integrity at time T), collision resistance critical for legal admissibility (SHA-256 accepted by courts)
-**Performance:** <5ms for 500KB PDF (in-memory hashing)
+**Use case:** Calculate hash for contracts (chain of custody verification)
+**Example:** Attorney uploads signed contract → Hash calculated → Immutable proof of content → Later verification confirms no modifications
 **Status:** ✅ Conceptually validated
 
 ### ✅ RSRCH (Utilitario Research)
-**Use case:** Verify integrity of scraped web pages and detect duplicate podcast transcripts
-**Example:** Scraper downloads TechCrunch article HTML (120KB) → HashCalculator.calculate_hash(html_bytes) → Returns "sha256:ghi789..." → Week later, fact extraction job retries → Article re-scraped → Hash calculated → Matches existing hash → Scraper skips re-download (deduplication saves bandwidth) → 2 weeks later, article updated (author added correction) → New hash "sha256:jkl012..." → Scraper detects content change → Re-extracts facts (fact extraction reproducibility: same source hash → same facts extracted)
-**Operations:** Deduplication critical for multi-source scraping (same article scraped from RSS feed + web crawler → stored once), change detection (article updated → new hash triggers re-extraction), reproducibility (given hash H, can reconstruct which facts came from which version of source)
-**Performance:** <5ms for 120KB HTML (in-memory), <20ms for large podcast transcript (200KB)
+**Use case:** Calculate hash for scraped articles (deduplication across sources)
+**Example:** Scraper downloads article from multiple sources → Same content → Same hash → Single storage
 **Status:** ✅ Conceptually validated
 
 ### ✅ E-commerce
-**Use case:** Deduplicate product images across variants and verify catalog integrity
-**Example:** Catalog uploads "iPhone15ProMax_Blue.jpg" (3MB) → HashCalculator.calculate_hash_streaming() → Returns "sha256:mno345..." → Later uploads "iPhone15ProMax_Natural.jpg" → Same image (color name changed, image identical) → Hash matches → Storage dedupe saves 3MB → Merchant bulk updates catalog (5,000 products) → Post-upload verification re-hashes all images → 3 images have hash mismatches → Corruption detected during transfer → Re-upload triggered
-**Operations:** Streaming for large product images (3-10MB), deduplication across SKU variants (same image used for multiple colors → stored once), bulk integrity verification (detect corruption in batch uploads)
-**Performance:** <60ms for 3MB product image (streaming), <600ms for 10MB video demo
+**Use case:** Calculate hash for product images (deduplication across variants)
+**Example:** Same product image used for blue/red variants → Same hash → Single storage
 **Status:** ✅ Conceptually validated
 
 **Validation Status:** ✅ **5 domains validated** (1 fully implemented, 4 conceptually verified)
-**Domain-Agnostic Score:** 100% (SHA-256 hashing is universal cryptographic primitive, no domain-specific code)
-**Reusability:** High (same calculate_hash/verify operations work for PDFs, DICOM images, legal contracts, HTML pages, product images; algorithm and chunk size are configurable)
+**Domain-Agnostic Score:** 100% (hash calculation is universal, no domain-specific logic)
+**Reusability:** High (same interface works for any binary content)
 
 ---
 
-**Last Updated**: 2025-10-22
+## Related Primitives
+
+- `StorageEngine`: Uses HashCalculator for content-addressable storage
+- `FileArtifact`: Stores hash as dedupe key
+- `ProvenanceLedger`: References hash for immutability
+
+---
+
+**Last Updated**: 2025-10-27
 **Maturity**: Spec complete, ready for implementation
