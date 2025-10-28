@@ -1,12 +1,12 @@
 # Phase 5: Refactoring Progress Report
 
-**Status:** In Progress (13/33 primitives complete - 39%)
+**Status:** In Progress (15/33 primitives complete - 45%)
 **Started:** 2025-10-27
 **Pattern:** Literate programming style with Spanish narrative + English code
 
 ---
 
-## Completed Primitives (13/33 - 39%)
+## Completed Primitives (15/33 - 45%)
 
 ### API/Auth System (8/8 complete ✅)
 
@@ -60,7 +60,7 @@
 
 ---
 
-### Truth Construction (5/9 complete)
+### Truth Construction (7/9 complete)
 
 9. ✅ **IndexStrategy** (commit e06ffb5)
    - Personal (0 LOC): Table-scan 8ms suficiente
@@ -86,20 +86,30 @@
    - Enterprise (900 LOC): Elasticsearch, distributed tracing, Prometheus
    - Expansion: 904 lines → 612 lines (condensed)
 
-13. ✅ **ParserRegistry** (commit pending)
+13. ✅ **ParserRegistry** (commit 120a31d)
    - Personal (30 LOC): Hardcoded dict (1 parser)
    - Small Business (120 LOC): YAML config (8 parsers)
    - Enterprise (800 LOC): PostgreSQL, versioning, canary deployments
    - Expansion: 783 lines → 532 lines (condensed)
 
+14. ✅ **ParserVersionManager** (commit bc0ff14)
+   - Personal (0 LOC): Always use latest (no versioning)
+   - Small Business (80 LOC): YAML version pinning
+   - Enterprise (650 LOC): PostgreSQL, auto-rollback, compatibility matrix
+   - Expansion: 861 lines → 635 lines (condensed)
+
+15. ✅ **TransactionQuery** (commit pending)
+   - Personal (0 LOC): Write SQL directly (5-10 lines)
+   - Small Business (120 LOC): Query builder, multi-filter, OFFSET pagination
+   - Enterprise (600 LOC): Cursor pagination, JSON DSL, query caching
+   - Expansion: 937 lines → 847 lines (condensed)
+
 ---
 
-## Pending Primitives (20/33 - 61%)
+## Pending Primitives (18/33 - 55%)
 
-### Truth Construction (4 primitives remaining)
+### Truth Construction (2 primitives remaining)
 - ⏳ ValidationEngine
-- ⏳ ParserVersionManager
-- ⏳ TransactionQuery
 - ⏳ ParserSelector
 
 ### Audit System (5 primitives)
@@ -214,26 +224,26 @@ primitive_name:
 
 ## Estimated Remaining Effort
 
-- Average condensation: ~31% reduction (based on 5 condensed primitives)
-- Remaining primitives: 20
-- Estimated lines: 20 × 250 = 5,000 lines
-- Estimated time: 60 hours (3 hours per primitive)
+- Average condensation: ~25% reduction (based on 7 condensed primitives)
+- Remaining primitives: 18
+- Estimated lines: 18 × 250 = 4,500 lines
+- Estimated time: 54 hours (3 hours per primitive)
 
 ---
 
 **Status Summary:**
-- ✅ Pattern established and validated (13 primitives)
+- ✅ Pattern established and validated (15 primitives)
 - ✅ API/Auth system complete (8/8 primitives - 100%)
-- ✅ Truth Construction in progress (5/9 - 56%)
-- ✅ Average ~31% condensation per primitive
-- ⏳ 20 primitives await systematic application
+- ✅ Truth Construction in progress (7/9 - 78%)
+- ✅ Average ~25% condensation per primitive
+- ⏳ 18 primitives await systematic application
 - ⏳ Consistency review pending
 
 **Session Achievements:**
-- 17 commits pushed to GitHub successfully (pending)
-- 13 primitives refactored (~3,300 lines added)
+- 19 commits pushed to GitHub successfully (pending)
+- 15 primitives refactored (~3,850 lines added)
 - Pattern fully documented and replicable
-- ParserRegistry condensed (783 → 532 lines, -32%)
+- TransactionQuery condensed (937 → 847 lines, -10%)
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
